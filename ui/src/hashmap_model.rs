@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use std::{cell::RefCell, collections::HashMap};
 
-use slint::{Model, ModelNotify};
+use slint::{Model, ModelNotify, ModelTracker};
 
 /// A [`Model`] backed by `HashMap<K, V>`, using interior mutability.
 pub struct HashMapModel<K, V> {
@@ -10,6 +10,7 @@ pub struct HashMapModel<K, V> {
     notify: ModelNotify,
 }
 
+// TODO: entry()やand_modify()など？
 impl<K: Eq + Hash + Clone, V: Clone> HashMapModel<K, V> {
     pub fn new() -> Self {
         Self {
@@ -65,7 +66,7 @@ impl<K: Eq + Hash + Clone, V: Clone> Model for HashMapModel<K, V> {
             .and_then(|k| self.inner.borrow().get(k).cloned())
     }
 
-    fn model_tracker(&self) -> &dyn slint::ModelTracker {
+    fn model_tracker(&self) -> &dyn ModelTracker {
         &self.notify
     }
 }
