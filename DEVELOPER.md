@@ -4,7 +4,7 @@
 - Small components should not access Adapters directory. Use `in property` instead.
 
 - データの流れ：ユーザーアクション -> Adapterのコールバック -> update(Msg)で状態を更新 -> 派生状態も更新(自前で実装するかSlintのMapModelを使うかは未定)。
-- Observerを雑に使わない。データの流れを見づらくなるため。SlintのModelがやるように、型の内部に隠蔽する。
+- Observerを雑に使わない。データの流れを見づらくなるため。SlintのModelがやるように、型の内部に隠蔽して宣言的にできるようにする。
 - コンポーネント内でしか使わないローカルな状態はSlint内で完結させる。
 - Rust側で持つ状態を使いたい場合はAdapterのin propertyを使う。
 - Adapterでout propertyは使わない。
