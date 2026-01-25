@@ -46,9 +46,13 @@ macro_rules! declare_id_newtype {
 }
 
 mod readonly {
-    use std::sync::{Arc, RwLock, RwLockReadGuard};
+    use std::{
+        cell::RefCell,
+        rc::Rc,
+        sync::{Arc, RwLock, RwLockReadGuard},
+    };
     /// Read-only access to [`Arc<RwLock<T>>`].
-    pub struct ReadOnly<T>(Arc<RwLock<T>>);
+    pub struct ArcView<T>(Arc<RwLock<T>>);
 
     impl<T> Clone for ReadOnly<T> {
         /// Cheap clone(same as [`Arc::clone()`]).
@@ -59,7 +63,7 @@ mod readonly {
         }
     }
 
-    impl<T> ReadOnly<T> {
+    impl<T> ArcView<T> {
         pub fn new(value: Arc<RwLock<T>>) -> Self {
             Self(value)
         }
@@ -68,9 +72,31 @@ mod readonly {
             self.0.read().unwrap()
         }
     }
+
+    /// Read-only facade of `Rc<RefCell<T>>`.
+    ///
+    /// `Arc` version of this is [`ArcView`].
+    pub struct RcView<T>(Rc<RefCell<T>>);
+
+    impl<T> RcView<T> {
+        pub fn new(value: Rc<RefCell<T>>) -> Self {
+            Self(value)
+        }
+
+        pub fn borrow(&self) -> std::cell::Ref<'_, T> {
+            self.0.borrow()
+        }
+    }
+
+    impl<T> Clone for RcView<T> {
+        /// Cheap clone(same as [`Rc::clone()`]).
+        fn clone(&self) -> Self {
+            RcView(Rc::clone(&self.0))
+        }
+    }
 }
 
-pub use readonly::ReadOnly;
+pub use readonly::{ArcView, RcView};
 
 pub mod engine;
 pub mod fixture;
