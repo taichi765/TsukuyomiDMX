@@ -1,6 +1,6 @@
 use super::helpers::{make_doc_handle_with_observer, make_fixture, make_fixture_def_with_mode};
 use crate::{
-    doc::{DocEvent, DocStore, FixtureDefNotFound, ResolveError},
+    doc::{DocEvent, DocState, FixtureDefNotFound, ResolveError},
     fixture::MergeMode,
     fixture_def::ChannelKind,
     universe::{DmxAddress, UniverseId},
@@ -10,7 +10,7 @@ use crate::{
 
 #[test]
 fn insert_fixture_def_allows_resolution() {
-    let mut doc = DocStore::new();
+    let mut doc = DocState::new();
 
     // prepare a fixture def with one mode and one channel
     let def = make_fixture_def_with_mode(
@@ -50,7 +50,7 @@ fn insert_fixture_def_allows_resolution() {
 
 #[test]
 fn remove_fixture_def_breaks_resolution() {
-    let mut doc = DocStore::new();
+    let mut doc = DocState::new();
 
     // prepare and insert fixture def
     let def = make_fixture_def_with_mode(
@@ -89,7 +89,7 @@ fn remove_fixture_def_breaks_resolution() {
 
 #[test]
 fn remove_nonexistent_fixture_def_returns_none() {
-    let mut doc = DocStore::new();
+    let mut doc = DocState::new();
 
     // random UUID via a dummy def: create and drop to get a valid id, then remove twice
     let def = make_fixture_def_with_mode(
