@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use bimap::BiHashMap;
 use thiserror::Error;
 
-use crate::fixture::MergeMode;
+use crate::{fixture::MergeMode, prelude::DmxAddress};
 
 declare_id_newtype!(FixtureDefId);
 
+#[derive(Debug, Clone)]
 pub struct FixtureDef {
     id: FixtureDefId,
     manufacturer: String,
@@ -39,12 +40,12 @@ impl FixtureDef {
         &self.model
     }
 
-    pub fn modes(&self) -> &HashMap<String, FixtureMode> {
-        &self.modes
+    pub fn mode(&self, name: &str) -> Option<&FixtureMode> {
+        self.modes.get(name)
     }
 
-    pub fn channel_templates(&self) -> &HashMap<String, ChannelDef> {
-        &self.channel_templates
+    pub fn channel_template(&self, name: &str) -> Option<&ChannelDef> {
+        self.channel_templates.get(name)
     }
 
     // TODO: バリデーション
@@ -91,6 +92,7 @@ pub enum DuplicatedError {
     },
 }
 
+#[derive(Debug, Clone)]
 pub struct FixtureMode {
     channel_order: BiHashMap<String, usize>,
 }
@@ -150,6 +152,13 @@ impl FixtureMode {
         self.channel_order.len()
     }
 
+    pub fn occupied_addresses(
+        &self,
+        start_address: DmxAddress,
+    ) -> impl Iterator<Item = DmxAddress> {
+        AddressIter::new(start_address, self.footprint())
+    }
+
     pub fn get_offset_by_channel(&self, channel: &str) -> Option<usize> {
         self.channel_order.get_by_left(channel).map(|n| *n)
     }
@@ -159,6 +168,40 @@ impl FixtureMode {
     }
 }
 
+pub struct AddressIter {
+    start_address: DmxAddress,
+    footprint: usize,
+    count: usize,
+}
+
+impl AddressIter {
+    fn new(start_address: DmxAddress, footprint: usize) -> Self {
+        Self {
+            start_address,
+            footprint,
+            count: 0,
+        }
+    }
+}
+
+impl Iterator for AddressIter {
+    type Item = DmxAddress;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.count >= self.footprint {
+            None
+        } else {
+            let ret = self
+                .start_address
+                .checked_add(self.count)
+                .expect("これはsafe?");
+            self.count += 1;
+            Some(ret)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ChannelDef {
     merge_mode: MergeMode,
     kind: ChannelKind,
@@ -179,6 +222,7 @@ impl ChannelDef {
 }
 
 // TODO: Add more kinds
+#[derive(Debug, Clone)]
 pub enum ChannelKind {
     Dimmer,
     Red,
