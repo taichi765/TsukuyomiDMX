@@ -80,13 +80,13 @@ pub enum ValidateError {
 /// Internal error type for [`ValidateError`]
 #[derive(Debug, Error)]
 #[error(
-    "address conflicted: channel {old_offset} of fixture {old_fixture_id:?}\
+    "address conflicted: channel {existing_offset} of fixture {existing_fixture_id:?}\
     and channel {new_offset} of fixture {new_fixture_id:?}"
 )]
 pub struct AddressConflictedError {
     pub address: DmxAddress,
-    pub old_fixture_id: FixtureId,
-    pub old_offset: usize,
+    pub existing_fixture_id: FixtureId,
+    pub existing_offset: usize,
     pub new_fixture_id: FixtureId,
     pub new_offset: usize,
 }
