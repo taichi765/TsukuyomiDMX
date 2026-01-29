@@ -1,8 +1,5 @@
-use uuid::Uuid;
-
 use crate::{
-    doc::ModeNotFound,
-    fixture_def::{FixtureDef, FixtureDefId},
+    fixture_def::FixtureDefId,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -26,6 +23,7 @@ pub struct Fixture {
     x: f32,
     y: f32,
 }
+
 // TODO: modeが一つ以上あることを保証
 impl Fixture {
     pub fn new(
@@ -81,28 +79,21 @@ impl Fixture {
         self.y
     }
 
-    /// Number of channels in the current mode.
-    pub fn footprint(&self, fixture_def: &FixtureDef) -> Result<usize, ModeNotFound> {
-        let mode_name = self.fixture_mode();
-        let mode = fixture_def.modes().get(mode_name).ok_or(ModeNotFound {
-            fixture_def: fixture_def.id(),
-            mode: String::from(mode_name),
-        })?;
-        Ok(mode.footprint())
+    pub fn pos(&self) -> (f32, f32) {
+        (self.x, self.y)
     }
 
-    /// Enumerates all addresses occupied by this [Fixture].
-    pub fn occupied_addresses(
-        &self,
-        fixture_def: &FixtureDef,
-    ) -> Result<Vec<DmxAddress>, ModeNotFound> {
-        let footprint = self.footprint(fixture_def)?;
-        let address_base = self.address();
-        let mut addresses = Vec::new();
-        for i in 0..footprint {
-            addresses.push(address_base.checked_add(i).expect("address overflow"));
+    pub(crate) fn apply_change(&mut self, change: FixtureChange) {
+        match change {
+            FixtureChange::Rename(name) => self.name = name,
+            FixtureChange::Universe(uni) => self.universe_id = uni,
+            FixtureChange::Address(adr) => self.address = adr,
+            FixtureChange::Mode(mode) => self.fixture_mode = mode,
+            FixtureChange::Position(x, y) => {
+                self.x = x;
+                self.y = y;
+            }
         }
-        Ok(addresses)
     }
 }
 
@@ -117,6 +108,32 @@ impl Default for Fixture {
             fixture_mode: "mode".to_string(),
             x: 0.,
             y: 0.,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FixtureChange {
+    Rename(String),
+    Universe(UniverseId),
+    Address(DmxAddress),
+    // TODO: 必要か？　FixtureDef(FixtureDefId),
+    Mode(String),
+    Position(f32, f32),
+}
+
+impl FixtureChange {
+    /// 逆操作を生成する
+    pub(crate) fn inverse_from(&self, fixture: &Fixture) -> FixtureChange {
+        match self {
+            FixtureChange::Rename(_) => FixtureChange::Rename(fixture.name().to_string()),
+            FixtureChange::Universe(_) => FixtureChange::Universe(fixture.universe_id()),
+            FixtureChange::Address(_) => FixtureChange::Address(fixture.address()),
+            FixtureChange::Mode(_) => FixtureChange::Mode(fixture.fixture_mode().to_string()),
+            FixtureChange::Position(_, _) => {
+                let (x, y) = fixture.pos();
+                FixtureChange::Position(x, y)
+            }
         }
     }
 }
