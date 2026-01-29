@@ -45,73 +45,17 @@ macro_rules! declare_id_newtype {
     };
 }
 
-mod readonly {
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        sync::{Arc, RwLock, RwLockReadGuard},
-    };
-    /// Read-only access to [`Arc<RwLock<T>>`].
-    pub struct ArcView<T>(Arc<RwLock<T>>);
-
-    impl<T> Clone for ReadOnly<T> {
-        /// Cheap clone(same as [`Arc::clone()`]).
-        ///
-        /// `ReadOnly::clone(&self)` is recommended over `self.clone()` as same as [`Arc::clone()`].
-        fn clone(&self) -> Self {
-            ReadOnly(Arc::clone(&self.0))
-        }
-    }
-
-    impl<T> ArcView<T> {
-        pub fn new(value: Arc<RwLock<T>>) -> Self {
-            Self(value)
-        }
-
-        pub fn read(&self) -> RwLockReadGuard<'_, T> {
-            self.0.read().unwrap()
-        }
-    }
-
-    /// Read-only facade of `Rc<RefCell<T>>`.
-    ///
-    /// `Arc` version of this is [`ArcView`].
-    pub struct RcView<T>(Rc<RefCell<T>>);
-
-    impl<T> RcView<T> {
-        pub fn new(value: Rc<RefCell<T>>) -> Self {
-            Self(value)
-        }
-
-        pub fn borrow(&self) -> std::cell::Ref<'_, T> {
-            self.0.borrow()
-        }
-    }
-
-    impl<T> Clone for RcView<T> {
-        /// Cheap clone(same as [`Rc::clone()`]).
-        fn clone(&self) -> Self {
-            RcView(Rc::clone(&self.0))
-        }
-    }
-}
-
-pub use readonly::{ArcView, RcView};
-
+pub mod doc;
 pub mod engine;
 pub mod fixture;
+pub mod fixture_def;
 pub mod functions;
 pub mod plugins;
-//pub mod qxw_loader;
-pub mod command_manager;
-pub mod commands;
-pub mod doc;
-pub mod fixture_def;
 pub mod universe;
 
 pub mod prelude {
     pub use super::{
-        doc::{DocStore, OutputPluginId},
+        doc::{Doc, OutputPluginId},
         fixture::{Fixture, FixtureId, MergeMode},
         fixture_def::{ChannelDef, ChannelKind, FixtureDef, FixtureDefId, FixtureMode},
         functions::FunctionId,
