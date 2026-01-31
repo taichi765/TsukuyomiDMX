@@ -7,7 +7,7 @@ use crate::doc::{state::DocState, DocEffect};
 
 pub trait DocCommand {
     /// 逆コマンドを返す。
-    fn apply(self, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
+    fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
 }
 
 mod fixtures {
@@ -26,7 +26,7 @@ mod fixtures {
     }
 
     impl DocCommand for AddFixtureCommand {
-        fn apply(self, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let id = self.fixture.id();
             state.with_fixtures_mut(|it| it.insert(id, self.fixture));
             (
@@ -48,7 +48,7 @@ mod fixtures {
     }
 
     impl DocCommand for UpdateFixtureCommand {
-        fn apply(self, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let rev_change = state.with_fixtures(|it| {
                 let fxt = it.get(&self.id).unwrap();
                 self.change.inverse_from(fxt)
@@ -76,7 +76,7 @@ mod fixtures {
     }
 
     impl DocCommand for RemoveFixtureCommand {
-        fn apply(self, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let removed = state.with_fixtures_mut(|it| it.remove(&self.id).unwrap());
             (
                 Box::new(AddFixtureCommand::new(removed)),
