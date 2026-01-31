@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     doc::{OutputMapError, OutputPluginId, ResolveError, ResolvedAddress, UniverseSetting},
@@ -12,9 +12,9 @@ use crate::{
 /// Maybe similar to DB in web apps.
 /// -- it's just a data structure and validating is [`decider`]'s responsibility as same as application server in web apps.
 pub struct DocState {
-    fixtures: Rc<RefCell<HashMap<FixtureId, Fixture>>>,
-    fixture_defs: Rc<RefCell<HashMap<FixtureDefId, FixtureDef>>>,
-    functions: Rc<RefCell<HashMap<FunctionId, FunctionData>>>,
+    fixtures: RefCell<HashMap<FixtureId, Fixture>>,
+    fixture_defs: RefCell<HashMap<FixtureDefId, FixtureDef>>,
+    functions: RefCell<HashMap<FunctionId, FunctionData>>,
     universe_settings: HashMap<UniverseId, UniverseSetting>,
 
     fixture_by_address_index: HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
@@ -24,9 +24,9 @@ pub struct DocState {
 impl DocState {
     pub fn new() -> Self {
         Self {
-            fixtures: Rc::new(RefCell::new(HashMap::new())),
-            fixture_defs: Rc::new(RefCell::new(HashMap::new())),
-            functions: Rc::new(RefCell::new(HashMap::new())),
+            fixtures: RefCell::new(HashMap::new()),
+            fixture_defs: RefCell::new(HashMap::new()),
+            functions: RefCell::new(HashMap::new()),
             universe_settings: HashMap::new(),
 
             fixture_by_address_index: HashMap::new(),

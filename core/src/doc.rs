@@ -1,15 +1,20 @@
 mod errors;
 pub use errors::*;
 mod commands;
+pub use commands::*;
 mod decider;
 mod state;
+pub use state::DocState;
+mod def_registry;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
-    doc::{commands::DocCommand, state::DocState},
     fixture::{Fixture, FixtureChange, FixtureId, MergeMode},
-    fixture_def::{FixtureDef, FixtureDefId},
+    fixture_def::FixtureDefId,
     functions::{FunctionData, FunctionId},
     universe::{DmxAddress, UniverseId},
 };
@@ -18,10 +23,10 @@ declare_id_newtype!(OutputPluginId);
 
 /// Facade of [`DocState`].
 ///
-/// Orchestrates [`decider`], [`DocState::evolve()`], [`EventStore::append()`] etc.
+/// Orchestrates `decider`, `commands`, `subscribers` etc.
 /// This is in application layer.
 pub struct Doc {
-    state: DocState,
+    state: Arc<DocState>,
     subscribers: Vec<Box<dyn Fn(&DocEffect)>>,
     undo_stack: Vec<Box<dyn DocCommand>>,
     redo_stack: Vec<Box<dyn DocCommand>>,
@@ -32,7 +37,7 @@ pub struct Doc {
 impl Doc {
     pub fn new() -> Self {
         Self {
-            state: DocState::new(),
+            state: Arc::new(DocState::new()),
             subscribers: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -40,6 +45,11 @@ impl Doc {
         }
     }
 
+    pub fn states(&self) -> Arc<DocState> {
+        Arc::clone(&self.state)
+    }
+
+    /// Undo.
     pub fn undo(&mut self) {
         let cmd = self
             .undo_stack
@@ -50,6 +60,7 @@ impl Doc {
         self.subscribers.iter().for_each(|f| f(&effect));
     }
 
+    /// Redo.
     pub fn redo(&mut self) {
         let cmd = self
             .redo_stack
@@ -93,18 +104,6 @@ impl Doc {
         let cmd = decider::remove_fixture(self.state.as_view(), id)?;
         self.apply_command(cmd);
         Ok(())
-    }
-
-    pub fn add_fixture_def(&mut self, _def: FixtureDef) -> Result<DocEffect, ()> {
-        todo!()
-    }
-
-    pub fn update_fixture_def(&mut self, _new: FixtureDef) -> Result<DocEffect, ()> {
-        todo!()
-    }
-
-    pub fn remove_fixture_def(&mut self, _id: &FixtureDefId) -> Result<DocEffect, ()> {
-        todo!()
     }
 
     pub fn add_function(&mut self, _value: FunctionData) -> Result<DocEffect, ()> {
@@ -185,7 +184,6 @@ mod tests {
     mod address_index;
     mod current_max_address;
     mod events;
-    mod fixture_defs;
     mod fixtures;
     mod functions;
     mod helpers;
