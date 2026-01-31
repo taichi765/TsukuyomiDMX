@@ -85,14 +85,6 @@ mod fixtures {
     }
 }
 
-mod defs {
-    pub struct AddFixtureDefCommand {}
-
-    pub struct UpdateFixtureDefCommand {}
-
-    pub struct RemoveFixtureDefCommand {}
-}
-
 mod functions {
     pub struct AddFunctionCommand {}
 
