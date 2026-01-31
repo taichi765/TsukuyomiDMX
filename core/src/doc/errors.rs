@@ -94,7 +94,5 @@ pub struct AddressConflictedError {
 #[derive(Debug, Error)]
 pub enum FixtureRemoveError {
     #[error(transparent)]
-    FixtureDefNotFound(#[from] FixtureDefNotFound),
-    #[error(transparent)]
-    ModeNotFound(#[from] ModeNotFound),
+    FixtureNotFound(#[from] FixtureNotFound),
 }

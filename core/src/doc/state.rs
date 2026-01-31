@@ -82,14 +82,6 @@ impl DocState {
         f(&mut fixtures)
     }
 
-    pub(super) fn with_fixture_defs_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<FixtureDefId, FixtureDef>) -> R,
-    {
-        let mut defs = self.fixture_defs.borrow_mut();
-        f(&mut defs)
-    }
-
     pub(super) fn with_functions_mut<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<FunctionId, FunctionData>) -> R,
