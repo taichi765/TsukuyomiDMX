@@ -1,10 +1,9 @@
-pub use defs::*;
 pub use fixtures::*;
 pub use functions::*;
 pub use plugins::*;
 pub use universes::*;
 
-use crate::doc::{DocEffect, state::DocState};
+use crate::doc::{state::DocState, DocEffect};
 
 pub trait DocCommand {
     /// 逆コマンドを返す。
@@ -32,7 +31,7 @@ mod fixtures {
             state.with_fixtures_mut(|it| it.insert(id, self.fixture));
             (
                 Box::new(RemoveFixtureCommand::new(id)),
-                DocEffect::FixtureAdded(self.id),
+                DocEffect::FixtureAdded(id),
             )
         }
     }
@@ -54,12 +53,14 @@ mod fixtures {
                 let fxt = it.get(&self.id).unwrap();
                 self.change.inverse_from(fxt)
             });
+
+            let id = self.id;
             state.with_fixtures_mut(|it| {
                 it.get_mut(&self.id).unwrap().apply_change(self.change);
             });
             (
-                Box::new(UpdateFixtureCommand::new(self.id, rev_change)),
-                DocEffect::FixtureUpdated(self.id),
+                Box::new(UpdateFixtureCommand::new(id, rev_change)),
+                DocEffect::FixtureUpdated(id),
             )
         }
     }

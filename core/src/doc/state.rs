@@ -10,7 +10,7 @@ use crate::{
 /// Single source of true.
 ///
 /// Maybe similar to DB in web apps.
-/// - Is just a data structure. Validating is [`decider`]'s responsibility as same as application server in web apps.
+/// -- it's just a data structure and validating is [`decider`]'s responsibility as same as application server in web apps.
 pub struct DocState {
     fixtures: Rc<RefCell<HashMap<FixtureId, Fixture>>>,
     fixture_defs: Rc<RefCell<HashMap<FixtureDefId, FixtureDef>>>,
@@ -33,7 +33,7 @@ impl DocState {
         }
     }
 
-    pub fn as_view(&self) -> DocStateView {
+    pub fn as_view(&self) -> DocStateView<'_> {
         DocStateView(self)
     }
 
