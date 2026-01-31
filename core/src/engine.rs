@@ -1,16 +1,16 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tracing::{error, info, trace, warn};
+use tracing::{info, trace, warn};
 use uuid::Uuid;
 
-use crate::doc::{DocStore, OutputPluginId, ResolvedAddress};
+use crate::doc::{DocState, OutputPluginId, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
 use crate::functions::{FunctionCommand, FunctionId, FunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
-use crate::readonly::ReadOnly;
 use crate::universe::UniverseId;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
+use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ const TICK_DURATION: Duration = Duration::from_millis(100);
 // TODO: unwrap, expectを減らす
 /// Orchestrates [`FunctionRuntime`]s
 pub struct Engine {
-    doc: ReadOnly<DocStore>,
+    doc: Arc<DocState>,
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
@@ -36,12 +36,12 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(
-        doc: ReadOnly<DocStore>,
+        doc: Arc<DocState>,
         command_rx: Receiver<EngineCommand>,
         message_tx: Sender<EngineMessage>,
     ) -> Self {
         Self {
-            doc: doc,
+            doc,
             command_rx,
             message_tx,
             active_runtimes: HashMap::new(),
@@ -126,9 +126,10 @@ impl Engine {
         let mut commands_list = Vec::new();
         {
             for (function_id, runtime) in &mut self.active_runtimes {
-                let doc = self.doc.read();
-                let data = doc.get_function_data(function_id).unwrap();
-                commands_list.append(&mut runtime.run(data, TICK_DURATION));
+                self.doc.with_functions(|it| {
+                    let data = it.get(function_id).expect("todo: これはsafe?");
+                    commands_list.append(&mut runtime.run(data, TICK_DURATION));
+                });
             }
         }
 
@@ -179,12 +180,11 @@ impl Engine {
 
     ///既にstartしてた場合は何もしない
     fn start_function(&mut self, function_id: FunctionId) {
-        let runtime = self
-            .doc
-            .read()
-            .get_function_data(&function_id)
-            .expect(format!("could not find function with id {}", function_id).as_str())
-            .create_runtime();
+        let runtime = self.doc.with_functions(|it| {
+            it.get(&function_id)
+                .expect("todo: エラー返す")
+                .create_runtime()
+        });
         self.active_runtimes.insert(function_id, runtime);
     }
 
@@ -193,8 +193,9 @@ impl Engine {
         self.active_runtimes.remove(&function_id);
     }
 
-    fn write_universe(&mut self, fixture_id: FixtureId, channel: &str, value: u8) {
-        match self.doc.read().resolve_address(fixture_id, channel) {
+    fn write_universe(&mut self, _fixture_id: FixtureId, _channel: &str, _value: u8) {
+        todo!("resolve_addressをどっかから取ってくる")
+        /*match self.doc.read().resolve_address(fixture_id, channel) {
             Ok((universe_id, address)) => {
                 let universe = self
                     .universe_states
@@ -216,10 +217,10 @@ impl Engine {
                     error!("engine: failed to send error: {}", send_err);
                 }
             }
-        }
+        }*/
     }
 
-    fn start_fade(&mut self, from_id: Uuid, to_id: Uuid, chaser_id: Uuid, duration: Duration) {
+    fn start_fade(&mut self, _from_id: Uuid, _to_id: Uuid, _chaser_id: Uuid, _duration: Duration) {
         //必要な値だけを取り出す
         /*let (from_values, to_values) = {
             let from_scene = self.get_function(from_id).as_ref();
@@ -256,7 +257,8 @@ impl Engine {
 
     // FIXME: universe_settingsごとプッシュ型の方がいいか？
     fn update_output_map_cache(&mut self) {
-        trace!("updating output map cache");
+        todo!()
+        /*trace!("updating output map cache");
         let doc = self.doc.read();
         let mut new_map: HashMap<OutputPluginId, Vec<UniverseId>> = HashMap::new();
         for (u_id, setting) in doc.universe_settings() {
@@ -270,7 +272,7 @@ impl Engine {
             });
         }
 
-        self.output_map_cache = new_map;
+        self.output_map_cache = new_map;*/
     }
 }
 
