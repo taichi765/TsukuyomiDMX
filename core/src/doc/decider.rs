@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use super::errors::*;
-use super::{DocEffect, state::DocStateView};
+use super::{state::DocStateView, DocEffect};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
 use crate::fixture::FixtureChange;
 use crate::functions::FunctionData;
