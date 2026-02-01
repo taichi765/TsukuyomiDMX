@@ -68,6 +68,16 @@ impl FixtureDef {
     }
 }
 
+impl TryFrom<ofl_schemas::Fixture> for FixtureDef {
+    type Error = FixtureDefConverseError;
+    fn try_from(_value: ofl_schemas::Fixture) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum FixtureDefConverseError {}
+
 #[derive(Debug, Error)]
 pub enum FixtureModeCreateError {
     #[error("{} offset are duplicated",.duplicates.len())]

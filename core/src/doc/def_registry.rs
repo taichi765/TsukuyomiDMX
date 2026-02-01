@@ -1,17 +1,16 @@
-use std::{
-    collections::HashMap,
-    fs::{self, File, read_dir},
-    io,
-    path::PathBuf,
-};
+use std::{cell::OnceCell, collections::HashMap, fs, io, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::prelude::{FixtureDef, FixtureDefId};
+use crate::{
+    fixture_def::FixtureDefConverseError,
+    prelude::{FixtureDef, FixtureDefId},
+};
 
 pub(super) trait FixtureDefRegistry {
-    fn contains_def(&self, id: &FixtureDefId) -> bool;
+    fn contains(&self, id: &FixtureDefId) -> bool;
     fn load(&mut self) -> Result<(), io::Error>;
+    fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError<'a>>;
 }
 
 /// ファイルからFixtureDefをロードしてキャッシュする
@@ -24,7 +23,7 @@ struct FixtureDefCatalogItem {
     manufacturer: String,
     model: String,
     path: PathBuf,
-    val: Option<FixtureDef>,
+    val: OnceCell<Result<FixtureDef, FixtureDefLoadError>>,
 }
 
 impl FixtureDefRegistryImpl {
@@ -34,22 +33,28 @@ impl FixtureDefRegistryImpl {
             defs: HashMap::new(),
         }
     }
-    pub fn get_def(&self, id: &FixtureDefId) -> Result<&FixtureDef, FixtureDefGetError> {
-        let item = self
-            .defs
-            .get(id)
-            .ok_or(FixtureDefGetError::FixtureDefNotFound(*id))?;
-        if let Some(val) = item.val {
-            return Ok(&val);
-        };
-
-        let file = File::open(item.path)?;
-    }
 }
 
 impl FixtureDefRegistry for FixtureDefRegistryImpl {
-    fn contains_def(&self, id: &FixtureDefId) -> bool {
+    fn contains(&self, id: &FixtureDefId) -> bool {
         self.defs.contains_key(id)
+    }
+
+    fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError<'a>> {
+        let item = self
+            .defs
+            .get(id)
+            .ok_or(FixtureDefLookupError::NotInCatalog(*id))?;
+
+        item.val
+            .get_or_init(|| {
+                let s = fs::read_to_string(&item.path)?;
+                let dto: ofl_schemas::Fixture = serde_json::from_str(&s)?;
+                FixtureDef::try_from(dto)
+                    .map_err(|e| FixtureDefLoadError::FixtureDefConverseFailed(e))
+            })
+            .as_ref()
+            .map_err(|e| FixtureDefLookupError::LoadFailed(e).to_owned())
     }
 
     fn load(&mut self) -> Result<(), io::Error> {
@@ -58,16 +63,22 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
     }
 }
 
-pub enum FixtureDefLoadError {
-    Def,
+#[derive(Debug, Error, Clone)]
+pub enum FixtureDefLookupError<'a> {
+    #[error(
+        "fixture def {0:?} not found in catalog. You can reload catalogs by calling FixtureDefRegitry::load()."
+    )]
+    NotInCatalog(FixtureDefId),
+    #[error("failed to load fixture def from file: {0:?}")]
+    LoadFailed(&'a FixtureDefLoadError),
 }
 
 #[derive(Debug, Error)]
-pub enum FixtureDefGetError {
-    #[error(
-        "fixture def {0:?} not found. You can reload catalogs by calling FixtureDefRegitry::load()."
-    )]
-    FixtureDefNotFound(FixtureDefId),
-    #[error(transparent)]
+pub enum FixtureDefLoadError {
+    #[error("fixture def recoded in catalog but file didn't exist: {0:?}")]
     FileNotFound(#[from] io::Error),
+    #[error(transparent)]
+    JsonParseFailed(#[from] serde_json::Error),
+    #[error(transparent)]
+    FixtureDefConverseFailed(#[from] FixtureDefConverseError),
 }
