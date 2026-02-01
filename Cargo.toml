@@ -1,7 +1,8 @@
 [workspace]
 members=[
     "ui",
-    "core"
+    "core",
+    "slint_model_ext"
 ]
 resolver="3"
 
@@ -13,9 +14,10 @@ panic = "unwind"
 version = "0.1.0"
 
 [workspace.dependencies]
-uuid = { version = "1.19.0", features = ["v4"] }
+derive_more = "2.1.1"
 tracing = "0.1"
 thiserror = "2.0.17"
+uuid = { version = "1.19.0", features = ["v4"] }
 wgpu = "27.0.1"
 
 slint = { version = "1.15.0", features = ["backend-winit", "unstable-wgpu-27"] }
