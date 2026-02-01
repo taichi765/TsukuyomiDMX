@@ -1,4 +1,10 @@
-use std::{cell::OnceCell, collections::HashMap, fs, io, path::PathBuf};
+use std::{
+    cell::OnceCell,
+    collections::HashMap,
+    fs::{self, DirEntry},
+    io,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -58,7 +64,34 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
     }
 
     fn load(&mut self) -> Result<(), io::Error> {
-        for ele in fs::read_dir(&self.path)? {}
+        let new = self
+            .path
+            .read_dir()?
+            .filter_map(Result::ok)
+            .filter(|ent| ent.path().is_dir())
+            .fold(HashMap::new(), |mut map, dir| {
+                let manufacturer = dir.file_name().into_string().expect("todo");
+                fs::read_dir(dir.path())
+                    .expect("todo: 無視しつつdiagnostics出す")
+                    .filter_map(Result::ok)
+                    .filter(|ent| ent.path().is_file())
+                    .for_each(|file| {
+                        let model = file.file_name().into_string().expect("todo");
+                        map.insert(
+                            FixtureDefId::new(),
+                            FixtureDefCatalogItem {
+                                manufacturer: manufacturer.clone(), // TODO: Cow使った方がいいのでは？
+                                model,
+                                path: file.path(),
+                                val: OnceCell::new(),
+                            },
+                        );
+                    });
+                map
+            });
+
+        self.defs.clear();
+        self.defs = new;
         Ok(())
     }
 }
