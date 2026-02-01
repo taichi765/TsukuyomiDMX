@@ -1,0 +1,11 @@
+[package]
+name = "schemas"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+regress = "0.10.5"
+serde = { workspace = true }
+
+[lib]
+path = "lib.rs"
