@@ -2,7 +2,8 @@
 members=[
     "ui",
     "core",
-    "slint_model_ext"
+    "slint_model_ext",
+    "schemas"
 ]
 resolver="3"
 
@@ -19,6 +20,7 @@ tracing = "0.1"
 thiserror = "2.0.17"
 uuid = { version = "1.19.0", features = ["v4"] }
 wgpu = "27.0.1"
+serde = { version = "1.0.228", features = ["derive"] }
 
 slint = { version = "1.15.0", features = ["backend-winit", "unstable-wgpu-27"] }
 i-slint-backend-winit = "1.15.0"
