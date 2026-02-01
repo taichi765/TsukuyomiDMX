@@ -1,236 +1,117 @@
-#![allow(clippy::redundant_closure_call)]
-#![allow(clippy::needless_lifetimes)]
-#![allow(clippy::match_single_binding)]
-#![allow(clippy::clone_on_copy)]
+//! Plugin definitions for the Open Fixture Library.
+//!
+//! This module defines the structure for import/export plugins that convert
+//! fixtures between different formats.
 
-#[doc = r" Error types."]
-pub mod error {
-    #[doc = r" Error from a `TryFrom` or `FromStr` implementation."]
-    pub struct ConversionError(::std::borrow::Cow<'static, str>);
-    impl ::std::error::Error for ConversionError {}
-    impl ::std::fmt::Display for ConversionError {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-            ::std::fmt::Display::fmt(&self.0, f)
-        }
-    }
-    impl ::std::fmt::Debug for ConversionError {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-            ::std::fmt::Debug::fmt(&self.0, f)
-        }
-    }
-    impl From<&'static str> for ConversionError {
-        fn from(value: &'static str) -> Self {
-            Self(value.into())
-        }
-    }
-    impl From<String> for ConversionError {
-        fn from(value: String) -> Self {
-            Self(value.into())
-        }
-    }
-}
-#[doc = "`FileLocations`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"object\","]
-#[doc = "  \"minProperties\": 1,"]
-#[doc = "  \"properties\": {"]
-#[doc = "    \"main\": {"]
-#[doc = "      \"type\": \"string\""]
-#[doc = "    },"]
-#[doc = "    \"user\": {"]
-#[doc = "      \"type\": \"string\""]
-#[doc = "    }"]
-#[doc = "  },"]
-#[doc = "  \"additionalProperties\": false"]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/// HTML string lines that will be joined with newlines.
+pub type HtmlStringLines = Vec<String>;
+
+/// A URL string.
+pub type UrlString = String;
+
+// ============================================================================
+// File Locations
+// ============================================================================
+
+/// Platform-specific file locations.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct FileLocations {
-    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-    pub main: ::std::option::Option<::std::string::String>,
-    #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-    pub user: ::std::option::Option<::std::string::String>,
+    /// Main/system location.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub main: Option<String>,
+
+    /// User-specific location.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
 }
-impl ::std::convert::From<&FileLocations> for FileLocations {
-    fn from(value: &FileLocations) -> Self {
-        value.clone()
-    }
-}
-impl ::std::default::Default for FileLocations {
-    fn default() -> Self {
-        Self {
-            main: Default::default(),
-            user: Default::default(),
-        }
-    }
-}
+
 impl FileLocations {
-    pub fn builder() -> builder::FileLocations {
-        Default::default()
+    /// Creates new file locations.
+    pub fn new(main: Option<String>, user: Option<String>) -> Self {
+        Self { main, user }
     }
 }
-#[doc = "HTML string lines, will be joined by \\n."]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"description\": \"HTML string lines, will be joined by \\\\n.\","]
-#[doc = "  \"type\": \"array\","]
-#[doc = "  \"items\": {"]
-#[doc = "    \"type\": \"string\""]
-#[doc = "  },"]
-#[doc = "  \"minItems\": 1"]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
-#[serde(transparent)]
-pub struct HtmlStringLines(pub ::std::vec::Vec<::std::string::String>);
-impl ::std::ops::Deref for HtmlStringLines {
-    type Target = ::std::vec::Vec<::std::string::String>;
-    fn deref(&self) -> &::std::vec::Vec<::std::string::String> {
-        &self.0
-    }
+
+/// File locations grouped by platform with additional options.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformFileLocations {
+    /// Whether subdirectories are allowed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_directories_allowed: Option<bool>,
+
+    /// Platform-specific locations (Windows, Mac OS, Linux).
+    #[serde(flatten)]
+    pub platforms: HashMap<String, FileLocations>,
 }
-impl ::std::convert::From<HtmlStringLines> for ::std::vec::Vec<::std::string::String> {
-    fn from(value: HtmlStringLines) -> Self {
-        value.0
-    }
+
+// ============================================================================
+// Plugin
+// ============================================================================
+
+/// A plugin definition for importing/exporting fixtures.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Plugin {
+    /// JSON Schema reference.
+    #[serde(rename = "$schema")]
+    pub schema: String,
+
+    /// Plugin name.
+    pub name: String,
+
+    /// Previous version names/keys for migration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_versions: Option<HashMap<String, String>>,
+
+    /// Description of the plugin (HTML lines).
+    pub description: HtmlStringLines,
+
+    /// Links related to the plugin.
+    pub links: HashMap<String, UrlString>,
+
+    /// Instructions for using fixtures with this plugin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fixture_usage: Option<HtmlStringLines>,
+
+    /// File locations for this plugin's fixture format.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_locations: Option<PlatformFileLocations>,
+
+    /// Additional information (HTML lines).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_info: Option<HtmlStringLines>,
+
+    /// Request for help with this plugin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help_wanted: Option<String>,
 }
-impl ::std::convert::From<&HtmlStringLines> for HtmlStringLines {
-    fn from(value: &HtmlStringLines) -> Self {
-        value.clone()
+
+impl Plugin {
+    /// Returns the description as a single string joined by newlines.
+    pub fn description_text(&self) -> String {
+        self.description.join("\n")
     }
-}
-impl ::std::convert::From<::std::vec::Vec<::std::string::String>> for HtmlStringLines {
-    fn from(value: ::std::vec::Vec<::std::string::String>) -> Self {
-        Self(value)
+
+    /// Returns the fixture usage as a single string joined by newlines.
+    pub fn fixture_usage_text(&self) -> Option<String> {
+        self.fixture_usage.as_ref().map(|lines| lines.join("\n"))
     }
-}
-#[doc = "`UrlString`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"format\": \"uri\","]
-#[doc = "  \"pattern\": \"^(ftp|http|https)://[^ \\\"]+$\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(
-    :: serde :: Deserialize,
-    :: serde :: Serialize,
-    Clone,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-)]
-#[serde(transparent)]
-pub struct UrlString(pub ::std::string::String);
-impl ::std::ops::Deref for UrlString {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
+
+    /// Returns the additional info as a single string joined by newlines.
+    pub fn additional_info_text(&self) -> Option<String> {
+        self.additional_info.as_ref().map(|lines| lines.join("\n"))
     }
-}
-impl ::std::convert::From<UrlString> for ::std::string::String {
-    fn from(value: UrlString) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&UrlString> for UrlString {
-    fn from(value: &UrlString) -> Self {
-        value.clone()
-    }
-}
-impl ::std::convert::From<::std::string::String> for UrlString {
-    fn from(value: ::std::string::String) -> Self {
-        Self(value)
-    }
-}
-impl ::std::str::FromStr for UrlString {
-    type Err = ::std::convert::Infallible;
-    fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
-        Ok(Self(value.to_string()))
-    }
-}
-impl ::std::fmt::Display for UrlString {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-#[doc = r" Types for composing complex structures."]
-pub mod builder {
-    #[derive(Clone, Debug)]
-    pub struct FileLocations {
-        main: ::std::result::Result<
-            ::std::option::Option<::std::string::String>,
-            ::std::string::String,
-        >,
-        user: ::std::result::Result<
-            ::std::option::Option<::std::string::String>,
-            ::std::string::String,
-        >,
-    }
-    impl ::std::default::Default for FileLocations {
-        fn default() -> Self {
-            Self {
-                main: Ok(Default::default()),
-                user: Ok(Default::default()),
-            }
-        }
-    }
-    impl FileLocations {
-        pub fn main<T>(mut self, value: T) -> Self
-        where
-            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
-            T::Error: ::std::fmt::Display,
-        {
-            self.main = value
-                .try_into()
-                .map_err(|e| format!("error converting supplied value for main: {}", e));
-            self
-        }
-        pub fn user<T>(mut self, value: T) -> Self
-        where
-            T: ::std::convert::TryInto<::std::option::Option<::std::string::String>>,
-            T::Error: ::std::fmt::Display,
-        {
-            self.user = value
-                .try_into()
-                .map_err(|e| format!("error converting supplied value for user: {}", e));
-            self
-        }
-    }
-    impl ::std::convert::TryFrom<FileLocations> for super::FileLocations {
-        type Error = super::error::ConversionError;
-        fn try_from(
-            value: FileLocations,
-        ) -> ::std::result::Result<Self, super::error::ConversionError> {
-            Ok(Self {
-                main: value.main?,
-                user: value.user?,
-            })
-        }
-    }
-    impl ::std::convert::From<super::FileLocations> for FileLocations {
-        fn from(value: super::FileLocations) -> Self {
-            Self {
-                main: Ok(value.main),
-                user: Ok(value.user),
-            }
-        }
+
+    /// Gets a specific link by key.
+    pub fn get_link(&self, key: &str) -> Option<&str> {
+        self.links.get(key).map(|s| s.as_str())
     }
 }

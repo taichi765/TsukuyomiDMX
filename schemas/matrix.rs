@@ -1,535 +1,375 @@
-#![allow(clippy::redundant_closure_call)]
-#![allow(clippy::needless_lifetimes)]
-#![allow(clippy::match_single_binding)]
-#![allow(clippy::clone_on_copy)]
+//! Matrix definitions for pixel-based fixtures.
+//!
+//! This module defines the structure for LED matrices/pixel arrays,
+//! including pixel counts, keys, and grouping constraints.
 
-#[doc = r" Error types."]
-pub mod error {
-    #[doc = r" Error from a `TryFrom` or `FromStr` implementation."]
-    pub struct ConversionError(::std::borrow::Cow<'static, str>);
-    impl ::std::error::Error for ConversionError {}
-    impl ::std::fmt::Display for ConversionError {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-            ::std::fmt::Display::fmt(&self.0, f)
-        }
-    }
-    impl ::std::fmt::Debug for ConversionError {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-            ::std::fmt::Debug::fmt(&self.0, f)
-        }
-    }
-    impl From<&'static str> for ConversionError {
-        fn from(value: &'static str) -> Self {
-            Self(value.into())
-        }
-    }
-    impl From<String> for ConversionError {
-        fn from(value: String) -> Self {
-            Self(value.into())
-        }
-    }
-}
-#[doc = "`PixelNumberConstraint`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"oneOf\": ["]
-#[doc = "    {"]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"pattern\": \"^=[1-9][0-9]*$\","]
-#[doc = "      \"$comment\": \"exact position\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"pattern\": \"^>=[1-9][0-9]*$\","]
-#[doc = "      \"$comment\": \"minimum position\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"pattern\": \"^<=[1-9][0-9]*$\","]
-#[doc = "      \"$comment\": \"maximum position\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"pattern\": \"^[1-9][0-9]*n$\","]
-#[doc = "      \"$comment\": \"position divisible by number\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"type\": \"string\","]
-#[doc = "      \"pattern\": \"^[1-9][0-9]*n\\\\+[1-9][0-9]*$\","]
-#[doc = "      \"$comment\": \"position divisible by number with remainder\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"const\": \"even\""]
-#[doc = "    },"]
-#[doc = "    {"]
-#[doc = "      \"const\": \"odd\""]
-#[doc = "    }"]
-#[doc = "  ]"]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+use crate::NoVariablesString;
+
+// ============================================================================
+// Pixel Number Constraints
+// ============================================================================
+
+/// Constraint for filtering pixels by position.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PixelNumberConstraint {
-    Variant0(PixelNumberConstraintVariant0),
-    Variant1(PixelNumberConstraintVariant1),
-    Variant2(PixelNumberConstraintVariant2),
-    Variant3(PixelNumberConstraintVariant3),
-    Variant4(PixelNumberConstraintVariant4),
-    Variant5(::serde_json::Value),
-    Variant6(::serde_json::Value),
+    /// Exact position: `=N` (e.g., "=1", "=5")
+    Exact(ExactPosition),
+    /// Minimum position: `>=N` (e.g., ">=1", ">=5")
+    Minimum(MinimumPosition),
+    /// Maximum position: `<=N` (e.g., "<=10", "<=5")
+    Maximum(MaximumPosition),
+    /// Divisible by N: `Nn` (e.g., "2n", "3n")
+    Divisible(DivisiblePosition),
+    /// Divisible with remainder: `Nn+M` (e.g., "2n+1", "3n+2")
+    DivisibleWithRemainder(DivisibleWithRemainderPosition),
+    /// Even positions
+    Even(EvenPosition),
+    /// Odd positions
+    Odd(OddPosition),
 }
-impl ::std::convert::From<&Self> for PixelNumberConstraint {
-    fn from(value: &PixelNumberConstraint) -> Self {
-        value.clone()
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant0> for PixelNumberConstraint {
-    fn from(value: PixelNumberConstraintVariant0) -> Self {
-        Self::Variant0(value)
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant1> for PixelNumberConstraint {
-    fn from(value: PixelNumberConstraintVariant1) -> Self {
-        Self::Variant1(value)
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant2> for PixelNumberConstraint {
-    fn from(value: PixelNumberConstraintVariant2) -> Self {
-        Self::Variant2(value)
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant3> for PixelNumberConstraint {
-    fn from(value: PixelNumberConstraintVariant3) -> Self {
-        Self::Variant3(value)
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant4> for PixelNumberConstraint {
-    fn from(value: PixelNumberConstraintVariant4) -> Self {
-        Self::Variant4(value)
-    }
-}
-#[doc = "`PixelNumberConstraintArray`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"array\","]
-#[doc = "  \"items\": {"]
-#[doc = "    \"$ref\": \"#/definitions/pixelNumberConstraint\""]
-#[doc = "  },"]
-#[doc = "  \"minItems\": 1,"]
-#[doc = "  \"uniqueItems\": true"]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintArray(pub Vec<PixelNumberConstraint>);
-impl ::std::ops::Deref for PixelNumberConstraintArray {
-    type Target = Vec<PixelNumberConstraint>;
-    fn deref(&self) -> &Vec<PixelNumberConstraint> {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintArray> for Vec<PixelNumberConstraint> {
-    fn from(value: PixelNumberConstraintArray) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintArray> for PixelNumberConstraintArray {
-    fn from(value: &PixelNumberConstraintArray) -> Self {
-        value.clone()
-    }
-}
-impl ::std::convert::From<Vec<PixelNumberConstraint>> for PixelNumberConstraintArray {
-    fn from(value: Vec<PixelNumberConstraint>) -> Self {
-        Self(value)
-    }
-}
-#[doc = "`PixelNumberConstraintVariant0`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"pattern\": \"^=[1-9][0-9]*$\","]
-#[doc = "  \"$comment\": \"exact position\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintVariant0(::std::string::String);
-impl ::std::ops::Deref for PixelNumberConstraintVariant0 {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant0> for ::std::string::String {
-    fn from(value: PixelNumberConstraintVariant0) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintVariant0> for PixelNumberConstraintVariant0 {
-    fn from(value: &PixelNumberConstraintVariant0) -> Self {
-        value.clone()
-    }
-}
-impl ::std::str::FromStr for PixelNumberConstraintVariant0 {
-    type Err = self::error::ConversionError;
-    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^=[1-9][0-9]*$").unwrap());
-        if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^=[1-9][0-9]*$\"".into());
-        }
-        Ok(Self(value.to_string()))
-    }
-}
-impl ::std::convert::TryFrom<&str> for PixelNumberConstraintVariant0 {
-    type Error = self::error::ConversionError;
-    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<&::std::string::String> for PixelNumberConstraintVariant0 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: &::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<::std::string::String> for PixelNumberConstraintVariant0 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: ::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for PixelNumberConstraintVariant0 {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+
+/// Exact position constraint: `=N`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExactPosition(pub u32);
+
+impl Serialize for ExactPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        D: ::serde::Deserializer<'de>,
+        S: serde::Serializer,
     {
-        ::std::string::String::deserialize(deserializer)?
-            .parse()
-            .map_err(|e: self::error::ConversionError| {
-                <D::Error as ::serde::de::Error>::custom(e.to_string())
-            })
+        serializer.serialize_str(&format!("={}", self.0))
     }
 }
-#[doc = "`PixelNumberConstraintVariant1`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"pattern\": \"^>=[1-9][0-9]*$\","]
-#[doc = "  \"$comment\": \"minimum position\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintVariant1(::std::string::String);
-impl ::std::ops::Deref for PixelNumberConstraintVariant1 {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant1> for ::std::string::String {
-    fn from(value: PixelNumberConstraintVariant1) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintVariant1> for PixelNumberConstraintVariant1 {
-    fn from(value: &PixelNumberConstraintVariant1) -> Self {
-        value.clone()
-    }
-}
-impl ::std::str::FromStr for PixelNumberConstraintVariant1 {
-    type Err = self::error::ConversionError;
-    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^>=[1-9][0-9]*$").unwrap());
-        if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^>=[1-9][0-9]*$\"".into());
-        }
-        Ok(Self(value.to_string()))
-    }
-}
-impl ::std::convert::TryFrom<&str> for PixelNumberConstraintVariant1 {
-    type Error = self::error::ConversionError;
-    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<&::std::string::String> for PixelNumberConstraintVariant1 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: &::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<::std::string::String> for PixelNumberConstraintVariant1 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: ::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for PixelNumberConstraintVariant1 {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+
+impl<'de> Deserialize<'de> for ExactPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: ::serde::Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        ::std::string::String::deserialize(deserializer)?
-            .parse()
-            .map_err(|e: self::error::ConversionError| {
-                <D::Error as ::serde::de::Error>::custom(e.to_string())
-            })
-    }
-}
-#[doc = "`PixelNumberConstraintVariant2`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"pattern\": \"^<=[1-9][0-9]*$\","]
-#[doc = "  \"$comment\": \"maximum position\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintVariant2(::std::string::String);
-impl ::std::ops::Deref for PixelNumberConstraintVariant2 {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant2> for ::std::string::String {
-    fn from(value: PixelNumberConstraintVariant2) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintVariant2> for PixelNumberConstraintVariant2 {
-    fn from(value: &PixelNumberConstraintVariant2) -> Self {
-        value.clone()
-    }
-}
-impl ::std::str::FromStr for PixelNumberConstraintVariant2 {
-    type Err = self::error::ConversionError;
-    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^<=[1-9][0-9]*$").unwrap());
-        if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^<=[1-9][0-9]*$\"".into());
+        let s = String::deserialize(deserializer)?;
+        if let Some(num) = s.strip_prefix('=') {
+            num.parse()
+                .map(ExactPosition)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Err(serde::de::Error::custom("expected '=N' format"))
         }
-        Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for PixelNumberConstraintVariant2 {
-    type Error = self::error::ConversionError;
-    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<&::std::string::String> for PixelNumberConstraintVariant2 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: &::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<::std::string::String> for PixelNumberConstraintVariant2 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: ::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for PixelNumberConstraintVariant2 {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+
+/// Minimum position constraint: `>=N`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MinimumPosition(pub u32);
+
+impl Serialize for MinimumPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        D: ::serde::Deserializer<'de>,
+        S: serde::Serializer,
     {
-        ::std::string::String::deserialize(deserializer)?
-            .parse()
-            .map_err(|e: self::error::ConversionError| {
-                <D::Error as ::serde::de::Error>::custom(e.to_string())
-            })
+        serializer.serialize_str(&format!(">={}", self.0))
     }
 }
-#[doc = "`PixelNumberConstraintVariant3`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"pattern\": \"^[1-9][0-9]*n$\","]
-#[doc = "  \"$comment\": \"position divisible by number\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintVariant3(::std::string::String);
-impl ::std::ops::Deref for PixelNumberConstraintVariant3 {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant3> for ::std::string::String {
-    fn from(value: PixelNumberConstraintVariant3) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintVariant3> for PixelNumberConstraintVariant3 {
-    fn from(value: &PixelNumberConstraintVariant3) -> Self {
-        value.clone()
-    }
-}
-impl ::std::str::FromStr for PixelNumberConstraintVariant3 {
-    type Err = self::error::ConversionError;
-    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-            ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[1-9][0-9]*n$").unwrap());
-        if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[1-9][0-9]*n$\"".into());
+
+impl<'de> Deserialize<'de> for MinimumPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if let Some(num) = s.strip_prefix(">=") {
+            num.parse()
+                .map(MinimumPosition)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Err(serde::de::Error::custom("expected '>=N' format"))
         }
-        Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for PixelNumberConstraintVariant3 {
-    type Error = self::error::ConversionError;
-    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<&::std::string::String> for PixelNumberConstraintVariant3 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: &::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<::std::string::String> for PixelNumberConstraintVariant3 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: ::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for PixelNumberConstraintVariant3 {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+
+/// Maximum position constraint: `<=N`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MaximumPosition(pub u32);
+
+impl Serialize for MaximumPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        D: ::serde::Deserializer<'de>,
+        S: serde::Serializer,
     {
-        ::std::string::String::deserialize(deserializer)?
-            .parse()
-            .map_err(|e: self::error::ConversionError| {
-                <D::Error as ::serde::de::Error>::custom(e.to_string())
-            })
+        serializer.serialize_str(&format!("<={}", self.0))
     }
 }
-#[doc = "`PixelNumberConstraintVariant4`"]
-#[doc = r""]
-#[doc = r" <details><summary>JSON schema</summary>"]
-#[doc = r""]
-#[doc = r" ```json"]
-#[doc = "{"]
-#[doc = "  \"type\": \"string\","]
-#[doc = "  \"pattern\": \"^[1-9][0-9]*n\\\\+[1-9][0-9]*$\","]
-#[doc = "  \"$comment\": \"position divisible by number with remainder\""]
-#[doc = "}"]
-#[doc = r" ```"]
-#[doc = r" </details>"]
-#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[serde(transparent)]
-pub struct PixelNumberConstraintVariant4(::std::string::String);
-impl ::std::ops::Deref for PixelNumberConstraintVariant4 {
-    type Target = ::std::string::String;
-    fn deref(&self) -> &::std::string::String {
-        &self.0
-    }
-}
-impl ::std::convert::From<PixelNumberConstraintVariant4> for ::std::string::String {
-    fn from(value: PixelNumberConstraintVariant4) -> Self {
-        value.0
-    }
-}
-impl ::std::convert::From<&PixelNumberConstraintVariant4> for PixelNumberConstraintVariant4 {
-    fn from(value: &PixelNumberConstraintVariant4) -> Self {
-        value.clone()
-    }
-}
-impl ::std::str::FromStr for PixelNumberConstraintVariant4 {
-    type Err = self::error::ConversionError;
-    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-            ::std::sync::LazyLock::new(|| {
-                ::regress::Regex::new("^[1-9][0-9]*n\\+[1-9][0-9]*$").unwrap()
-            });
-        if PATTERN.find(value).is_none() {
-            return Err("doesn't match pattern \"^[1-9][0-9]*n\\+[1-9][0-9]*$\"".into());
+
+impl<'de> Deserialize<'de> for MaximumPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if let Some(num) = s.strip_prefix("<=") {
+            num.parse()
+                .map(MaximumPosition)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Err(serde::de::Error::custom("expected '<=N' format"))
         }
-        Ok(Self(value.to_string()))
     }
 }
-impl ::std::convert::TryFrom<&str> for PixelNumberConstraintVariant4 {
-    type Error = self::error::ConversionError;
-    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<&::std::string::String> for PixelNumberConstraintVariant4 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: &::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl ::std::convert::TryFrom<::std::string::String> for PixelNumberConstraintVariant4 {
-    type Error = self::error::ConversionError;
-    fn try_from(
-        value: ::std::string::String,
-    ) -> ::std::result::Result<Self, self::error::ConversionError> {
-        value.parse()
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for PixelNumberConstraintVariant4 {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+
+/// Divisible position constraint: `Nn` (every Nth position)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DivisiblePosition(pub u32);
+
+impl Serialize for DivisiblePosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        D: ::serde::Deserializer<'de>,
+        S: serde::Serializer,
     {
-        ::std::string::String::deserialize(deserializer)?
-            .parse()
-            .map_err(|e: self::error::ConversionError| {
-                <D::Error as ::serde::de::Error>::custom(e.to_string())
-            })
+        serializer.serialize_str(&format!("{}n", self.0))
+    }
+}
+
+impl<'de> Deserialize<'de> for DivisiblePosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if let Some(num) = s.strip_suffix('n') {
+            if !num.contains('+') {
+                return num
+                    .parse()
+                    .map(DivisiblePosition)
+                    .map_err(serde::de::Error::custom);
+            }
+        }
+        Err(serde::de::Error::custom("expected 'Nn' format"))
+    }
+}
+
+/// Divisible with remainder constraint: `Nn+M`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DivisibleWithRemainderPosition {
+    pub divisor: u32,
+    pub remainder: u32,
+}
+
+impl Serialize for DivisibleWithRemainderPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&format!("{}n+{}", self.divisor, self.remainder))
+    }
+}
+
+impl<'de> Deserialize<'de> for DivisibleWithRemainderPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if let Some((divisor_str, remainder_str)) = s.split_once("n+") {
+            let divisor = divisor_str.parse().map_err(serde::de::Error::custom)?;
+            let remainder = remainder_str.parse().map_err(serde::de::Error::custom)?;
+            Ok(DivisibleWithRemainderPosition { divisor, remainder })
+        } else {
+            Err(serde::de::Error::custom("expected 'Nn+M' format"))
+        }
+    }
+}
+
+/// Even position marker
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EvenPosition;
+
+impl Serialize for EvenPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("even")
+    }
+}
+
+impl<'de> Deserialize<'de> for EvenPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "even" {
+            Ok(EvenPosition)
+        } else {
+            Err(serde::de::Error::custom("expected 'even'"))
+        }
+    }
+}
+
+/// Odd position marker
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OddPosition;
+
+impl Serialize for OddPosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("odd")
+    }
+}
+
+impl<'de> Deserialize<'de> for OddPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "odd" {
+            Ok(OddPosition)
+        } else {
+            Err(serde::de::Error::custom("expected 'odd'"))
+        }
+    }
+}
+
+// ============================================================================
+// Pixel Groups
+// ============================================================================
+
+/// Pixel group definition - specifies which pixels belong to a group.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PixelGroup {
+    /// Explicit list of pixel keys
+    Keys(Vec<NoVariablesString>),
+    /// All pixels in the matrix
+    All(AllPixels),
+    /// Constraint-based selection
+    Constraints(PixelConstraints),
+}
+
+/// Marker for "all pixels"
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AllPixels;
+
+impl Serialize for AllPixels {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("all")
+    }
+}
+
+impl<'de> Deserialize<'de> for AllPixels {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s == "all" {
+            Ok(AllPixels)
+        } else {
+            Err(serde::de::Error::custom("expected 'all'"))
+        }
+    }
+}
+
+/// Constraint-based pixel selection.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct PixelConstraints {
+    /// X-axis constraints
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<Vec<PixelNumberConstraint>>,
+
+    /// Y-axis constraints
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<Vec<PixelNumberConstraint>>,
+
+    /// Z-axis constraints
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub z: Option<Vec<PixelNumberConstraint>>,
+
+    /// Name pattern constraints (regex patterns)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<Vec<String>>,
+}
+
+// ============================================================================
+// Matrix Definition
+// ============================================================================
+
+/// A 3D pixel key - can be a pixel key string or null (for empty positions).
+pub type PixelKey = Option<NoVariablesString>;
+
+/// Matrix definition for pixel-based fixtures.
+///
+/// Must have either `pixel_count` or `pixel_keys`, but not both.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Matrix {
+    /// Number of pixels in X, Y, Z directions.
+    /// Use this for simple rectangular matrices.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pixel_count: Option<[u32; 3]>,
+
+    /// Explicit pixel key layout as a 3D array [Z][Y][X].
+    /// Use this for non-rectangular or sparse matrices.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pixel_keys: Option<Vec<Vec<Vec<PixelKey>>>>,
+
+    /// Named groups of pixels for easier channel mapping.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pixel_groups: Option<HashMap<NoVariablesString, PixelGroup>>,
+}
+
+impl Matrix {
+    /// Creates a new matrix with the given pixel count.
+    pub fn with_count(x: u32, y: u32, z: u32) -> Self {
+        Self {
+            pixel_count: Some([x, y, z]),
+            pixel_keys: None,
+            pixel_groups: None,
+        }
+    }
+
+    /// Creates a new matrix with explicit pixel keys.
+    pub fn with_keys(keys: Vec<Vec<Vec<PixelKey>>>) -> Self {
+        Self {
+            pixel_count: None,
+            pixel_keys: Some(keys),
+            pixel_groups: None,
+        }
+    }
+
+    /// Returns the dimensions of the matrix as (X, Y, Z).
+    pub fn dimensions(&self) -> Option<(u32, u32, u32)> {
+        if let Some([x, y, z]) = self.pixel_count {
+            Some((x, y, z))
+        } else if let Some(keys) = &self.pixel_keys {
+            let z = keys.len() as u32;
+            let y = keys.first().map(|row| row.len() as u32).unwrap_or(0);
+            let x = keys
+                .first()
+                .and_then(|row| row.first())
+                .map(|col| col.len() as u32)
+                .unwrap_or(0);
+            Some((x, y, z))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the total number of pixels (including null positions).
+    pub fn total_positions(&self) -> u32 {
+        if let Some((x, y, z)) = self.dimensions() {
+            x * y * z
+        } else {
+            0
+        }
     }
 }
