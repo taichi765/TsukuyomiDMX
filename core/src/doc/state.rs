@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-    doc::{OutputMapError, OutputPluginId, ResolveError, ResolvedAddress, UniverseSetting},
+    doc::{ResolveError, ResolvedAddress, UniverseSetting},
     fixture::{Fixture, FixtureId},
     functions::FunctionData,
     prelude::{DmxAddress, FixtureDef, FixtureDefId, FunctionId, UniverseId},
@@ -11,13 +11,13 @@ use crate::{
 ///
 /// Maybe similar to DB in web apps.
 /// -- it's just a data structure and validating is [`decider`]'s responsibility as same as application server in web apps.
-pub struct DocState {
+pub(super) struct DocState {
     fixtures: RefCell<HashMap<FixtureId, Fixture>>,
     fixture_defs: RefCell<HashMap<FixtureDefId, FixtureDef>>,
     functions: RefCell<HashMap<FunctionId, FunctionData>>,
-    universe_settings: HashMap<UniverseId, UniverseSetting>,
+    universe_settings: HashMap<UniverseId, UniverseSetting>, // TODO: これもRefCell化するかも
 
-    fixture_by_address_index: HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
+    fixture_by_address_index: HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>, // TODO: 外に出す
 }
 
 /* ---------- public, readonly ---------- */
@@ -31,10 +31,6 @@ impl DocState {
 
             fixture_by_address_index: HashMap::new(),
         }
-    }
-
-    pub fn as_view(&self) -> DocStateView<'_> {
-        DocStateView(self)
     }
 
     pub fn universe_settings(&self) -> &HashMap<UniverseId, UniverseSetting> {
@@ -168,79 +164,5 @@ impl DocState {
             .to_owned();
         Some(adr)*/
         todo!("FixtureStoreかDocに移動？")
-    }
-}
-
-impl DocState {
-    /// Returns `Some(old_setting)` or `None`
-    fn add_universe(&mut self, id: UniverseId) -> Option<UniverseSetting> {
-        self.universe_settings.insert(id, UniverseSetting::new())
-    }
-
-    /// Same as [std::collections::HashMap::remove()]
-    fn remove_universe(&mut self, id: &UniverseId) -> Option<UniverseSetting> {
-        self.universe_settings.remove(id)
-    }
-
-    /// Returns `true` when plugin already exists.
-    fn add_output(
-        &mut self,
-        universe_id: UniverseId,
-        plugin: OutputPluginId,
-    ) -> Result<bool, OutputMapError> {
-        let setting = self
-            .universe_settings
-            .get_mut(&universe_id)
-            .ok_or(OutputMapError::UniverseNotFound(universe_id))?;
-        let is_inserted = setting.output_plugins.insert(plugin);
-
-        Ok(is_inserted)
-    }
-
-    /// Returns `true` when plugin was not in the list.
-    fn remove_output(
-        &mut self,
-        universe_id: &UniverseId,
-        plugin: &OutputPluginId,
-    ) -> Result<bool, OutputMapError> {
-        let setting = self
-            .universe_settings
-            .get_mut(&universe_id)
-            .ok_or(OutputMapError::UniverseNotFound(*universe_id))?;
-        let is_removed = setting.output_plugins.remove(&plugin);
-
-        Ok(is_removed)
-    }
-}
-
-pub struct DocStateView<'a>(&'a DocState);
-
-impl<'a> DocStateView<'a> {
-    pub fn with_fixtures<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FixtureId, Fixture>) -> R,
-    {
-        self.0.with_fixtures(f)
-    }
-
-    pub fn with_fixture_defs<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FixtureDefId, FixtureDef>) -> R,
-    {
-        self.0.with_fixture_defs(f)
-    }
-
-    pub fn with_functions<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FunctionId, FunctionData>) -> R,
-    {
-        self.0.with_functions(f)
-    }
-
-    pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FixtureId, Fixture>, &HashMap<FixtureDefId, FixtureDef>) -> R,
-    {
-        self.0.with_fixtures_and_defs(f)
     }
 }

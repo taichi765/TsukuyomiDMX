@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use super::errors::*;
-use super::{state::DocStateView, DocEffect};
+use super::{DocEffect, DocStateView};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
 use crate::fixture::FixtureChange;
 use crate::functions::FunctionData;
@@ -113,22 +113,6 @@ pub(super) fn remove_fixture(
     }*/
 
     Ok(RemoveFixtureCommand::new(*id))
-}
-
-pub(super) fn add_fixture_def(_state: DocStateView, _def: FixtureDef) -> Result<DocEffect, ()> {
-    todo!()
-}
-
-pub(super) fn update_fixture_def(_state: DocStateView, _new: FixtureDef) -> Result<DocEffect, ()> {
-    todo!()
-}
-
-// TODO: このFixtureDefを使っているFixtureをどうするか
-pub(super) fn remove_fixture_def(
-    _state: DocStateView,
-    _id: &FixtureDefId,
-) -> Result<DocEffect, ()> {
-    todo!()
 }
 
 pub(super) fn add_function(_state: DocStateView, _value: FunctionData) -> Result<DocEffect, ()> {
