@@ -3,9 +3,8 @@ pub use errors::*;
 mod commands;
 pub use commands::*;
 mod decider;
-mod state;
-pub use state::DocState;
 mod def_registry;
+mod state;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -13,9 +12,11 @@ use std::{
 };
 
 use crate::{
+    doc::state::DocState,
     fixture::{Fixture, FixtureChange, FixtureId, MergeMode},
     fixture_def::FixtureDefId,
     functions::{FunctionData, FunctionId},
+    prelude::FixtureDef,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -45,8 +46,13 @@ impl Doc {
         }
     }
 
-    pub fn states(&self) -> Arc<DocState> {
-        Arc::clone(&self.state)
+    pub fn state_view(&self) -> DocStateView {
+        DocStateView(Arc::clone(&self.state))
+    }
+
+    /// Callback called when [`DocEvent`] is occured.
+    pub fn subscribe(&mut self, f: Box<dyn Fn(&DocEffect)>) {
+        self.subscribers.push(f);
     }
 
     /// Undo.
@@ -73,11 +79,7 @@ impl Doc {
 
     /// Adds fixture.
     pub fn add_fixture(&mut self, fixture: Fixture) -> Result<(), FixtureAddError> {
-        let cmd = decider::add_fixture(
-            self.state.as_view(),
-            fixture,
-            &self.fixture_by_address_index,
-        )?;
+        let cmd = decider::add_fixture(self.state_view(), fixture, &self.fixture_by_address_index)?;
         self.apply_command(cmd);
         Ok(())
     }
@@ -89,7 +91,7 @@ impl Doc {
         change: FixtureChange,
     ) -> Result<(), FixtureUpdateError> {
         let cmd = decider::update_fixture(
-            self.state.as_view(),
+            self.state_view(),
             id,
             change,
             &self.fixture_by_address_index,
@@ -101,7 +103,7 @@ impl Doc {
     /// Removes fixture.
     /// If the fixture didn't exist, [FixtureRemoveError::FixtureNotFound][`FixtureRemoveError`] will be returned.
     pub fn remove_fixture(&mut self, id: &FixtureId) -> Result<(), FixtureRemoveError> {
-        let cmd = decider::remove_fixture(self.state.as_view(), id)?;
+        let cmd = decider::remove_fixture(self.state_view(), id)?;
         self.apply_command(cmd);
         Ok(())
     }
@@ -118,16 +120,44 @@ impl Doc {
         todo!()
     }
 
-    /// Callback called when [`DocEvent`] is occured.
-    pub fn subscribe(&mut self, f: Box<dyn Fn(&DocEffect)>) {
-        self.subscribers.push(f);
-    }
-
     /// Helper method -- Applies [`DocEvent`] to `state` and `event_store`, then notifies event to subscribers.
     fn apply_command(&mut self, cmd: impl DocCommand) {
         let (undo, effect) = Box::new(cmd).apply(&self.state);
         self.undo_stack.push(undo);
         self.subscribers.iter().for_each(|f| f(&effect));
+    }
+}
+
+/// Readonly-facade of [`DocState`].
+pub struct DocStateView(Arc<DocState>);
+
+impl DocStateView {
+    pub fn with_fixtures<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FixtureId, Fixture>) -> R,
+    {
+        self.0.with_fixtures(f)
+    }
+
+    pub fn with_fixture_defs<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FixtureDefId, FixtureDef>) -> R,
+    {
+        self.0.with_fixture_defs(f)
+    }
+
+    pub fn with_functions<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FunctionId, FunctionData>) -> R,
+    {
+        self.0.with_functions(f)
+    }
+
+    pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FixtureId, Fixture>, &HashMap<FixtureDefId, FixtureDef>) -> R,
+    {
+        self.0.with_fixtures_and_defs(f)
     }
 }
 
