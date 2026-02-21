@@ -21,16 +21,17 @@ pub(super) fn add_fixture(
 
     let def_id = fixture.fixture_def();
     let occupied_addresses = state.with_fixture_defs(|defs| {
-        let def = defs
-            .get(&def_id)
-            .ok_or(FixtureAddError::FixtureDefNotFound(FixtureDefNotFound {
+        let def = defs.get(&def_id).map_err(|e| {
+            FixtureAddError::FixtureDefNotFound(FixtureDefNotFound {
                 fixture_id: fixture.id(),
-                fixture_def_id: def_id,
-            }))?;
+                fixture_def_id: def_id.clone(),
+                source: e,
+            })
+        })?;
         let mode = def
             .mode(fixture.fixture_mode())
             .ok_or(FixtureAddError::ModeNotFound(ModeNotFound {
-                fixture_def: def_id,
+                fixture_def: def_id.clone(),
                 mode: fixture.fixture_mode().to_string(),
             }))?;
         Ok::<_, FixtureAddError>(
@@ -135,7 +136,7 @@ fn compute_occupied_addresses(
     match change {
         FixtureChange::Mode(mode_name) => {
             let mode = def.mode(mode_name).ok_or(ModeNotFound {
-                fixture_def: def.id(),
+                fixture_def: def.id().clone(),
                 mode: mode_name.clone(),
             })?;
             Ok(mode.occupied_addresses(fixture.address()).collect())
