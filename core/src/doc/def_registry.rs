@@ -78,7 +78,7 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
                     .for_each(|file| {
                         let model = file.file_name().into_string().expect("todo");
                         map.insert(
-                            FixtureDefId::new(),
+                            FixtureDefId::new(manufacturer.clone(), model.clone()),
                             FixtureDefCatalogItem {
                                 manufacturer: manufacturer.clone(), // TODO: Cow使った方がいいのでは？
                                 model,

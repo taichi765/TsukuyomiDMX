@@ -1,11 +1,30 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use bimap::BiHashMap;
 use thiserror::Error;
 
 use crate::{fixture::MergeMode, prelude::DmxAddress};
 
-declare_id_newtype!(FixtureDefId);
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct FixtureDefId(Arc<(ofl_schemas::NonEmptyString, ofl_schemas::NonEmptyString)>);
+
+impl FixtureDefId {
+    /// The API may change in future.
+    /// We currently use manufacturer and model as an id, but Uuid might be better.
+    pub fn new(
+        manufacturer: ofl_schemas::NonEmptyString,
+        model: ofl_schemas::NonEmptyString,
+    ) -> Self {
+        Self(Arc::new((manufacturer, model)))
+    }
+}
+
+impl Clone for FixtureDefId {
+    /// Cheap clone (Same as [`Arc::clone()`][std::sync::Arc])
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct FixtureDef {
@@ -19,17 +38,19 @@ pub struct FixtureDef {
 impl FixtureDef {
     // TODO: すべての関数でimpl Into<String>を使うようにする
     pub fn new(manufacturer: impl Into<String>, model: impl Into<String>) -> Self {
+        let manufacturer = manufacturer.into();
+        let model = model.into();
         Self {
-            id: FixtureDefId::new(),
-            manufacturer: manufacturer.into(),
-            model: model.into(),
+            id: FixtureDefId::new(manufacturer.clone(), model.clone()),
+            manufacturer,
+            model,
             modes: HashMap::new(),
             channel_templates: HashMap::new(),
         }
     }
 
-    pub fn id(&self) -> FixtureDefId {
-        self.id
+    pub fn id(&self) -> &FixtureDefId {
+        &self.id
     }
 
     pub fn manufacturer(&self) -> &str {

@@ -11,6 +11,7 @@ pub enum MergeMode {
     LTP,
 }
 
+// TODO: builderパターン
 // TODO: クロスユニバース
 #[derive(Debug, Clone)]
 pub struct Fixture {
@@ -25,13 +26,14 @@ pub struct Fixture {
 }
 
 // TODO: modeが一つ以上あることを保証
+// TODO: Modeのnew type
 impl Fixture {
     pub fn new(
         name: impl Into<String>,
         universe_id: UniverseId,
         address: DmxAddress,
         fixture_def_id: FixtureDefId,
-        fixture_mode: String,
+        fixture_mode: impl Into<String>,
         x: f32,
         y: f32,
     ) -> Self {
@@ -41,7 +43,7 @@ impl Fixture {
             universe_id,
             address,
             fixture_def_id,
-            fixture_mode,
+            fixture_mode: fixture_mode.into(),
             x,
             y,
         }
@@ -63,8 +65,8 @@ impl Fixture {
         self.address
     }
 
-    pub fn fixture_def(&self) -> FixtureDefId {
-        self.fixture_def_id
+    pub fn fixture_def(&self) -> &FixtureDefId {
+        &self.fixture_def_id
     }
 
     pub fn fixture_mode(&self) -> &str {
@@ -93,21 +95,6 @@ impl Fixture {
                 self.x = x;
                 self.y = y;
             }
-        }
-    }
-}
-
-impl Default for Fixture {
-    fn default() -> Self {
-        Self {
-            id: Default::default(),
-            name: "fixture".to_string(),
-            universe_id: Default::default(),
-            address: Default::default(),
-            fixture_def_id: Default::default(),
-            fixture_mode: "mode".to_string(),
-            x: 0.,
-            y: 0.,
         }
     }
 }
