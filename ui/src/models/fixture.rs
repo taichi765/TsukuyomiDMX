@@ -123,80 +123,14 @@ mod tests {
     use tsukuyomi_core::fixture::FixtureChange;
     use tsukuyomi_core::prelude::*;
 
+    use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer, create_fixture_def};
+
     use super::*;
 
     #[derive(Debug, PartialEq, Eq)]
     struct DummyStruct {
         name: SharedString,
         id: SharedString,
-    }
-
-    struct SpyModelPeer {
-        events: RefCell<Vec<ModelChangeEvent>>,
-    }
-
-    impl SpyModelPeer {
-        fn new() -> Self {
-            Self {
-                events: RefCell::new(Vec::new()),
-            }
-        }
-    }
-
-    impl ModelChangeListener for SpyModelPeer {
-        fn row_added(self: Pin<&Self>, index: usize, _count: usize) {
-            self.events
-                .borrow_mut()
-                .push(ModelChangeEvent::Added(index));
-        }
-
-        fn row_changed(self: Pin<&Self>, row: usize) {
-            self.events
-                .borrow_mut()
-                .push(ModelChangeEvent::Changed(row));
-        }
-
-        fn row_removed(self: Pin<&Self>, index: usize, _count: usize) {
-            self.events
-                .borrow_mut()
-                .push(ModelChangeEvent::Removed(index));
-        }
-
-        fn reset(self: Pin<&Self>) {
-            self.events.borrow_mut().push(ModelChangeEvent::Reset);
-        }
-    }
-
-    enum ModelChangeEvent {
-        Added(usize),
-        Changed(usize),
-        Removed(usize),
-        Reset,
-    }
-
-    fn create_fixture_def() -> FixtureDef {
-        let mut def = FixtureDef::new("Test Manufacturer", "Test Model");
-        def.insert_channel(
-            "Dimmer",
-            ChannelDef::new(MergeMode::HTP, ChannelKind::Dimmer),
-        );
-        def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, ChannelKind::Red));
-        def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, ChannelKind::Green));
-        def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, ChannelKind::Blue));
-        def.insert_mode(
-            "4 Channel",
-            FixtureMode::new(
-                vec![
-                    ("Dimmer".into(), 0),
-                    ("Red".into(), 1),
-                    ("Green".into(), 2),
-                    ("Blue".into(), 3),
-                ]
-                .into_iter(),
-            )
-            .unwrap(),
-        );
-        def
     }
 
     #[test]
@@ -245,7 +179,10 @@ mod tests {
             },
             map_model.row_data(0).unwrap()
         );
-        matches!(container.events.borrow()[0], ModelChangeEvent::Added(0));
+        matches!(
+            container.events.borrow()[0],
+            DummyModelChangeEvent::Added(0)
+        );
 
         let new_name = "Renamed Fixture";
         doc.update_fixture(fxt_id, FixtureChange::Rename(new_name.to_string()))
@@ -258,13 +195,19 @@ mod tests {
             },
             map_model.row_data(0).unwrap()
         );
-        matches!(container.events.borrow()[1], ModelChangeEvent::Changed(0));
+        matches!(
+            container.events.borrow()[1],
+            DummyModelChangeEvent::Changed(0)
+        );
 
         doc.remove_fixture(&fxt_id).unwrap();
         assert_eq!(0, inner.row_count());
         assert_eq!(0, inner.index.borrow().len());
         assert_eq!(0, inner.keys.borrow().len());
         assert_eq!(3, container.events.borrow().len());
-        matches!(container.events.borrow()[2], ModelChangeEvent::Removed(0));
+        matches!(
+            container.events.borrow()[2],
+            DummyModelChangeEvent::Removed(0)
+        );
     }
 }
