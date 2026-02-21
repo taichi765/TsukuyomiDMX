@@ -1,10 +1,10 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-    doc::{ResolveError, ResolvedAddress, UniverseSetting},
+    doc::{ResolveError, ResolvedAddress, UniverseSetting, def_registry::FixtureDefRegistry},
     fixture::{Fixture, FixtureId},
     functions::FunctionData,
-    prelude::{DmxAddress, FixtureDef, FixtureDefId, FunctionId, UniverseId},
+    prelude::{DmxAddress, FunctionId, UniverseId},
 };
 
 /// Single source of true.
@@ -13,7 +13,7 @@ use crate::{
 /// -- it's just a data structure and validating is [`decider`]'s responsibility as same as application server in web apps.
 pub(super) struct DocState {
     fixtures: RefCell<HashMap<FixtureId, Fixture>>,
-    fixture_defs: RefCell<HashMap<FixtureDefId, FixtureDef>>,
+    fixture_defs: RefCell<Box<dyn FixtureDefRegistry>>,
     functions: RefCell<HashMap<FunctionId, FunctionData>>,
     universe_settings: HashMap<UniverseId, UniverseSetting>, // TODO: これもRefCell化するかも
 
@@ -22,10 +22,10 @@ pub(super) struct DocState {
 
 /* ---------- public, readonly ---------- */
 impl DocState {
-    pub fn new() -> Self {
+    pub fn new(def_registry: Box<dyn FixtureDefRegistry>) -> Self {
         Self {
             fixtures: RefCell::new(HashMap::new()),
-            fixture_defs: RefCell::new(HashMap::new()),
+            fixture_defs: RefCell::new(def_registry),
             functions: RefCell::new(HashMap::new()),
             universe_settings: HashMap::new(),
 
@@ -47,10 +47,10 @@ impl DocState {
 
     pub fn with_fixture_defs<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FixtureDefId, FixtureDef>) -> R,
+        F: FnOnce(&dyn FixtureDefRegistry) -> R,
     {
         let defs = self.fixture_defs.borrow();
-        f(&defs)
+        f(&(**defs))
     }
 
     pub fn with_functions<F, R>(&self, f: F) -> R
@@ -63,11 +63,11 @@ impl DocState {
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FixtureId, Fixture>, &HashMap<FixtureDefId, FixtureDef>) -> R,
+        F: FnOnce(&HashMap<FixtureId, Fixture>, &dyn FixtureDefRegistry) -> R,
     {
         let fixtures = self.fixtures.borrow();
         let defs = self.fixture_defs.borrow();
-        f(&fixtures, &defs)
+        f(&fixtures, &(**defs))
     }
 
     pub(super) fn with_fixtures_mut<F, R>(&self, f: F) -> R
@@ -84,6 +84,10 @@ impl DocState {
     {
         let mut functions = self.functions.borrow_mut();
         f(&mut functions)
+    }
+
+    pub(super) fn load_defs(&self) -> Result<(), std::io::Error> {
+        self.fixture_defs.borrow_mut().load()
     }
 
     pub fn resolve_address(

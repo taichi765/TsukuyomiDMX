@@ -4,10 +4,12 @@ mod commands;
 pub use commands::*;
 mod decider;
 mod def_registry;
+pub use def_registry::*;
 mod state;
 
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -16,7 +18,6 @@ use crate::{
     fixture::{Fixture, FixtureChange, FixtureId, MergeMode},
     fixture_def::FixtureDefId,
     functions::{FunctionData, FunctionId},
-    prelude::FixtureDef,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -37,8 +38,33 @@ pub struct Doc {
 
 impl Doc {
     pub fn new() -> Self {
+        let path: PathBuf = [
+            r"C:\",
+            "Users",
+            "taich",
+            "source",
+            "tsukuyomi-rs",
+            "resources",
+            "fixture_defs",
+        ]
+        .iter()
+        .collect(); // TODO: dirsクレートを使う
+        let state = DocState::new(Box::new(FixtureDefRegistryImpl::new(path)));
+        state
+            .load_defs()
+            .expect("TODO: 初回のloadはUI側に呼ばせてもいいかも");
         Self {
-            state: Arc::new(DocState::new()),
+            state: Arc::new(state),
+            subscribers: Vec::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            fixture_by_address_index: HashMap::new(),
+        }
+    }
+
+    pub fn new_with_def_registry(def_registry: Box<dyn FixtureDefRegistry>) -> Self {
+        Self {
+            state: Arc::new(DocState::new(def_registry)),
             subscribers: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -120,6 +146,17 @@ impl Doc {
         todo!()
     }
 
+    /// 外部が関わる操作なのでDocCommandでのundo/redoはできない
+    pub fn reload_defs(&mut self) -> Result<(), std::io::Error> {
+        let ret = self.state.load_defs();
+        if ret.is_ok() {
+            self.subscribers
+                .iter()
+                .for_each(|f| f(&DocEffect::DefRegistryLoaded));
+        }
+        ret
+    }
+
     /// Helper method -- Applies [`DocEvent`] to `state` and `event_store`, then notifies event to subscribers.
     fn apply_command(&mut self, cmd: impl DocCommand) {
         let (undo, effect) = Box::new(cmd).apply(&self.state);
@@ -131,6 +168,13 @@ impl Doc {
 /// Readonly-facade of [`DocState`].
 pub struct DocStateView(Arc<DocState>);
 
+impl Clone for DocStateView {
+    /// Cheap clone.
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
 impl DocStateView {
     pub fn with_fixtures<F, R>(&self, f: F) -> R
     where
@@ -141,7 +185,7 @@ impl DocStateView {
 
     pub fn with_fixture_defs<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FixtureDefId, FixtureDef>) -> R,
+        F: FnOnce(&dyn FixtureDefRegistry) -> R,
     {
         self.0.with_fixture_defs(f)
     }
@@ -155,7 +199,7 @@ impl DocStateView {
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FixtureId, Fixture>, &HashMap<FixtureDefId, FixtureDef>) -> R,
+        F: FnOnce(&HashMap<FixtureId, Fixture>, &dyn FixtureDefRegistry) -> R,
     {
         self.0.with_fixtures_and_defs(f)
     }
@@ -163,6 +207,7 @@ impl DocStateView {
 
 /// UIとかに通知する用のやつ。
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum DocEffect {
     UniverseSettingsChanged,
     UniverseAdded(UniverseId),
@@ -181,6 +226,7 @@ pub enum DocEffect {
     FunctionRemoved(FunctionId),
 
     AddressIndexChanged((UniverseId, DmxAddress), (FixtureId, usize)),
+    DefRegistryLoaded,
 }
 
 pub trait EventStore {

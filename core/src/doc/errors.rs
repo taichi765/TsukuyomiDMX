@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use crate::{
+    doc::def_registry,
     fixture::FixtureId,
     fixture_def::FixtureDefId,
     universe::{DmxAddress, UniverseId},
@@ -28,10 +29,11 @@ pub enum ResolveError {
 pub struct FixtureNotFound(pub FixtureId);
 
 #[derive(Debug, Error)]
-#[error("cannot find fixture definition {fixture_def_id:?} for fixture {fixture_id:?}")]
+#[error("cannot find fixture definition {fixture_def_id:?} for fixture {fixture_id:?}: {source:?}")]
 pub struct FixtureDefNotFound {
     pub fixture_id: FixtureId,
     pub fixture_def_id: FixtureDefId,
+    pub source: def_registry::FixtureDefLookupError,
 }
 
 #[derive(Debug, Error)]
