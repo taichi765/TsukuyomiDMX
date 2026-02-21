@@ -10,7 +10,8 @@ use crate::{
 pub trait FixtureDefRegistry {
     fn contains(&self, id: &FixtureDefId) -> bool;
     fn load(&mut self) -> Result<(), io::Error>;
-    fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError<'a>>;
+    fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError>;
+    fn iter_metadata<'a>(&'a self) -> Box<dyn Iterator<Item = FixtureDefMetaData<'a>> + 'a>;
 }
 
 /// ファイルからFixtureDefをロードしてキャッシュする
@@ -70,7 +71,13 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
                     .filter_map(Result::ok)
                     .filter(|ent| ent.path().is_file())
                     .for_each(|file| {
-                        let model = file.file_name().into_string().expect("todo");
+                        let model = file
+                            .path()
+                            .file_stem()
+                            .expect("todo")
+                            .to_str()
+                            .expect("todo")
+                            .to_string();
                         map.insert(
                             FixtureDefId::new(manufacturer.clone(), model.clone()),
                             FixtureDefCatalogItem {
@@ -88,6 +95,20 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
         self.defs = new;
         Ok(())
     }
+
+    fn iter_metadata<'a>(&'a self) -> Box<dyn Iterator<Item = FixtureDefMetaData<'a>> + 'a> {
+        Box::new(self.defs.iter().map(|(id, item)| FixtureDefMetaData {
+            id,
+            manufacturer: &item.manufacturer,
+            model: &item.model,
+        }))
+    }
+}
+
+pub struct FixtureDefMetaData<'a> {
+    pub id: &'a FixtureDefId,
+    pub manufacturer: &'a str,
+    pub model: &'a str,
 }
 
 #[derive(Debug, Error)]
