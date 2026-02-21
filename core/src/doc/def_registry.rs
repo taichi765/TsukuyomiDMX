@@ -20,6 +20,12 @@ pub struct FixtureDefRegistryImpl {
     defs: HashMap<FixtureDefId, FixtureDefCatalogItem>,
 }
 
+pub struct FixtureDefMetaData<'a> {
+    pub id: &'a FixtureDefId,
+    pub manufacturer: &'a str,
+    pub model: &'a str,
+}
+
 struct FixtureDefCatalogItem {
     manufacturer: String,
     model: String,
@@ -105,10 +111,45 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
     }
 }
 
-pub struct FixtureDefMetaData<'a> {
-    pub id: &'a FixtureDefId,
-    pub manufacturer: &'a str,
-    pub model: &'a str,
+/// テスト用のフェイク。インメモリで完結する。
+pub struct FakeFixtureDefRegistry {
+    defs: HashMap<FixtureDefId, FixtureDef>,
+}
+
+impl FakeFixtureDefRegistry {
+    pub fn new() -> Self {
+        Self {
+            defs: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, id: FixtureDefId, def: FixtureDef) {
+        self.defs.insert(id, def);
+    }
+}
+
+impl FixtureDefRegistry for FakeFixtureDefRegistry {
+    fn contains(&self, id: &FixtureDefId) -> bool {
+        self.defs.contains_key(id)
+    }
+
+    fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError> {
+        self.defs
+            .get(id)
+            .ok_or(FixtureDefLookupError::NotInCatalog(id.to_owned()))
+    }
+
+    fn load(&mut self) -> Result<(), io::Error> {
+        Ok(())
+    }
+
+    fn iter_metadata<'a>(&'a self) -> Box<dyn Iterator<Item = FixtureDefMetaData<'a>> + 'a> {
+        Box::new(self.defs.iter().map(|(id, def)| FixtureDefMetaData {
+            id: id,
+            manufacturer: def.manufacturer(),
+            model: def.model(),
+        }))
+    }
 }
 
 #[derive(Debug, Error)]
