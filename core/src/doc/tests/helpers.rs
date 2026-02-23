@@ -1,44 +1,23 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, RwLock},
-};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    doc::{DocEvent, DocEventBus, DocHandle, DocObserver, DocStore},
+    doc::{Doc, DocEffect},
     fixture::{Fixture, MergeMode},
     fixture_def::{ChannelDef, ChannelKind, FixtureDef, FixtureDefId, FixtureMode},
     functions::{FunctionData, StaticSceneData},
     universe::{DmxAddress, UniverseId},
 };
 
-pub(crate) struct TestObserver {
-    pub events: Vec<DocEvent>,
-}
-impl TestObserver {
-    pub(crate) fn new() -> Self {
-        Self { events: vec![] }
-    }
-}
-impl DocObserver for TestObserver {
-    fn on_doc_event(&mut self, event: &DocEvent) {
-        self.events.push(event.clone());
-    }
-}
-
-/// Creates a new DocHandle with an observer already subscribed.
-/// Returns the DocHandle, the underlying DocStore, and the observer for event verification.
-pub(crate) fn make_doc_handle_with_observer()
--> (DocHandle, Arc<RwLock<DocStore>>, Arc<RwLock<TestObserver>>) {
-    let doc_store = Arc::new(RwLock::new(DocStore::new()));
-    let mut event_bus = DocEventBus::new();
-
-    let observer = Arc::new(RwLock::new(TestObserver::new()));
-    let obs: Arc<RwLock<dyn DocObserver>> = Arc::clone(&observer) as _;
-    event_bus.subscribe(Arc::downgrade(&obs));
-
-    let handle = DocHandle::new(Arc::clone(&doc_store), Rc::new(RefCell::new(event_bus)));
-    (handle, doc_store, observer)
+/// Creates a new Doc with an event collector already subscribed.
+/// Returns the Doc and the collected events for verification.
+pub(crate) fn make_doc_with_observer() -> (Doc, Rc<RefCell<Vec<DocEffect>>>) {
+    let mut doc = Doc::new_with_def_registry();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let events_clone = Rc::clone(&events);
+    doc.subscribe(Box::new(move |effect| {
+        events_clone.borrow_mut().push(effect.clone());
+    }));
+    (doc, events)
 }
 
 /// Build a minimal FixtureDef with a single mode and dummy channels + single named channel.

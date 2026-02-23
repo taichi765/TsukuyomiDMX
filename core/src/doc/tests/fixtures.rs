@@ -297,7 +297,7 @@ fn resolve_address_fails_after_fixture_removed() {
     assert!(matches!(err, ResolveError::FixtureNotFound(FixtureNotFound(id)) if id == fxt_id));
 }
 
-/* ==================== DocHandle event notification tests ==================== */
+/* ==================== Doc event notification tests ==================== */
 
 #[test]
 fn doc_handle_add_and_update_fixture_emit_events() {
