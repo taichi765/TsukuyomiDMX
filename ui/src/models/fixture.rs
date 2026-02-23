@@ -11,6 +11,7 @@ use tsukuyomi_core::{
 };
 
 /// [`Fixture`]をマップする`Model`
+#[derive(Debug)]
 pub struct FixtureMapModel<F> {
     f: F,
     inner: Rc<FixtureModelInner>,
@@ -49,8 +50,11 @@ where
 }
 
 /// 複数の[`FixtureMapModel`]の間で共有される。
+#[derive(derive_more::Debug)]
 pub struct FixtureModelInner {
+    #[debug(skip)]
     state: DocStateView,
+    #[debug(skip)]
     notify: ModelNotify,
     keys: RefCell<Vec<FixtureId>>,
     index: RefCell<HashMap<FixtureId, usize>>,
