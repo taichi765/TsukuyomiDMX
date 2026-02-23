@@ -30,50 +30,6 @@ pub fn setup_fixture_list_view(
     event_bus.subscribe(Arc::downgrade(&controller) as _);
 
     let doc_clone = ReadOnly::clone(&doc);
-    ui.global::<FixtureListStore>().on_patch(
-        move |universe, address, fixture_def_id, mode, pos| {
-            let universe_id = parse_universe_id(universe.as_str());
-            let fixture_def_id =
-                FixtureDefId::from(Uuid::parse_str(fixture_def_id.as_str()).unwrap());
-            let fixture_name = {
-                let doc = doc_clone.read();
-                let fixture_def = doc.get_fixture_def(&fixture_def_id).unwrap(); // FIXME: unwrap
-                let num = 0; // TODO: 同じFixtureDefを使うFixtureの数を取得する(DocStoreに追加？)
-                format!("{}({})", fixture_def.model(), num)
-            };
-            let fixture = Fixture::new(
-                fixture_name,
-                universe_id,
-                DmxAddress::new(address as usize).unwrap(),
-                fixture_def_id,
-                mode.to_string(),
-                pos.x,
-                pos.y,
-            );
-            if let Err(e) = command_manager
-                .borrow_mut()
-                .execute(Box::new(doc_commands::AddFixture::new(fixture)))
-            {
-                e.to_shared_string()
-            } else {
-                "".to_shared_string()
-            }
-        },
-    );
-
-    let ui_handle = ui.as_weak();
-    ui.global::<FixtureListStore>().on_get_modes(move |def_id| {
-        let ui = ui_handle.unwrap();
-        let store = ui.global::<FixtureListStore>();
-        let fixture_model = store
-            .get_model()
-            .iter()
-            .find_map(|m| m.fixtures.iter().find(|fxt| fxt.id == def_id))
-            .unwrap();
-        fixture_model.modes
-    });
-
-    let doc_clone = ReadOnly::clone(&doc);
     ui.global::<FixtureListStore>()
         .on_get_next_address(move |universe| {
             let universe_id = parse_universe_id(universe.as_str());
@@ -153,20 +109,4 @@ impl Drop for FixtureListViewController {
     fn drop(&mut self) {
         debug!("FixtureListViewController is dropping");
     }
-}
-
-fn parse_universe_id(universe_name: &str) -> UniverseId {
-    // TODO: nameを自由に付けられるようにする
-    let universe_id = universe_name
-        .split(" ")
-        .collect::<Vec<&str>>()
-        .get(1)
-        .expect(
-            "cusstom universe name is not supproted at the moment: expected `universe <number>`",
-        )
-        .parse::<u8>()
-        .expect(
-            "custom universe name is not supproted at the moment: expected `universe <number>`",
-        ); // TODO: エラーを返せるか？
-    UniverseId::new(universe_id)
 }

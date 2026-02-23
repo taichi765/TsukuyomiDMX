@@ -1,7 +1,12 @@
+#![allow(unused_imports)]
+
+pub mod app;
 pub mod colors;
-pub mod controllers;
-pub mod doc_event_bridge;
-pub mod hashmap_model;
+//pub mod controllers;
+mod models;
+mod tea {
+    pub mod fixture_list_view;
+}
 
 use std::cell::RefCell;
 use std::error::Error;
@@ -16,16 +21,14 @@ use slint::wgpu_27::{WGPUConfiguration, WGPUSettings};
 use slint::{Timer, TimerMode};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use tsukuyomi_core::command_manager::CommandManager;
-use tsukuyomi_core::commands::doc_commands;
-use tsukuyomi_core::doc::{DocEventBus, DocHandle, DocStore};
 use tsukuyomi_core::engine::{Engine, EngineCommand, EngineMessage};
-use tsukuyomi_core::{ReadOnly, commands, commands::DocCommand, doc::DocObserver, prelude::*};
+use tsukuyomi_core::prelude::*;
 
-use crate::controllers::*;
-use crate::doc_event_bridge::DocEventBridge;
+use crate::app::App;
 
-slint::include_modules!();
+mod ui {
+    slint::include_modules!();
+}
 
 pub fn run_main() -> Result<(), Box<dyn Error>> {
     // Initialize logger
@@ -34,14 +37,20 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    let app = App::new();
+    app.run()?;
+    Ok(())
+}
+
+/*fn hoge() {
     // HACK: depending on the order of initialization, it would cause crash.
-    let doc = Arc::new(RwLock::new(DocStore::new()));
+    let doc = Arc::new(RwLock::new(DocState::new()));
     let mut event_bus = DocEventBus::new();
 
     // HACK: Initialize all observers before changing Doc.
     // If Doc is changed before engine initialized, states in observers(and engine) would be invalid.
     let (engine_handle, command_tx, error_rx, _bridge) =
-        setup_engine(ReadOnly::new(Arc::clone(&doc)), &mut event_bus);
+        setup_engine(ArcView::new(Arc::clone(&doc)), &mut event_bus);
 
     let ui = setup_window().expect("failed to setup ui");
 
@@ -57,7 +66,7 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
     setup_fader_view(&ui, command_tx.clone(), fixture_id);
     let (mut dc, mut update_2d_preview) = setup_2d_preview(
         &ui,
-        ReadOnly::new(Arc::clone(&doc)),
+        ArcView::new(Arc::clone(&doc)),
         &mut event_bus,
         command_tx.clone(),
     );
@@ -73,13 +82,13 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
 
     let _controller = setup_fixture_list_view(
         &ui,
-        ReadOnly::new(Arc::clone(&doc)),
+        ArcView::new(Arc::clone(&doc)),
         &mut event_bus.borrow_mut(),
         Rc::clone(&command_manager),
     );
     let _controller = setup_universe_view(
         &ui,
-        ReadOnly::new(Arc::clone(&doc)),
+        ArcView::new(Arc::clone(&doc)),
         &mut event_bus.borrow_mut(),
     );
 
@@ -99,12 +108,10 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
     }
 
     engine_handle.join().unwrap();
+}*/
 
-    Ok(())
-}
-
-fn setup_engine(
-    doc: ReadOnly<DocStore>,
+/*fn setup_engine(
+    doc: ArcView<DocState>,
     event_bus: &mut DocEventBus,
 ) -> (
     std::thread::JoinHandle<()>,
@@ -126,9 +133,9 @@ fn setup_engine(
         .spawn(move || engine.start_loop())
         .unwrap();
     (engine_handle, command_tx, error_rx, bridge)
-}
+}*/
 
-fn setup_window() -> Result<AppWindow, Box<dyn Error>> {
+/*fn setup_window() -> Result<AppWindow, Box<dyn Error>> {
     slint::BackendSelector::new()
         .require_wgpu_27(WGPUConfiguration::Automatic(WGPUSettings::default()))
         .select()
@@ -159,9 +166,9 @@ fn setup_window() -> Result<AppWindow, Box<dyn Error>> {
     });
 
     Ok(ui)
-}
+}*/
 
-fn create_some_presets() -> (Vec<Box<dyn DocCommand>>, FixtureId) {
+/*fn create_some_presets() -> (Vec<Box<dyn DocCommand>>, FixtureId) {
     let mut commands: Vec<Box<dyn DocCommand>> = Vec::new();
 
     let fixture_def_id = {
@@ -257,4 +264,4 @@ fn create_some_presets() -> (Vec<Box<dyn DocCommand>>, FixtureId) {
     }
 
     (commands, fixture_id)
-}
+}*/
