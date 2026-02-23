@@ -10,11 +10,13 @@ tsukuyomi-core = { path = "../core" }
 
 slint = { workspace = true }
 i-slint-backend-winit = { workspace = true }
+i-slint-core = { path = "../../slint/internal/core" }
 
 tracing-subscriber = "0.3.0"
 uuid = { workspace = true }
 tracing = { workspace = true }
 wgpu = { workspace = true }
+derive_more = { workspace = true, features = ["debug"] }
 
 [build-dependencies]
 slint-build = { workspace = true }
