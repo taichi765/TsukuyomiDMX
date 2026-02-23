@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use bimap::BiHashMap;
 use thiserror::Error;
@@ -23,6 +23,24 @@ impl Clone for FixtureDefId {
     /// Cheap clone (Same as [`Arc::clone()`][std::sync::Arc])
     fn clone(&self) -> Self {
         Self(Arc::clone(&self.0))
+    }
+}
+
+impl TryFrom<&str> for FixtureDefId {
+    type Error = String; // どんな変換ロジックかはブラックボックスにしておきたいのであえてenumにしない
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut it = value.split("@");
+        let model = it.next().ok_or("value was empty")?.to_string();
+        let manufacturer = it.next().ok_or("invalid format")?.to_string();
+        assert!(it.next().is_none(), "this case is not yet implmented");
+        Ok(Self(Arc::new((manufacturer, model))))
+    }
+}
+
+impl Display for FixtureDefId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.0.1, self.0.0) // TODO: manufacturerやmodelの中に'@'が含まれていないことは保証されていない
     }
 }
 
