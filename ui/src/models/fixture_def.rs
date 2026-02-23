@@ -10,10 +10,13 @@ use tsukuyomi_core::{
 type Manufacturer = SharedString;
 type ModelName = SharedString;
 
+#[derive(derive_more::Debug)]
 pub struct FixtureDefModel {
+    #[debug(skip)]
     state: DocStateView,
     catalog: RefCell<HashMap<Manufacturer, Vec<(FixtureDefId, ModelName)>>>,
     keys: RefCell<Vec<Manufacturer>>,
+    #[debug(skip)]
     notify: ModelNotify,
 }
 
