@@ -1,3 +1,4 @@
+#![allow(unused)]
 use uuid::Uuid;
 
 use super::FunctionData;

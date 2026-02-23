@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub struct Collection {
     id: usize,
     name: String,
