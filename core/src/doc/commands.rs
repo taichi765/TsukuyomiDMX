@@ -3,9 +3,9 @@ pub use functions::*;
 pub use plugins::*;
 pub use universes::*;
 
-use crate::doc::{state::DocState, DocEffect};
+use crate::doc::{DocEffect, state::DocState};
 
-pub trait DocCommand {
+pub(super) trait DocCommand {
     /// 逆コマンドを返す。
     fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
 }

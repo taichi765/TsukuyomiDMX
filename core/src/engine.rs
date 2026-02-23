@@ -2,7 +2,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tracing::{info, trace, warn};
 use uuid::Uuid;
 
-use crate::doc::{DocState, OutputPluginId, ResolvedAddress};
+use crate::doc::{DocStateView, OutputPluginId, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
 use crate::functions::{FunctionCommand, FunctionId, FunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
@@ -10,7 +10,6 @@ use crate::universe::UniverseId;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
-use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -21,7 +20,7 @@ const TICK_DURATION: Duration = Duration::from_millis(100);
 // TODO: unwrap, expectを減らす
 /// Orchestrates [`FunctionRuntime`]s
 pub struct Engine {
-    doc: Arc<DocState>,
+    doc: DocStateView,
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
@@ -36,7 +35,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(
-        doc: Arc<DocState>,
+        doc: DocStateView,
         command_rx: Receiver<EngineCommand>,
         message_tx: Sender<EngineMessage>,
     ) -> Self {
