@@ -9,7 +9,6 @@ mod state;
 
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
     sync::Arc,
 };
 
@@ -37,29 +36,22 @@ pub struct Doc {
 }
 
 impl Doc {
-    pub fn new() -> Self {
-        let path: PathBuf = [
-            r"C:\",
-            "Users",
-            "taich",
-            "source",
-            "tsukuyomi-rs",
-            "resources",
-            "fixture_defs",
-        ]
-        .iter()
-        .collect(); // TODO: dirsクレートを使う
-        let state = DocState::new(Box::new(FixtureDefRegistryImpl::new(path)));
-        state
-            .load_defs()
-            .expect("TODO: 初回のloadはUI側に呼ばせてもいいかも");
-        Self {
+    pub fn try_new() -> Result<Self, std::io::Error> {
+        let def_resource_path = {
+            let mut p = dirs::data_local_dir().unwrap();
+            p.push("tsukuyomidmx");
+            p.push("fixtures");
+            p
+        };
+        let state = DocState::new(Box::new(FixtureDefRegistryImpl::new(def_resource_path)));
+        state.load_defs()?;
+
+        Ok(Self {
             state: Arc::new(state),
             subscribers: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            fixture_by_address_index: HashMap::new(),
-        }
+        })
     }
 
     pub fn new_with_def_registry(def_registry: Box<dyn FixtureDefRegistry>) -> Self {
