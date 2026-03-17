@@ -1,11 +1,10 @@
 //! Validates command and returns [`DocEvent`] or an error.
 //! Similar to event sourcing's decider.
 
-use std::collections::HashMap;
-
 use super::errors::*;
 use super::{DocEffect, DocStateView};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
+use crate::doc::state::AddressIndex;
 use crate::fixture::FixtureChange;
 use crate::functions::FunctionData;
 use crate::prelude::*;
@@ -13,8 +12,7 @@ use crate::prelude::*;
 pub(super) fn add_fixture(
     state: DocStateView,
     fixture: Fixture,
-    fixture_by_address_index: &HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
-) -> Result<AddFixtureCommand, FixtureAddError> {
+) -> Result<AddFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)>>, FixtureAddError> {
     if state.with_fixtures(|it| it.contains_key(&fixture.id())) {
         return Err(FixtureAddError::FixtureAlreadyExists(fixture.id()));
     }
@@ -34,36 +32,32 @@ pub(super) fn add_fixture(
                 fixture_def: def_id.clone(),
                 mode: fixture.fixture_mode().to_string(),
             }))?;
-        Ok::<_, FixtureAddError>(
-            mode.occupied_addresses(fixture.address())
-                .collect::<Vec<_>>(),
-        )
+
+        Ok::<_, FixtureAddError>(mode.occupied_addresses(fixture.universe_id(), fixture.address()))
     })?;
 
-    validate_fixture_address(&fixture, &occupied_addresses, fixture_by_address_index)
-        .map_err(|e| FixtureAddError::AddressValidateError(e))?;
+    state.with_address_index(|index| {
+        validate_fixture_address(fixture.id(), occupied_addresses.clone(), index)
+            .map_err(|e| FixtureAddError::AddressValidateError(e))
+    })?;
 
-    Ok(AddFixtureCommand::new(fixture))
+    Ok(AddFixtureCommand::new(fixture, occupied_addresses))
 }
 
 pub(super) fn update_fixture(
     state: DocStateView,
     id: FixtureId,
     change: FixtureChange,
-    fixture_by_address_index: &HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
 ) -> Result<UpdateFixtureCommand, FixtureUpdateError> {
     state.with_fixtures_and_defs(|fxts, defs| -> Result<(), FixtureUpdateError> {
         let fxt = fxts.get(&id).ok_or(FixtureNotFound(id))?;
         let def = defs.get(&fxt.fixture_def()).unwrap();
         let occupied_addresses = compute_occupied_addresses(fxt, def, &change)?;
 
-        validate_fixture_address_change(
-            fxt,
-            &change,
-            &occupied_addresses,
-            &fixture_by_address_index,
-        )
-        .map_err(|e| FixtureUpdateError::AddressValidateError(e))
+        state.with_address_index(|index| {
+            validate_fixture_address_change(fxt, &change, occupied_addresses, index)
+                .map_err(|e| FixtureUpdateError::AddressValidateError(e))
+        })
     })?;
 
     // TODO: projectionに移す
@@ -128,91 +122,74 @@ pub(super) fn remove_function(_state: DocStateView, _id: &FunctionId) -> Result<
     todo!()
 }
 
+/// changeを適用したあとのoccupied_addressを計算する
 fn compute_occupied_addresses(
     fixture: &Fixture,
     def: &FixtureDef,
     change: &FixtureChange,
-) -> Result<Vec<DmxAddress>, ModeNotFound> {
+) -> Result<impl Iterator<Item = (UniverseId, DmxAddress)>, ModeNotFound> {
     match change {
         FixtureChange::Mode(mode_name) => {
             let mode = def.mode(mode_name).ok_or(ModeNotFound {
                 fixture_def: def.id().clone(),
                 mode: mode_name.clone(),
             })?;
-            Ok(mode.occupied_addresses(fixture.address()).collect())
+            Ok(mode.occupied_addresses(fixture.universe_id(), fixture.address()))
         }
         FixtureChange::Address(adr) => {
             let mode = def
                 .mode(fixture.fixture_mode())
                 .expect("invariant: mode must exist");
-            Ok(mode.occupied_addresses(*adr).collect())
+            Ok(mode.occupied_addresses(fixture.universe_id(), *adr))
+        }
+        FixtureChange::Universe(u_id) => {
+            let mode = def
+                .mode(fixture.fixture_mode())
+                .expect("invariant: mode must exist");
+            Ok(mode.occupied_addresses(*u_id, fixture.address()))
         }
         _ => {
             let mode = def
                 .mode(fixture.fixture_mode())
                 .expect("invariant: mode must exist");
-            Ok(mode.occupied_addresses(fixture.address()).collect())
+            Ok(mode.occupied_addresses(fixture.universe_id(), fixture.address()))
         }
     }
 }
 
-/// Validates that the fixture does not conflict with existing [Fixture]s' address.
-/// This is a helper function to call [`validate_fixture_address_with_params()`].
-fn validate_fixture_address(
-    fixture: &Fixture,
-    occupied_addresses: &[DmxAddress],
-    fixture_by_address_index: &HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
-) -> Result<(), ValidateError> {
-    validate_fixture_address_with_params(
-        fixture.id(),
-        fixture.universe_id(),
-        occupied_addresses,
-        fixture_by_address_index,
-    )
-}
-
-/// Helper function to call [`validate_fixture_address_with_params()`].
+/// Helper function to call [`validate_fixture_address()`].
+///
+/// If change doesn't affect to the address, it does nothing and `Ok(())` is returned.
 fn validate_fixture_address_change(
     fixture: &Fixture,
     change: &FixtureChange,
-    occupied_addresses: &[DmxAddress],
-    fixture_by_address_index: &HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
+    occupied_addresses: impl Iterator<Item = (UniverseId, DmxAddress)>,
+    address_index: &AddressIndex,
 ) -> Result<(), ValidateError> {
     match change {
-        FixtureChange::Universe(u_id) => validate_fixture_address_with_params(
-            fixture.id(),
-            *u_id,
-            occupied_addresses,
-            fixture_by_address_index,
-        ),
-        FixtureChange::Address(_) | FixtureChange::Mode(_) => validate_fixture_address_with_params(
-            fixture.id(),
-            fixture.universe_id(),
-            occupied_addresses,
-            fixture_by_address_index,
-        ),
+        FixtureChange::Address(_) | FixtureChange::Mode(_) | FixtureChange::Universe(_) => {
+            validate_fixture_address(fixture.id(), occupied_addresses, address_index)
+        }
         _ => Ok(()),
     }
 }
 
-/// Actual validation.
-fn validate_fixture_address_with_params(
+/// Validates that the fixture does not conflict with existing [Fixture]s' address.
+fn validate_fixture_address(
     fixture_id: FixtureId,
-    universe_id: UniverseId,
-    occupied_addresses: &[DmxAddress],
-    fixture_by_address_index: &HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>,
+    occupied_addresses: impl Iterator<Item = (UniverseId, DmxAddress)>,
+    address_index: &AddressIndex,
 ) -> Result<(), ValidateError> {
     let mut conflicts = Vec::new();
 
-    for (new_offset, new_adr) in occupied_addresses.iter().enumerate() {
-        if let Some((existing_fixture_id, offset)) =
-            fixture_by_address_index.get(&(universe_id, *new_adr))
-        {
+    for (new_offset, (new_uni, new_adr)) in occupied_addresses.enumerate() {
+        if let Some((existing_fixture_id, offset)) = address_index.get(&(new_uni, new_adr)) {
             if *existing_fixture_id == fixture_id {
                 continue;
             }
             conflicts.push(AddressConflictedError {
-                address: *new_adr,
+                universe: new_uni,
+                address: new_adr,
                 existing_fixture_id: *existing_fixture_id,
                 existing_offset: *offset,
                 new_fixture_id: fixture_id,

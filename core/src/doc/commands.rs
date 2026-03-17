@@ -14,21 +14,40 @@ mod fixtures {
     use crate::doc::state::DocState;
     use crate::doc::{DocCommand, DocEffect};
     use crate::fixture::{Fixture, FixtureChange, FixtureId};
+    use crate::prelude::{DmxAddress, UniverseId};
 
-    pub struct AddFixtureCommand {
+    pub struct AddFixtureCommand<T> {
         fixture: Fixture,
+        occupied_addresses: T, // TODO: クロスユニバースを考えるとVec<(UniverseId, DmxAddress)>を受けたほうがいいか？
     }
 
-    impl AddFixtureCommand {
-        pub fn new(fixture: Fixture) -> Self {
-            Self { fixture }
+    impl<T> AddFixtureCommand<T> {
+        pub fn new(fixture: Fixture, occupied_addresses: T) -> Self {
+            Self {
+                fixture,
+                occupied_addresses,
+            }
         }
     }
 
-    impl DocCommand for AddFixtureCommand {
+    impl<T> DocCommand for AddFixtureCommand<T>
+    where
+        T: Iterator<Item = (UniverseId, DmxAddress)>,
+    {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let id = self.fixture.id();
-            state.with_fixtures_mut(|it| it.insert(id, self.fixture));
+
+            // Update address index
+            let fxt = self.fixture; // due to .enumerate() moves self partially
+            self.occupied_addresses
+                .enumerate()
+                .for_each(|(offset, (u_id, adr))| {
+                    let _ = state.with_address_index_mut(|it| it.insert((u_id, adr), (id, offset)));
+                });
+
+            // Add to fixtures
+            state.with_fixtures_mut(|it| it.insert(id, fxt));
+
             (
                 Box::new(RemoveFixtureCommand::new(id)),
                 DocEffect::FixtureAdded(id),
@@ -78,8 +97,15 @@ mod fixtures {
     impl DocCommand for RemoveFixtureCommand {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let removed = state.with_fixtures_mut(|it| it.remove(&self.id).unwrap());
+            let occupied_addresses = state.with_fixture_defs(|it| {
+                it.get(removed.fixture_def())
+                    .unwrap()
+                    .mode(removed.fixture_mode())
+                    .unwrap()
+                    .occupied_addresses(removed.universe_id(), removed.address())
+            });
             (
-                Box::new(AddFixtureCommand::new(removed)),
+                Box::new(AddFixtureCommand::new(removed, occupied_addresses)),
                 DocEffect::FixtureRemoved(self.id),
             )
         }

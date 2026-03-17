@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    doc::state::DocState,
+    doc::state::{AddressIndex, DocState},
     fixture::{Fixture, FixtureChange, FixtureId, MergeMode},
     fixture_def::FixtureDefId,
     functions::{FunctionData, FunctionId},
@@ -31,8 +31,6 @@ pub struct Doc {
     subscribers: Vec<Box<dyn Fn(&DocEffect)>>,
     undo_stack: Vec<Box<dyn DocCommand>>,
     redo_stack: Vec<Box<dyn DocCommand>>,
-
-    fixture_by_address_index: HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>, // TODO: prokectionに移す
 }
 
 impl Doc {
@@ -60,7 +58,6 @@ impl Doc {
             subscribers: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            fixture_by_address_index: HashMap::new(),
         }
     }
 
@@ -97,7 +94,7 @@ impl Doc {
 
     /// Adds fixture.
     pub fn add_fixture(&mut self, fixture: Fixture) -> Result<(), FixtureAddError> {
-        let cmd = decider::add_fixture(self.state_view(), fixture, &self.fixture_by_address_index)?;
+        let cmd = decider::add_fixture(self.state_view(), fixture)?;
         self.apply_command(cmd);
         Ok(())
     }
@@ -108,12 +105,7 @@ impl Doc {
         id: FixtureId,
         change: FixtureChange,
     ) -> Result<(), FixtureUpdateError> {
-        let cmd = decider::update_fixture(
-            self.state_view(),
-            id,
-            change,
-            &self.fixture_by_address_index,
-        )?;
+        let cmd = decider::update_fixture(self.state_view(), id, change)?;
         self.apply_command(cmd);
         Ok(())
     }
@@ -194,6 +186,13 @@ impl DocStateView {
         F: FnOnce(&HashMap<FixtureId, Fixture>, &dyn FixtureDefRegistry) -> R,
     {
         self.0.with_fixtures_and_defs(f)
+    }
+
+    pub fn with_address_index<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&AddressIndex) -> R,
+    {
+        self.0.with_address_index(f)
     }
 }
 

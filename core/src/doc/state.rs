@@ -7,6 +7,9 @@ use crate::{
     prelude::{DmxAddress, FunctionId, UniverseId},
 };
 
+/// Get fixture id by address.
+pub type AddressIndex = HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>;
+
 /// Single source of true.
 ///
 /// Maybe similar to DB in web apps.
@@ -15,9 +18,9 @@ pub(super) struct DocState {
     fixtures: RefCell<HashMap<FixtureId, Fixture>>,
     fixture_defs: RefCell<Box<dyn FixtureDefRegistry>>,
     functions: RefCell<HashMap<FunctionId, FunctionData>>,
-    universe_settings: HashMap<UniverseId, UniverseSetting>, // TODO: これもRefCell化するかも
 
-    fixture_by_address_index: HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>, // TODO: 外に出す
+    universe_settings: HashMap<UniverseId, UniverseSetting>, // TODO: これもRefCell化するかも
+    address_index: RefCell<AddressIndex>,
 }
 
 /* ---------- public, readonly ---------- */
@@ -27,9 +30,9 @@ impl DocState {
             fixtures: RefCell::new(HashMap::new()),
             fixture_defs: RefCell::new(def_registry),
             functions: RefCell::new(HashMap::new()),
-            universe_settings: HashMap::new(),
 
-            fixture_by_address_index: HashMap::new(),
+            universe_settings: HashMap::new(),
+            address_index: RefCell::new(AddressIndex::new()),
         }
     }
 
@@ -70,6 +73,14 @@ impl DocState {
         f(&fixtures, &(**defs))
     }
 
+    pub fn with_address_index<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&AddressIndex) -> R,
+    {
+        let index = self.address_index.borrow();
+        f(&index)
+    }
+
     pub(super) fn with_fixtures_mut<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<FixtureId, Fixture>) -> R,
@@ -78,12 +89,21 @@ impl DocState {
         f(&mut fixtures)
     }
 
+    #[allow(unused)]
     pub(super) fn with_functions_mut<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<FunctionId, FunctionData>) -> R,
     {
         let mut functions = self.functions.borrow_mut();
         f(&mut functions)
+    }
+
+    pub(super) fn with_address_index_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut AddressIndex) -> R,
+    {
+        let mut index = self.address_index.borrow_mut();
+        f(&mut index)
     }
 
     pub(super) fn load_defs(&self) -> Result<(), std::io::Error> {
@@ -135,14 +155,6 @@ impl DocState {
             },
         ))*/
         todo!("FixtureStoreかDocに移動するかも")
-    }
-
-    pub fn get_fixture_by_address(
-        &self,
-        universe_id: &UniverseId,
-        address: DmxAddress,
-    ) -> Option<&(FixtureId, usize)> {
-        self.fixture_by_address_index.get(&(*universe_id, address))
     }
 
     /// Returns max address which is occupied by a fixture.

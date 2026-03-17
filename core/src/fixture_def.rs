@@ -3,7 +3,10 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 use bimap::BiHashMap;
 use thiserror::Error;
 
-use crate::{fixture::MergeMode, prelude::DmxAddress};
+use crate::{
+    fixture::MergeMode,
+    prelude::{DmxAddress, UniverseId},
+};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FixtureDefId(Arc<(ofl_schemas::NonEmptyString, ofl_schemas::NonEmptyString)>);
@@ -201,11 +204,15 @@ impl FixtureMode {
         self.channel_order.len()
     }
 
+    /// Iterate over the occupied addresses.
+    ///
+    /// Usually UniverseId is same in all addresses, but in a cross-universe fixture it changes.
     pub fn occupied_addresses(
         &self,
+        start_universe: UniverseId,
         start_address: DmxAddress,
-    ) -> impl Iterator<Item = DmxAddress> {
-        AddressIter::new(start_address, self.footprint())
+    ) -> AddressIter {
+        AddressIter::new(start_universe, start_address, self.footprint())
     }
 
     pub fn get_offset_by_channel(&self, channel: &str) -> Option<usize> {
@@ -217,36 +224,41 @@ impl FixtureMode {
     }
 }
 
+#[derive(Clone)]
 pub struct AddressIter {
-    start_address: DmxAddress,
     footprint: usize,
     count: usize,
+    current_universe: UniverseId,
+    current_address: DmxAddress,
 }
 
 impl AddressIter {
-    fn new(start_address: DmxAddress, footprint: usize) -> Self {
+    fn new(start_universe: UniverseId, start_address: DmxAddress, footprint: usize) -> Self {
         Self {
-            start_address,
             footprint,
             count: 0,
+            current_universe: start_universe,
+            current_address: start_address,
         }
     }
 }
 
 impl Iterator for AddressIter {
-    type Item = DmxAddress;
+    type Item = (UniverseId, DmxAddress);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.count >= self.footprint {
-            None
-        } else {
-            let ret = self
-                .start_address
-                .checked_add(self.count)
-                .expect("これはsafe?");
-            self.count += 1;
-            Some(ret)
+            return None;
         }
+
+        if self.current_address == DmxAddress::MAX {
+            self.current_universe = UniverseId::new(self.current_universe.value() + 1);
+            self.current_address = DmxAddress::MIN
+        } else {
+            self.current_address = self.current_address.checked_add(1).unwrap();
+        }
+        self.count += 1;
+        Some((self.current_universe, self.current_address))
     }
 }
 
@@ -288,6 +300,33 @@ pub enum ChannelKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn address_iter_works_with_single_universe() {
+        let uni_id = UniverseId::new(0);
+        let mut iter = AddressIter::new(uni_id, DmxAddress::new(1).unwrap(), 2);
+
+        assert!(
+            iter.next()
+                .is_some_and(|e| e == (uni_id, DmxAddress::new(1).unwrap()))
+        );
+        assert!(
+            iter.next()
+                .is_some_and(|e| e == (uni_id, DmxAddress::new(2).unwrap()))
+        );
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn address_iter_works_with_cross_universe() {
+        let iter = AddressIter::new(UniverseId::new(0), DmxAddress::new(510).unwrap(), 5);
+        let mut iter = iter.skip(3);
+
+        assert!(
+            iter.next()
+                .is_some_and(|e| e == (UniverseId::new(1), DmxAddress::MIN))
+        );
+    }
 
     mod fixture_mode_new {
         use super::*;
