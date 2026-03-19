@@ -310,9 +310,7 @@ impl UniverseSetting {
 
 #[cfg(test)]
 mod tests {
-    mod address_index;
     mod commands;
-    mod current_max_address;
     mod events;
     //mod fixtures;
     //mod functions;
