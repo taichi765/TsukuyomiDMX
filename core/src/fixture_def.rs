@@ -228,8 +228,8 @@ impl FixtureMode {
 pub struct AddressIter {
     footprint: usize,
     count: usize,
-    current_universe: UniverseId,
-    current_address: DmxAddress,
+    next_universe: UniverseId,
+    next_address: DmxAddress,
 }
 
 impl AddressIter {
@@ -237,8 +237,8 @@ impl AddressIter {
         Self {
             footprint,
             count: 0,
-            current_universe: start_universe,
-            current_address: start_address,
+            next_universe: start_universe,
+            next_address: start_address,
         }
     }
 }
@@ -251,14 +251,16 @@ impl Iterator for AddressIter {
             return None;
         }
 
-        if self.current_address == DmxAddress::MAX {
-            self.current_universe = UniverseId::new(self.current_universe.value() + 1);
-            self.current_address = DmxAddress::MIN
+        let ret = (self.next_universe, self.next_address);
+
+        if self.next_address == DmxAddress::MAX {
+            self.next_universe = UniverseId::new(self.next_universe.value() + 1);
+            self.next_address = DmxAddress::MIN
         } else {
-            self.current_address = self.current_address.checked_add(1).unwrap();
+            self.next_address = self.next_address.checked_add(1).unwrap();
         }
         self.count += 1;
-        Some((self.current_universe, self.current_address))
+        Some(ret)
     }
 }
 
