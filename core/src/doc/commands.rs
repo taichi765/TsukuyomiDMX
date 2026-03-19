@@ -1,3 +1,5 @@
+use std::any::Any;
+
 pub use fixtures::*;
 pub use functions::*;
 pub use plugins::*;
@@ -7,18 +9,24 @@ use crate::doc::{DocEffect, state::DocState};
 
 pub(super) trait DocCommand {
     /// 逆コマンドを返す。
+    #[must_use]
     fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
+    /// This allows downcasting to specific command types so that you can use `assert_eq!()`
+    fn as_any(&self) -> &dyn Any;
 }
 
 mod fixtures {
+    use std::fmt::Debug;
+
     use crate::doc::state::DocState;
     use crate::doc::{DocCommand, DocEffect};
     use crate::fixture::{Fixture, FixtureChange, FixtureId};
     use crate::prelude::{DmxAddress, UniverseId};
 
+    #[derive(Debug, Clone, PartialEq)]
     pub struct AddFixtureCommand<T> {
         fixture: Fixture,
-        occupied_addresses: T, // TODO: クロスユニバースを考えるとVec<(UniverseId, DmxAddress)>を受けたほうがいいか？
+        occupied_addresses: T,
     }
 
     impl<T> AddFixtureCommand<T> {
@@ -32,13 +40,14 @@ mod fixtures {
 
     impl<T> DocCommand for AddFixtureCommand<T>
     where
-        T: Iterator<Item = (UniverseId, DmxAddress)>,
+        T: Iterator<Item = (UniverseId, DmxAddress)> + 'static,
     {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let id = self.fixture.id();
 
             // Update address index
             let fxt = self.fixture; // due to .enumerate() moves self partially
+
             self.occupied_addresses
                 .enumerate()
                 .for_each(|(offset, (u_id, adr))| {
@@ -53,37 +62,80 @@ mod fixtures {
                 DocEffect::FixtureAdded(id),
             )
         }
-    }
 
-    pub struct UpdateFixtureCommand {
-        id: FixtureId,
-        change: FixtureChange,
-    }
-
-    impl UpdateFixtureCommand {
-        pub fn new(id: FixtureId, change: FixtureChange) -> Self {
-            Self { id, change }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 
-    impl DocCommand for UpdateFixtureCommand {
+    #[derive(Debug, PartialEq, Clone)]
+    pub struct UpdateFixtureCommand<T> {
+        id: FixtureId,
+        change: FixtureChange,
+        old_occupied_addresses: T,
+        new_occupied_addresses: T,
+    }
+
+    impl<T> UpdateFixtureCommand<T> {
+        pub fn new(
+            id: FixtureId,
+            change: FixtureChange,
+            old_occupied_addresses: T,
+            new_occupied_addresses: T,
+        ) -> Self {
+            Self {
+                id,
+                change,
+                old_occupied_addresses,
+                new_occupied_addresses,
+            }
+        }
+    }
+
+    impl<T> DocCommand for UpdateFixtureCommand<T>
+    where
+        T: Iterator<Item = (UniverseId, DmxAddress)> + Clone + 'static,
+    {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let rev_change = state.with_fixtures(|it| {
                 let fxt = it.get(&self.id).unwrap();
                 self.change.inverse_from(fxt)
             });
 
-            let id = self.id;
-            state.with_fixtures_mut(|it| {
-                it.get_mut(&self.id).unwrap().apply_change(self.change);
+            self.old_occupied_addresses.clone().for_each(|(uni, adr)| {
+                let _ = state.with_address_index_mut(|index| index.remove(&(uni, adr)));
             });
+            self.new_occupied_addresses
+                .clone()
+                .enumerate()
+                .for_each(|(offset, (uni, adr))| {
+                    let _ = state.with_address_index_mut(|index| {
+                        index.insert((uni, adr), (self.id, offset))
+                    });
+                });
+
+            let (id, change) = (self.id, self.change);
+            state.with_fixtures_mut(|it| {
+                it.get_mut(&id).unwrap().apply_change(change);
+            });
+
             (
-                Box::new(UpdateFixtureCommand::new(id, rev_change)),
+                Box::new(UpdateFixtureCommand::new(
+                    id,
+                    rev_change,
+                    self.new_occupied_addresses,
+                    self.old_occupied_addresses,
+                )),
                 DocEffect::FixtureUpdated(id),
             )
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
+    #[derive(Debug, PartialEq, Clone)]
     pub struct RemoveFixtureCommand {
         id: FixtureId,
     }
@@ -104,10 +156,17 @@ mod fixtures {
                     .unwrap()
                     .occupied_addresses(removed.universe_id(), removed.address())
             });
+            occupied_addresses.clone().for_each(|(uni, adr)| {
+                let _ = state.with_address_index_mut(|index| index.remove(&(uni, adr)));
+            });
             (
                 Box::new(AddFixtureCommand::new(removed, occupied_addresses)),
                 DocEffect::FixtureRemoved(self.id),
             )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 }
