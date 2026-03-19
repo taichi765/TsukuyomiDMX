@@ -249,9 +249,10 @@ pub struct ResolvedAddress {
 #[cfg(test)]
 mod tests {
     mod address_index;
+    mod commands;
     mod current_max_address;
     mod events;
-    mod fixtures;
+    //mod fixtures;
     mod functions;
     mod helpers;
     mod resolve;

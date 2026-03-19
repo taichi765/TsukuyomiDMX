@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use bimap::BiHashMap;
 use thiserror::Error;
@@ -224,7 +228,7 @@ impl FixtureMode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddressIter {
     footprint: usize,
     count: usize,

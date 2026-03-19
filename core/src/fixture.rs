@@ -13,7 +13,7 @@ pub enum MergeMode {
 
 // TODO: builderパターン
 // TODO: クロスユニバース
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Fixture {
     id: FixtureId,
     name: String,
@@ -99,7 +99,7 @@ impl Fixture {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FixtureChange {
     Rename(String),
     Universe(UniverseId),
