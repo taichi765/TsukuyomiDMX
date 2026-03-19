@@ -6,6 +6,7 @@ use super::{DocEffect, DocStateView};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
 use crate::doc::state::AddressIndex;
 use crate::fixture::FixtureChange;
+use crate::fixture_def::AddressIter;
 use crate::functions::FunctionData;
 use crate::prelude::*;
 
@@ -48,28 +49,38 @@ pub(super) fn update_fixture(
     state: DocStateView,
     id: FixtureId,
     change: FixtureChange,
-) -> Result<UpdateFixtureCommand, FixtureUpdateError> {
-    state.with_fixtures_and_defs(|fxts, defs| -> Result<(), FixtureUpdateError> {
+) -> Result<
+    UpdateFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)> + Clone>,
+    FixtureUpdateError,
+> {
+    let new_occupied_addresses = state.with_fixtures_and_defs(|fxts, defs| {
         let fxt = fxts.get(&id).ok_or(FixtureNotFound(id))?;
         let def = defs.get(&fxt.fixture_def()).unwrap();
-        let occupied_addresses = compute_occupied_addresses(fxt, def, &change)?;
+        let new_occupied_addresses = compute_occupied_addresses(fxt, def, &change)?;
 
-        state.with_address_index(|index| {
-            validate_fixture_address_change(fxt, &change, occupied_addresses, index)
-                .map_err(|e| FixtureUpdateError::AddressValidateError(e))
-        })
+        state
+            .with_address_index(|index| {
+                validate_fixture_address_change(fxt, &change, new_occupied_addresses.clone(), index)
+                    .map_err(|e| FixtureUpdateError::AddressValidateError(e))
+            })
+            .map(|_| new_occupied_addresses)
     })?;
 
-    // TODO: projectionに移す
-    /*for adr in occupied_addresses {
-        if let Some(_) = self.fixture_by_address_index.insert(
-            (fixture.universe_id(), adr),
-            (fixture.id(), adr.checked_sub(fixture.address()).unwrap()),
-        ) {
-            warn!("there must be logic error in address validation");
-        }
-    }*/
-    Ok(UpdateFixtureCommand::new(id, change))
+    let old_occupied_addresses = state.with_fixtures_and_defs(|fxts, defs| {
+        let fxt = fxts.get(&id).unwrap();
+        defs.get(&fxt.fixture_def())
+            .unwrap()
+            .mode(fxt.fixture_mode())
+            .unwrap()
+            .occupied_addresses(fxt.universe_id(), fxt.address())
+    });
+
+    Ok(UpdateFixtureCommand::new(
+        id,
+        change,
+        old_occupied_addresses,
+        new_occupied_addresses,
+    ))
 }
 
 pub(super) fn remove_fixture(
@@ -110,14 +121,17 @@ pub(super) fn remove_fixture(
     Ok(RemoveFixtureCommand::new(*id))
 }
 
+#[allow(unused)]
 pub(super) fn add_function(_state: DocStateView, _value: FunctionData) -> Result<DocEffect, ()> {
     todo!()
 }
 
+#[allow(unused)]
 pub(super) fn update_function(_state: DocStateView, _new: FunctionData) -> Result<DocEffect, ()> {
     todo!()
 }
 
+#[allow(unused)]
 pub(super) fn remove_function(_state: DocStateView, _id: &FunctionId) -> Result<DocEffect, ()> {
     todo!()
 }
@@ -127,7 +141,7 @@ fn compute_occupied_addresses(
     fixture: &Fixture,
     def: &FixtureDef,
     change: &FixtureChange,
-) -> Result<impl Iterator<Item = (UniverseId, DmxAddress)>, ModeNotFound> {
+) -> Result<AddressIter, ModeNotFound> {
     match change {
         FixtureChange::Mode(mode_name) => {
             let mode = def.mode(mode_name).ok_or(ModeNotFound {
