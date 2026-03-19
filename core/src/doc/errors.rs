@@ -11,11 +11,7 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum ResolveError {
     #[error(transparent)]
-    FixtureNotFound(#[from] FixtureNotFound),
-    #[error(transparent)]
-    FixtureDefNotFound(#[from] FixtureDefNotFound),
-    #[error(transparent)]
-    ModeNotFound(#[from] ModeNotFound),
+    FixtureNotFound(#[from] FixtureNotFoundError),
     #[error("cannot find channel {channel} in mode {mode} of {fixture_def:?}")]
     ChannelNotFound {
         fixture_def: FixtureDefId,
@@ -26,11 +22,11 @@ pub enum ResolveError {
 
 #[derive(Debug, Error)]
 #[error("cannot find fixture {0:?}")]
-pub struct FixtureNotFound(pub FixtureId);
+pub struct FixtureNotFoundError(pub FixtureId);
 
 #[derive(Debug, Error)]
 #[error("cannot find fixture definition {fixture_def_id:?} for fixture {fixture_id:?}: {source:?}")]
-pub struct FixtureDefNotFound {
+pub struct FixtureDefNotFoundError {
     pub fixture_id: FixtureId,
     pub fixture_def_id: FixtureDefId,
     pub source: def_registry::FixtureDefLookupError,
@@ -38,7 +34,7 @@ pub struct FixtureDefNotFound {
 
 #[derive(Debug, Error)]
 #[error("cannot find mode {mode} in the definition {fixture_def:?}")]
-pub struct ModeNotFound {
+pub struct ModeNotFoundError {
     pub fixture_def: FixtureDefId,
     pub mode: String,
 }
@@ -53,9 +49,9 @@ pub enum OutputMapError {
 #[derive(Debug, Error)]
 pub enum FixtureAddError {
     #[error(transparent)]
-    FixtureDefNotFound(#[from] FixtureDefNotFound),
+    FixtureDefNotFound(#[from] FixtureDefNotFoundError),
     #[error(transparent)]
-    ModeNotFound(#[from] ModeNotFound),
+    ModeNotFound(#[from] ModeNotFoundError),
     #[error(transparent)]
     AddressValidateError(#[from] ValidateError),
     #[error("fixture with id {0:?} already exists")]
@@ -65,9 +61,9 @@ pub enum FixtureAddError {
 #[derive(Debug, Error)]
 pub enum FixtureUpdateError {
     #[error(transparent)]
-    FixtureNotFound(#[from] FixtureNotFound),
+    FixtureNotFound(#[from] FixtureNotFoundError),
     #[error(transparent)]
-    ModeNotFound(#[from] ModeNotFound),
+    ModeNotFound(#[from] ModeNotFoundError),
     #[error(transparent)]
     AddressValidateError(#[from] ValidateError),
 }
@@ -97,5 +93,5 @@ pub struct AddressConflictedError {
 #[derive(Debug, Error)]
 pub enum FixtureRemoveError {
     #[error(transparent)]
-    FixtureNotFound(#[from] FixtureNotFound),
+    FixtureNotFound(#[from] FixtureNotFoundError),
 }

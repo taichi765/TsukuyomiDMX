@@ -21,7 +21,7 @@ pub(super) fn add_fixture(
     let def_id = fixture.fixture_def();
     let occupied_addresses = state.with_fixture_defs(|defs| {
         let def = defs.get(&def_id).map_err(|e| {
-            FixtureAddError::FixtureDefNotFound(FixtureDefNotFound {
+            FixtureAddError::FixtureDefNotFound(FixtureDefNotFoundError {
                 fixture_id: fixture.id(),
                 fixture_def_id: def_id.clone(),
                 source: e,
@@ -29,7 +29,7 @@ pub(super) fn add_fixture(
         })?;
         let mode = def
             .mode(fixture.fixture_mode())
-            .ok_or(FixtureAddError::ModeNotFound(ModeNotFound {
+            .ok_or(FixtureAddError::ModeNotFound(ModeNotFoundError {
                 fixture_def: def_id.clone(),
                 mode: fixture.fixture_mode().to_string(),
             }))?;
@@ -54,16 +54,22 @@ pub(super) fn update_fixture(
     FixtureUpdateError,
 > {
     let new_occupied_addresses = state.with_fixtures_and_defs(|fxts, defs| {
-        let fxt = fxts.get(&id).ok_or(FixtureNotFound(id))?;
+        let fxt = fxts.get(&id).ok_or(FixtureNotFoundError(id))?;
         let def = defs.get(&fxt.fixture_def()).unwrap();
         let new_occupied_addresses = compute_occupied_addresses(fxt, def, &change)?;
 
-        state
-            .with_address_index(|index| {
-                validate_fixture_address_change(fxt, &change, new_occupied_addresses.clone(), index)
-                    .map_err(|e| FixtureUpdateError::AddressValidateError(e))
-            })
-            .map(|_| new_occupied_addresses)
+        // Validate new addresses
+        match change {
+            FixtureChange::Address(_) | FixtureChange::Mode(_) | FixtureChange::Universe(_) => {
+                state
+                    .with_address_index(|index| {
+                        validate_fixture_address(fxt.id(), new_occupied_addresses.clone(), index)
+                            .map_err(|e| FixtureUpdateError::AddressValidateError(e))
+                    })
+                    .map(|_| new_occupied_addresses)
+            }
+            _ => Ok(new_occupied_addresses),
+        }
     })?;
 
     let old_occupied_addresses = state.with_fixtures_and_defs(|fxts, defs| {
@@ -141,10 +147,10 @@ fn compute_occupied_addresses(
     fixture: &Fixture,
     def: &FixtureDef,
     change: &FixtureChange,
-) -> Result<AddressIter, ModeNotFound> {
+) -> Result<AddressIter, ModeNotFoundError> {
     match change {
         FixtureChange::Mode(mode_name) => {
-            let mode = def.mode(mode_name).ok_or(ModeNotFound {
+            let mode = def.mode(mode_name).ok_or(ModeNotFoundError {
                 fixture_def: def.id().clone(),
                 mode: mode_name.clone(),
             })?;
@@ -168,23 +174,6 @@ fn compute_occupied_addresses(
                 .expect("invariant: mode must exist");
             Ok(mode.occupied_addresses(fixture.universe_id(), fixture.address()))
         }
-    }
-}
-
-/// Helper function to call [`validate_fixture_address()`].
-///
-/// If change doesn't affect to the address, it does nothing and `Ok(())` is returned.
-fn validate_fixture_address_change(
-    fixture: &Fixture,
-    change: &FixtureChange,
-    occupied_addresses: impl Iterator<Item = (UniverseId, DmxAddress)>,
-    address_index: &AddressIndex,
-) -> Result<(), ValidateError> {
-    match change {
-        FixtureChange::Address(_) | FixtureChange::Mode(_) | FixtureChange::Universe(_) => {
-            validate_fixture_address(fixture.id(), occupied_addresses, address_index)
-        }
-        _ => Ok(()),
     }
 }
 
