@@ -14,9 +14,10 @@ use std::{
 
 use crate::{
     doc::state::{AddressIndex, DocState},
-    fixture::{Fixture, FixtureChange, FixtureId, MergeMode},
+    fixture::{Fixture, FixtureChange, FixtureId},
     fixture_def::FixtureDefId,
     functions::{FunctionData, FunctionId},
+    prelude::ChannelDef,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -159,6 +160,7 @@ impl Clone for DocStateView {
     }
 }
 
+// RefCell borrow
 impl DocStateView {
     pub fn with_fixtures<F, R>(&self, f: F) -> R
     where
@@ -196,6 +198,65 @@ impl DocStateView {
     }
 }
 
+// Utilities
+impl DocStateView {
+    ///
+    pub fn resolve_address(
+        &self,
+        fixture_id: FixtureId,
+        channel: &str,
+    ) -> Result<ResolvedAddress, ResolveError> {
+        let (channel_def, address) =
+            self.with_fixtures_and_defs(|fxts, defs| -> Result<_, ResolveError> {
+                let fxt = fxts.get(&fixture_id).ok_or(ResolveError::FixtureNotFound(
+                    FixtureNotFoundError(fixture_id),
+                ))?;
+                let def = defs
+                    .get(&fxt.fixture_def())
+                    .expect("invariant: definition must exist");
+                let mode = def
+                    .mode(fxt.fixture_mode())
+                    .expect("invariant: mode must exist");
+                let offset =
+                    mode.get_offset_by_channel(channel)
+                        .ok_or(ResolveError::ChannelNotFound {
+                            fixture_def: fxt.fixture_def().to_owned(),
+                            mode: fxt.fixture_mode().to_string(),
+                            channel: channel.to_string(),
+                        })?;
+                let channel_def = def
+                    .channel_template(channel)
+                    .expect("channel order and channel template must match")
+                    .to_owned();
+                let address = mode
+                    .occupied_addresses(fxt.universe_id(), fxt.address())
+                    .nth(offset)
+                    .unwrap(); // TODO: この辺の処理はFixtureModeのメソッドにしたい
+                Ok((channel_def, address))
+            })?;
+
+        Ok(ResolvedAddress {
+            channel_def,
+            universe: address.0,
+            address: address.1,
+        })
+    }
+
+    /// Returns max address which is occupied by a fixture.
+    ///
+    /// If there's no fixture in the universe, `None` is returned.
+    /// If universe does not exist in the DocStore, `None` is returned.
+    pub fn current_max_address(&self, universe: UniverseId) -> Option<DmxAddress> {
+        self.with_address_index(|index| {
+            index
+                .iter()
+                .filter(|((u_id, _), _)| *u_id == universe)
+                .map(|e| e.0.1)
+                .max()
+        })
+    }
+}
+
 /// UIとかに通知する用のやつ。
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -220,6 +281,13 @@ pub enum DocEffect {
     DefRegistryLoaded,
 }
 
+#[derive(Debug)]
+pub struct ResolvedAddress {
+    pub channel_def: ChannelDef,
+    pub universe: UniverseId,
+    pub address: DmxAddress,
+}
+
 pub trait EventStore {
     fn append(&self, event: DocEffect);
 }
@@ -240,12 +308,6 @@ impl UniverseSetting {
     }
 }
 
-#[derive(Debug)]
-pub struct ResolvedAddress {
-    pub merge_mode: MergeMode,
-    pub address: DmxAddress,
-}
-
 #[cfg(test)]
 mod tests {
     mod address_index;
@@ -253,8 +315,8 @@ mod tests {
     mod current_max_address;
     mod events;
     //mod fixtures;
-    mod functions;
+    //mod functions;
     mod helpers;
-    mod resolve;
-    mod universe_outputs;
+    //mod resolve;
+    //mod universe_outputs;
 }

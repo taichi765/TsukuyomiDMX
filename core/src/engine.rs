@@ -350,7 +350,7 @@ impl UniverseState {
 
     pub(crate) fn set_value(&mut self, resolved_address: ResolvedAddress, value: u8) {
         let idx = resolved_address.address.value() - 1; // address -> index conversion
-        match resolved_address.merge_mode {
+        match resolved_address.channel_def.merge_mode() {
             MergeMode::HTP => {
                 if value > self.values[idx] {
                     self.values[idx] = value

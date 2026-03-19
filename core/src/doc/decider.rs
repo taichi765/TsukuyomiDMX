@@ -94,35 +94,10 @@ pub(super) fn remove_fixture(
     id: &FixtureId,
 ) -> Result<RemoveFixtureCommand, FixtureRemoveError> {
     if !state.with_fixtures(|it| it.contains_key(id)) {
-        return Err(FixtureRemoveError::FixtureNotFound(FixtureNotFound(*id)));
+        return Err(FixtureRemoveError::FixtureNotFound(FixtureNotFoundError(
+            *id,
+        )));
     }
-
-    // TODO: Projectionに移す
-    /*let fixture = state
-        .fixtures
-        .get(id)
-        .expect("we checked with contains_key()");
-    let def_id = fixture.fixture_def();
-    let fixture_def = state
-        .fixture_defs
-        .get(&def_id)
-        .expect("invariant: FixtureDef must exist");
-    let occupied_addresses = fixture
-    .occupied_addresses(fixture_def)
-    .expect("invariant: mode must exist");
-    for adr in occupied_addresses {
-        if let Some((old_id, offset)) = self
-            .fixture_by_address_index
-            .remove(&(fixture.universe_id(), adr))
-        {
-            // FIXME: unwrap
-            if old_id != *id || offset != adr.checked_sub(fixture.address()).unwrap() {
-                warn!(address=?adr,fixture_id=?id,?old_id,?offset,"address index had unexpected value");
-            }
-        } else {
-            warn!("the states of address index was invalid");
-        }
-    }*/
 
     Ok(RemoveFixtureCommand::new(*id))
 }
