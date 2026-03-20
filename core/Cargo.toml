@@ -8,6 +8,7 @@ artnet_protocol = "0.4.3"
 assert_matches = "1.5.0"
 bimap = { workspace = true }
 dirs = "6.0.0"
+derive-getters = { workspace = true }
 rayon = "1.11.0"
 serde = { workspace = true }
 serde_json = "1.0.149"

@@ -18,12 +18,14 @@ pub(super) trait DocCommand {
 mod fixtures {
     use std::fmt::Debug;
 
+    use derive_getters::Getters;
+
     use crate::doc::state::DocState;
     use crate::doc::{DocCommand, DocEffect};
     use crate::fixture::{Fixture, FixtureChange, FixtureId};
     use crate::prelude::{DmxAddress, UniverseId};
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Getters)]
     pub struct AddFixtureCommand<T> {
         fixture: Fixture,
         occupied_addresses: T,
