@@ -1,6 +1,8 @@
 //! Validates command and returns [`DocEvent`] or an error.
 //! Similar to event sourcing's decider.
 
+use std::fmt::Debug;
+
 use super::errors::*;
 use super::{DocEffect, DocStateView};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
@@ -13,7 +15,10 @@ use crate::prelude::*;
 pub(super) fn add_fixture(
     state: DocStateView,
     fixture: Fixture,
-) -> Result<AddFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)>>, FixtureAddError> {
+) -> Result<
+    AddFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)> + Clone + Debug>,
+    FixtureAddError,
+> {
     if state.with_fixtures(|it| it.contains_key(&fixture.id())) {
         return Err(FixtureAddError::FixtureAlreadyExists(fixture.id()));
     }

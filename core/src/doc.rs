@@ -311,6 +311,7 @@ impl UniverseSetting {
 #[cfg(test)]
 mod tests {
     mod commands;
+    mod decider;
     mod events;
     //mod fixtures;
     //mod functions;

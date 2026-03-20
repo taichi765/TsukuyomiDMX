@@ -24,6 +24,14 @@ impl FixtureDefId {
     ) -> Self {
         Self(Arc::new((manufacturer, model)))
     }
+
+    /// Creates invalid id. Typically used in tests.
+    pub fn new_invalid() -> Self {
+        Self(Arc::new((
+            "invalid manufacturer".to_string(),
+            "invalid model".to_string(),
+        )))
+    }
 }
 
 impl Clone for FixtureDefId {
