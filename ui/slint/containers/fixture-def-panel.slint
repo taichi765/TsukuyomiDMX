@@ -15,9 +15,13 @@ export global FixtureListStore {
         {
             manufacturer:"Stage Evolution",
             fixtures:[{ name:"HPAR64-9" }, { name:"ORION WH" }, { name:"IM-MH90S" }],
-            expanded:false
+            expanded:false,
         },
-        { manufacturer:"IM-Relax", fixtures:[{ name:"IM-MH90S" }], expanded:false }
+        {  
+            manufacturer:"IM-Relax", 
+            fixtures:[{ name:"IM-MH90S" }],
+            expanded:false,
+        }
     ];
     /// Returns error message. Empty when there's no error.
     callback patch(universe: string, address: int, fixture-id: string, mode: string, pos: Point) -> string;

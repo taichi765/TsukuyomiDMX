@@ -13,9 +13,10 @@ use tsukuyomi_core::{
 use crate::{
     models::{FixtureDefModel, FixtureModelInner},
     tea::fixture_list_view,
-    ui::{self, AppWindow},
+    ui,
 };
 
+/// root struct
 pub struct App {
     pub doc: Arc<Mutex<Doc>>,
     pub ui: ui::AppWindow,
@@ -27,8 +28,10 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let doc = Arc::new(Mutex::new(Doc::new()));
-        let ui = AppWindow::new().unwrap();
+        let doc = Arc::new(Mutex::new(
+            Doc::try_new().expect("failed to initialize doc"),
+        ));
+        let ui = ui::AppWindow::new().unwrap();
         let dispatcher = Self::create_dispatcher();
         Self {
             doc,
@@ -66,7 +69,7 @@ pub struct SharedInnerModel {
 
 pub enum AppAction {}
 
-pub struct Dispatcher(Rc<dyn FnMut(AppAction)>);
+pub struct Dispatcher(Rc<dyn Fn(AppAction)>);
 
 impl Clone for Dispatcher {
     /// Cheap clone.

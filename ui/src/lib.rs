@@ -37,7 +37,7 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let app = App::new();
+    let mut app = App::new();
     app.run()?;
     Ok(())
 }

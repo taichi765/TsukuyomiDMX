@@ -14,7 +14,9 @@ type ModelName = SharedString;
 pub struct FixtureDefModel {
     #[debug(skip)]
     state: DocStateView,
+    /// manufacturer -> fixture_defs
     catalog: RefCell<HashMap<Manufacturer, Vec<(FixtureDefId, ModelName)>>>,
+    /// row -> manufacturer
     keys: RefCell<Vec<Manufacturer>>,
     #[debug(skip)]
     notify: ModelNotify,

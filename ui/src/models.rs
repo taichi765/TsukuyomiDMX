@@ -2,6 +2,8 @@ mod fixture;
 pub use fixture::*;
 mod fixture_def;
 pub use fixture_def::*;
+mod manufacturer;
+pub use manufacturer::*;
 
 #[cfg(test)]
 mod test_helpers {

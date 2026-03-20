@@ -9,7 +9,7 @@ export struct FixtureModel {
     }
 
 export struct ManufacturerModel {
-    manufacturer:string,
+    manufacturer: string,
     fixtures:[FixtureModel],
     expanded:bool,
 }
@@ -93,7 +93,7 @@ export component FixtureListView inherits Rectangle {
                             width: parent.width;
                             height: parent.height;
                             clicked => {
-                                manufacturer-model.expanded = !manufacturer-model.expanded
+                                manufacturer-model.expanded = !manufacturer-model.expanded;
                             }
                         }
                     }

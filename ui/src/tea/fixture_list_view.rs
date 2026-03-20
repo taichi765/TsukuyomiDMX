@@ -5,14 +5,17 @@ use std::{
 
 use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
 use tsukuyomi_core::{
-    doc::{Doc, DocStateView, FixtureAddError, FixtureDefNotFound, ModeNotFound, ValidateError},
+    doc::{
+        Doc, DocStateView, FixtureAddError, FixtureDefNotFoundError, ModeNotFoundError,
+        ValidateError,
+    },
     prelude::{DmxAddress, Fixture, FixtureDefId, UniverseId},
 };
 use uuid::Uuid;
 
 use crate::{
     app::{App, AppAction, Dispatcher},
-    models::FixtureDefModel,
+    models::{FixtureDefModel, ManufacturerModel},
     ui,
 };
 
@@ -27,29 +30,17 @@ pub fn setup(app: &mut App) {
         .def_model
         .set(Rc::clone(&def_model))
         .unwrap();
-    let map_model = MapModel::new(def_model, |(manufacturer, defs)| ui::ManufacturerModel {
-        expanded: false,
-        fixtures: Rc::new(VecModel::from(
-            defs.iter()
-                .map(|(id, model)| ui::FixtureModel {
-                    id: id.to_shared_string(),
-                    modes: Rc::new(VecModel::from(vec!["Mode 1".into()])).into(), // TODO: metadataから取得したい,
-                    name: model.to_owned(),
-                })
-                .collect::<Vec<_>>(),
-        ))
-        .into(),
-        manufacturer: manufacturer,
-    });
+    let map_model = ManufacturerModel::new(def_model);
 
     adopter.set_model(Rc::new(map_model).into());
 
+    let doc_view_clone = doc_view.clone();
     adopter.on_patch(move |universe, address, fixture_def_id, mode, pos| {
         let universe_id = parse_universe_id(universe.as_str());
         let def_id = FixtureDefId::try_from(fixture_def_id.as_str()).unwrap();
         let default_fxt_name = {
-            let model_name =
-                doc_view.with_fixture_defs(|it| it.get(&def_id).expect("todo").model().to_string());
+            let model_name = doc_view_clone
+                .with_fixture_defs(|it| it.get(&def_id).expect("todo").model().to_string());
             let num = 0; // TODO: 同じFixtureDefを使うFixtureの数を取得する(DocStoreに追加？)
             format!("{}({})", model_name, num)
         };
@@ -69,13 +60,13 @@ pub fn setup(app: &mut App) {
             Ok(_) => "".to_shared_string(),
             Err(e) => {
                 match e {
-                    FixtureAddError::FixtureDefNotFound(FixtureDefNotFound {
+                    FixtureAddError::FixtureDefNotFound(FixtureDefNotFoundError {
                         fixture_id: _,
                         fixture_def_id: def_id,
                         source: e,
                     }) => format!("couldn't find fixture definition {}: {:?}", def_id, e)
                         .to_shared_string(),
-                    FixtureAddError::ModeNotFound(ModeNotFound {
+                    FixtureAddError::ModeNotFound(ModeNotFoundError {
                         fixture_def: def_id,
                         mode,
                     }) => format!("there's no mode {mode} in the definition {def_id:?}")
@@ -105,9 +96,19 @@ pub fn setup(app: &mut App) {
         fixture_model.modes
     });
 
-    adopter.on_get_next_address(|universe| {
+    adopter.on_get_next_address(move |universe| {
         let uni_id = parse_universe_id(&universe);
-        todo!()
+        let max = doc_view.current_max_address(uni_id);
+        match max {
+            Some(adr) => {
+                if adr == DmxAddress::MAX {
+                    todo!("次のユニバースに進むか空いているところから取るかどちらがいいか?")
+                } else {
+                    adr.checked_add(1).unwrap().value() as i32
+                }
+            }
+            None => DmxAddress::MIN.value() as i32,
+        }
     });
 }
 
