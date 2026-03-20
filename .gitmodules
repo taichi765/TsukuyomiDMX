@@ -1,0 +1,3 @@
+[submodule "open-fixture-library"]
+	path = open-fixture-library
+	url = https://github.com/OpenLightingProject/open-fixture-library
