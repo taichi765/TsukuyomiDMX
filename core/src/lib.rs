@@ -57,7 +57,7 @@ pub mod prelude {
     pub use super::{
         doc::{Doc, OutputPluginId},
         fixture::{Fixture, FixtureId, MergeMode},
-        fixture_def::{ChannelDef, ChannelKind, FixtureDef, FixtureDefId, FixtureMode},
+        fixture_def::{Capability, ChannelDef, FixtureDef, FixtureDefId, FixtureMode},
         functions::FunctionId,
         universe::{DmxAddress, UniverseId},
     };

@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 use crate::{
     doc::{Doc, DocEffect, DocState, FakeFixtureDefRegistry},
     fixture::{Fixture, MergeMode},
-    fixture_def::{ChannelDef, ChannelKind, FixtureDef, FixtureDefId, FixtureMode},
+    fixture_def::{Capability, ChannelDef, FixtureDef, FixtureDefId, FixtureMode},
     universe::{DmxAddress, UniverseId},
 };
 
@@ -13,11 +13,11 @@ pub(crate) fn make_doc_state_with_simple_def() -> (Arc<DocState>, FixtureDefId) 
         let mut def = FixtureDef::new("Test Manufacturer", "Test Model");
         def.insert_channel(
             "Dimmer",
-            ChannelDef::new(MergeMode::HTP, ChannelKind::Dimmer),
+            ChannelDef::new(MergeMode::HTP, Capability::Intensity),
         );
-        def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, ChannelKind::Red));
-        def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, ChannelKind::Green));
-        def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, ChannelKind::Blue));
+        def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, Capability::Red));
+        def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, Capability::Green));
+        def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, Capability::Blue));
         def.insert_mode(
             "Mode 1",
             FixtureMode::new(

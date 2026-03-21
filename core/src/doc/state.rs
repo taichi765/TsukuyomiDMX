@@ -4,7 +4,7 @@ use crate::{
     doc::{UniverseSetting, def_registry::FixtureDefRegistry},
     fixture::{Fixture, FixtureId},
     functions::FunctionData,
-    prelude::{ChannelDef, DmxAddress, FunctionId, UniverseId},
+    prelude::{DmxAddress, FunctionId, UniverseId},
 };
 
 /// Get fixture id by address.

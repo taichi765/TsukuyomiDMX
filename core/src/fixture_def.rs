@@ -11,6 +11,7 @@ use crate::{
     fixture::MergeMode,
     prelude::{DmxAddress, UniverseId},
 };
+pub use ofl::*;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FixtureDefId(Arc<(ofl_schemas::NonEmptyString, ofl_schemas::NonEmptyString)>);
@@ -98,6 +99,11 @@ impl FixtureDef {
         self.modes.get(name)
     }
 
+    /// Returns all modes in this fixture def
+    pub fn modes_all(&self) -> &HashMap<String, FixtureMode> {
+        &self.modes
+    }
+
     pub fn channel_template(&self, name: &str) -> Option<&ChannelDef> {
         self.channel_templates.get(name)
     }
@@ -121,16 +127,6 @@ impl FixtureDef {
         self.channel_templates.insert(name.into(), channel)
     }
 }
-
-impl TryFrom<ofl_schemas::Fixture> for FixtureDef {
-    type Error = FixtureDefConverseError;
-    fn try_from(_value: ofl_schemas::Fixture) -> Result<Self, Self::Error> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum FixtureDefConverseError {}
 
 #[derive(Debug, Error)]
 pub enum FixtureModeCreateError {
@@ -279,11 +275,11 @@ impl Iterator for AddressIter {
 #[derive(Debug, Clone)]
 pub struct ChannelDef {
     merge_mode: MergeMode,
-    kind: ChannelKind,
+    kind: Capability,
 }
 
 impl ChannelDef {
-    pub fn new(merge_mode: MergeMode, kind: ChannelKind) -> Self {
+    pub fn new(merge_mode: MergeMode, kind: Capability) -> Self {
         Self { merge_mode, kind }
     }
 
@@ -291,15 +287,17 @@ impl ChannelDef {
         self.merge_mode
     }
 
-    pub fn kind(&self) -> &ChannelKind {
+    pub fn kind(&self) -> &Capability {
         &self.kind
     }
 }
 
 // TODO: Add more kinds
+/// Channel's capability
 #[derive(Debug, Clone)]
-pub enum ChannelKind {
-    Dimmer,
+#[non_exhaustive]
+pub enum Capability {
+    Intensity,
     Red,
     Blue,
     Green,
@@ -309,6 +307,144 @@ pub enum ChannelKind {
     Amber,
     UV,
     Custom, // TODO: open-fixture-library互換にする
+    Unknown,
+}
+
+mod ofl {
+    #![allow(unused)]
+    use super::*;
+    use ofl_schemas as o;
+    use std::sync::Arc;
+
+    use crate::{
+        fixture::MergeMode,
+        prelude::{Capability, ChannelDef, FixtureDef, FixtureDefId},
+    };
+
+    impl TryFrom<(String, ofl_schemas::Fixture)> for FixtureDef {
+        type Error = FixtureDefConverseError;
+        fn try_from(
+            (manufacturer, v): (String, ofl_schemas::Fixture),
+        ) -> Result<Self, Self::Error> {
+            let mut errors = Vec::new();
+
+            let res = map_channel_templates(v.available_channels);
+            let mut channel_templates = None;
+            match res {
+                Err(mut e) => {
+                    errors.append(&mut e);
+                }
+                Ok(v) => {
+                    channel_templates = Some(v);
+                }
+            }
+
+            let res = map_modes(v.modes);
+            let mut modes = None;
+            match res {
+                Ok(v) => {
+                    modes = Some(v);
+                }
+                Err(mut e) => {
+                    errors.append(&mut e);
+                }
+            }
+
+            if !errors.is_empty() {
+                Err(FixtureDefConverseError(errors))
+            } else {
+                Ok(Self {
+                    id: FixtureDefId(Arc::new((manufacturer.clone(), v.name.clone()))),
+                    manufacturer,
+                    model: v.name,
+                    channel_templates: channel_templates.unwrap(),
+                    modes: modes.unwrap(),
+                })
+            }
+        }
+    }
+
+    #[derive(Debug, Error)]
+    #[error("failed to convert from open-fixture-library format: {0:?}")]
+    pub struct FixtureDefConverseError(Vec<FixtureDefConverseErrorInner>);
+
+    #[derive(Debug, Error)]
+    pub enum FixtureDefConverseErrorInner {
+        #[error("channel template was empty")]
+        ChannelTemplateEmpty,
+        #[error("no capability found")]
+        NoCapability,
+    }
+
+    fn map_channel_templates(
+        input: Option<HashMap<String, o::Channel>>,
+    ) -> Result<HashMap<String, ChannelDef>, Vec<FixtureDefConverseErrorInner>> {
+        let mut errors = Vec::new();
+
+        let ret = input
+            .ok_or(vec![FixtureDefConverseErrorInner::ChannelTemplateEmpty])?
+            .into_iter()
+            .map(|(channel_name, c)| {
+                let ret = match map_channel(c) {
+                    Ok(c) => Some(c),
+                    Err(e) => {
+                        errors.push(e);
+                        None
+                    }
+                };
+                (channel_name, ret)
+            })
+            .filter_map(|(name, opt)| {
+                if opt.is_some() {
+                    Some((name, opt.unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(ret)
+        }
+    }
+
+    fn map_channel(ch: o::Channel) -> Result<ChannelDef, FixtureDefConverseErrorInner> {
+        Ok(ChannelDef {
+            merge_mode: match ch.precedence {
+                Some(o::Precedence::HTP) => MergeMode::HTP,
+                Some(o::Precedence::LTP) => MergeMode::LTP,
+                None => MergeMode::HTP,
+            },
+            kind: if let Some(cap) = ch.capability {
+                map_channel_capability(cap)
+            } else if let Some(caps) = ch.capabilities {
+                todo!()
+            } else {
+                return Err(FixtureDefConverseErrorInner::NoCapability);
+            },
+        })
+    }
+
+    fn map_channel_capability(cap: o::Capability) -> Capability {
+        match cap {
+            o::Capability::Intensity {
+                dmx_range,
+                brightness,
+                brightness_start,
+                brightness_end,
+                common,
+            } => Capability::Intensity,
+            _ => Capability::Unknown,
+        }
+    }
+
+    fn map_modes(
+        input: Vec<o::Mode>,
+    ) -> Result<HashMap<String, FixtureMode>, Vec<FixtureDefConverseErrorInner>> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

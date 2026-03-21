@@ -58,7 +58,8 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
                 let s = fs::read_to_string(&item.path).map_err(|e| Arc::new(e.into()))?;
                 let dto: ofl_schemas::Fixture =
                     serde_json::from_str(&s).map_err(|e| Arc::new(e.into()))?;
-                FixtureDef::try_from(dto).map_err(|e| Arc::new(e.into()))
+                FixtureDef::try_from((item.manufacturer.clone(), dto))
+                    .map_err(|e| Arc::new(e.into()))
             })
             .as_ref()
             .map_err(|e| FixtureDefLookupError::LoadFailed(Arc::clone(e)))
@@ -111,13 +112,11 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
     }
 }
 
-#[cfg(test)]
 /// テスト用のフェイク。インメモリで完結する。
 pub struct FakeFixtureDefRegistry {
     defs: HashMap<FixtureDefId, FixtureDef>,
 }
 
-#[cfg(test)]
 impl FakeFixtureDefRegistry {
     pub fn new() -> Self {
         Self {
@@ -130,7 +129,6 @@ impl FakeFixtureDefRegistry {
     }
 }
 
-#[cfg(test)]
 impl FixtureDefRegistry for FakeFixtureDefRegistry {
     fn contains(&self, id: &FixtureDefId) -> bool {
         self.defs.contains_key(id)

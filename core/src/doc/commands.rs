@@ -11,7 +11,9 @@ pub(super) trait DocCommand {
     /// 逆コマンドを返す。
     #[must_use]
     fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
+
     /// This allows downcasting to specific command types so that you can use `assert_eq!()`
+    #[allow(dead_code)] // Actually this function is used in tests, but cargo doesn't recognize it
     fn as_any(&self) -> &dyn Any;
 }
 

@@ -1,4 +1,4 @@
-use tsukuyomi_core::prelude::{ChannelDef, ChannelKind, FixtureDef, FixtureMode, MergeMode};
+use tsukuyomi_core::prelude::{Capability, ChannelDef, FixtureDef, FixtureMode, MergeMode};
 
 ///
 pub fn make_fixture_def() -> FixtureDef {
@@ -6,11 +6,11 @@ pub fn make_fixture_def() -> FixtureDef {
     let mut def = FixtureDef::new("Test Manufacturer", "Test Model");
     def.insert_channel(
         "Dimmer",
-        ChannelDef::new(MergeMode::HTP, ChannelKind::Dimmer),
+        ChannelDef::new(MergeMode::HTP, Capability::Intensity),
     );
-    def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, ChannelKind::Red));
-    def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, ChannelKind::Green));
-    def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, ChannelKind::Blue));
+    def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, Capability::Red));
+    def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, Capability::Green));
+    def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, Capability::Blue));
     def.insert_mode(
         "4 Channel",
         FixtureMode::new(
@@ -32,12 +32,12 @@ pub fn make_fixture_def_2() -> FixtureDef {
     let mut def = FixtureDef::new("Some Manufacturer", "Some Model");
     def.insert_channel(
         "Dimmer",
-        ChannelDef::new(MergeMode::HTP, ChannelKind::Dimmer),
+        ChannelDef::new(MergeMode::HTP, Capability::Intensity),
     );
-    def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, ChannelKind::Red));
-    def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, ChannelKind::Green));
-    def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, ChannelKind::Blue));
-    def.insert_channel("White", ChannelDef::new(MergeMode::HTP, ChannelKind::White));
+    def.insert_channel("Red", ChannelDef::new(MergeMode::HTP, Capability::Red));
+    def.insert_channel("Green", ChannelDef::new(MergeMode::HTP, Capability::Green));
+    def.insert_channel("Blue", ChannelDef::new(MergeMode::HTP, Capability::Blue));
+    def.insert_channel("White", ChannelDef::new(MergeMode::HTP, Capability::White));
     def.insert_mode(
         "5 Channel",
         FixtureMode::new(
