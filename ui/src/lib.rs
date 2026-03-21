@@ -3,8 +3,8 @@
 pub mod app;
 pub mod colors;
 //pub mod controllers;
-mod models;
-mod tea {
+pub mod models;
+pub mod tea {
     pub mod fixture_list_view;
 }
 mod test_helpers;

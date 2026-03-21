@@ -4,6 +4,7 @@ use std::{
 };
 
 use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
+use tracing::debug;
 use tsukuyomi_core::{
     doc::{
         Doc, DocStateView, FixtureAddError, FixtureDefNotFoundError, ModeNotFoundError,
@@ -93,8 +94,18 @@ pub fn setup(app: &mut App) {
     adopter.on_toggle_expand_manufacturer({
         let model = Rc::clone(&manufacturer_model);
         move |name| {
-            let _ = model.get_manufacturer_detail(&name).unwrap();
-            model.toggle_expanded(name);
+            let now = std::time::Instant::now();
+            let model = Rc::clone(&model);
+            slint::spawn_local(async move {
+                model.get_manufacturer_detail(&name).unwrap();
+                model.toggle_expanded(&name);
+            })
+            .unwrap();
+            let elapsed = now.elapsed();
+            debug!(
+                callback = "FixtureListViewAdopter::toggle-expand-manufacturer",
+                elapsed = ?elapsed
+            );
         }
     });
 

@@ -172,12 +172,12 @@ impl ManufacturerModel {
     /// Just toggle `expanded` property.
     ///
     /// Returns new value of `expanded` if manufacturer present, or `None()` if not.
-    pub fn toggle_expanded(&self, manufacturer: SharedString) -> Option<bool> {
+    pub fn toggle_expanded(&self, manufacturer: &str) -> Option<bool> {
         let mut guard = self.inner_data.borrow_mut();
         let (row, m_data) = guard
             .iter_mut()
             .enumerate()
-            .find(|(_, item)| item.name == &manufacturer)
+            .find(|(_, item)| &item.name == manufacturer)
             .unwrap();
         let ret = !m_data.expanded;
         m_data.expanded = ret;
