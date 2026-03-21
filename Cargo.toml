@@ -25,11 +25,19 @@ wgpu = "27.0.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 
-slint = { version = "1.15.0", features = ["backend-winit", "unstable-wgpu-27"] }
-i-slint-backend-winit = "1.15.0"
-slint-build = "1.15.0"
+# Slint dependencies
+# Use forked version to use pre-release features
+slint = { git = "https://github.com/taichi765/slint", features = ["backend-winit", "renderer-femtovg-wgpu", "unstable-wgpu-27"] }
+# Must match the version of slint, see https://github.com/slint-ui/slint/blob/master/internal/backends/winit/README.md
+i-slint-backend-winit = { git = "https://github.com/taichi765/slint" }
+i-slint-backend-testing = { git = "https://github.com/taichi765/slint" }
+i-slint-core = { git = "https://github.com/taichi765/slint" }
+slint-build = { git = "https://github.com/taichi765/slint" }
 
-[patch.crates-io]
+
+[patch."https://github.com/taichi765/slint"]
 slint = { path = "../slint/api/rs/slint" }
 i-slint-backend-winit = { path = "../slint/internal/backends/winit" }
+i-slint-backend-testing = { path = "../slint/internal/backends/testing" }
+i-slint-core = { path = "../slint/internal/core" }
 slint-build = { path = "../slint/api/rs/build" }

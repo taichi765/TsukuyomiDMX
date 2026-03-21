@@ -127,7 +127,8 @@ mod tests {
     use tsukuyomi_core::fixture::FixtureChange;
     use tsukuyomi_core::prelude::*;
 
-    use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer, create_fixture_def};
+    use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer};
+    use crate::test_helpers::make_fixture_def;
 
     use super::*;
 
@@ -141,7 +142,7 @@ mod tests {
     fn fixture_map_model_works() {
         let mut def_rg = FakeFixtureDefRegistry::new();
 
-        let def = create_fixture_def();
+        let def = make_fixture_def();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
 

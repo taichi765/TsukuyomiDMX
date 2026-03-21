@@ -69,12 +69,29 @@ export component FixtureListView inherits Rectangle {
     in property <[ManufacturerModel]> manufacturers;
     out property <string> selected-fixture-id;
 
+    accessible-role: list;
+    accessible-label: "Fixture List View";
+    accessible-id: "fixture-list-view";
+
     ScrollView {
         vertical-scrollbar-policy: ScrollBarPolicy.always-on;
-        VerticalLayout {
+
+        layout-manufacturer-list:=VerticalLayout {
             alignment: LayoutAlignment.start;
             for manufacturer-model in manufacturers: Rectangle {
-                VerticalLayout {
+                accessible-role: button;
+                accessible-id: "fixture-list-view-m-"+manufacturer-model.manufacturer;
+                accessible-label: manufacturer-model.manufacturer;
+                accessible-expandable: true;
+                accessible-expanded: manufacturer-model.expanded;
+                accessible-action-expand => {
+                    manufacturer-model.expanded=true
+                }
+                accessible-action-default => {
+                    self.accessible-action-expand()
+                }
+
+                layout-manufacturer-item:=VerticalLayout {
                     header := Rectangle {
                         HorizontalLayout {
                             Image {
@@ -98,9 +115,14 @@ export component FixtureListView inherits Rectangle {
                         }
                     }
 
-                    if manufacturer-model.expanded:VerticalLayout {
+                    if manufacturer-model.expanded:layout-fixture-list:=VerticalLayout {
                         alignment: LayoutAlignment.start;
                         for fixture in manufacturer-model.fixtures: item := FixtureListItem {
+                            accessible-role: button;
+                            accessible-id: "fixture-list-view-f-"+manufacturer-model.manufacturer+"-"+fixture.name;
+                            accessible-label: manufacturer-model.manufacturer+"-"+fixture.name;
+                            accessible-action-default => {self.clicked()}
+
                             fixture-name: fixture.name;
                             fixture-id: fixture.id;
                             selected: selected-fixture-id == fixture.id;

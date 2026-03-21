@@ -82,9 +82,8 @@ impl Model for FixtureDefModel {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::test_helpers::{
-        DummyModelChangeEvent, SpyModelPeer, create_fixture_def, create_fixture_def_2,
-    };
+    use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer};
+    use crate::test_helpers::{make_fixture_def, make_fixture_def_2};
 
     use super::*;
     use i_slint_core::model::ModelChangeListenerContainer;
@@ -94,10 +93,10 @@ mod tests {
     fn def_map_model_works() {
         // Arrange
         let mut def_rg = FakeFixtureDefRegistry::new();
-        let def = create_fixture_def();
+        let def = make_fixture_def();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
-        let def_2 = create_fixture_def_2();
+        let def_2 = make_fixture_def_2();
         let def_id_2 = def_2.id().to_owned();
         def_rg.insert(def_id_2.clone(), def_2);
 
@@ -116,7 +115,7 @@ mod tests {
             .attach_peer(container.as_ref().model_peer());
 
         // Act
-        doc.reload_defs(); // TODO: Fakeでreloadのときにdefを追加するようにしたい
+        doc.reload_defs().unwrap(); // TODO: Fakeでreloadのときにdefを追加するようにしたい
 
         // Assert
         matches!(container.events.borrow()[0], DummyModelChangeEvent::Reset);

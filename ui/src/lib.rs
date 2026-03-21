@@ -7,6 +7,7 @@ mod models;
 mod tea {
     pub mod fixture_list_view;
 }
+mod test_helpers;
 
 use std::cell::RefCell;
 use std::error::Error;
