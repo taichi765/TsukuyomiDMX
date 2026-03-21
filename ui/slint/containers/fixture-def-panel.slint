@@ -9,7 +9,7 @@ import { StandardButton } from "std-widgets.slint";
 import { GlobalMessage } from "../global-state.slint";
 
 
-export global FixtureListStore {
+global Adopter {
     in property <[ManufacturerModel]> model:[
         // dummy model
         {
@@ -25,9 +25,11 @@ export global FixtureListStore {
     ];
     /// Returns error message. Empty when there's no error.
     callback patch(universe: string, address: int, fixture-id: string, mode: string, pos: Point) -> string;
-    callback get-modes(fixture-def-id: string) -> [string];
+    callback toggle-expand-manufacturer(name: string);
+    callback get-modes(id: string)->[string];
     callback get-next-address(universe: string) -> int;
 }
+export { Adopter as FixtureListAdopter }
 
 export component FixtureDefPanel inherits VerticalLayout {
     property <string> selected-fixture-id <=> list-view.selected-fixture-id;
@@ -36,11 +38,11 @@ export component FixtureDefPanel inherits VerticalLayout {
 
     init => {
         // TODO: hard code
-        next-address-cache = FixtureListStore.get-next-address("Universe 1");
+        next-address-cache = Adopter.get-next-address("Universe 1");
     }
 
     changed selected-fixture-id => {
-        fixture-modes-cache = FixtureListStore.get-modes(selected-fixture-id);
+        fixture-modes-cache = Adopter.get-modes(selected-fixture-id);
     }
 
     animate width { duration: 250ms; }
@@ -50,7 +52,8 @@ export component FixtureDefPanel inherits VerticalLayout {
     }
 
     list-view := FixtureListView {
-        manufacturers: FixtureListStore.model;
+        manufacturers: Adopter.model;
+        toggle-expand-manufacturer(name) => {Adopter.toggle-expand-manufacturer(name)}
     }
 
     BorderHorz { }
@@ -63,13 +66,13 @@ export component FixtureDefPanel inherits VerticalLayout {
         address-default: next-address-cache;
 
         changed selected-universe => {
-            next-address-cache = FixtureListStore.get-next-address(self.selected-universe);
+            next-address-cache = Adopter.get-next-address(self.selected-universe);
         }
 
         patch(universe, address, fixture-id, mode, pos) => {
-            GlobalMessage.error-message = FixtureListStore.patch(universe, address, fixture-id, mode,pos);
+            GlobalMessage.error-message = Adopter.patch(universe, address, fixture-id, mode,pos);
             if GlobalMessage.error-message == "" {
-                next-address-cache = FixtureListStore.get-next-address(self.selected-universe);
+                next-address-cache = Adopter.get-next-address(self.selected-universe);
             }
         }
     }

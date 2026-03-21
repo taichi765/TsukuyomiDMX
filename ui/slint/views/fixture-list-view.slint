@@ -1,5 +1,5 @@
 import { Icons } from "../styling.slint";
-import { Palette, ScrollView } from "std-widgets.slint";
+import { Palette, ScrollView, LineEdit } from "std-widgets.slint";
 import { PlaneText, MiddleText } from "../parts/texts.slint";
 
 export struct FixtureModel {
@@ -20,6 +20,8 @@ component FixtureListItem inherits Rectangle {
     in property <bool> selected;
     callback clicked();
 
+    forward-focus: fs;
+
     HorizontalLayout {
         alignment: LayoutAlignment.start;
         spacer := Rectangle {
@@ -36,6 +38,10 @@ component FixtureListItem inherits Rectangle {
             background: Palette.alternate-background;
         }
     ]
+
+    fs:=FocusScope {
+
+    }
 
     TouchArea {
         clicked => root.clicked();
@@ -68,6 +74,8 @@ component FixtureListItem inherits Rectangle {
 export component FixtureListView inherits Rectangle {
     in property <[ManufacturerModel]> manufacturers;
     out property <string> selected-fixture-id;
+    callback toggle-expand-manufacturer(name:string);
+    
 
     accessible-role: list;
     accessible-label: "Fixture List View";
@@ -85,7 +93,7 @@ export component FixtureListView inherits Rectangle {
                 accessible-expandable: true;
                 accessible-expanded: manufacturer-model.expanded;
                 accessible-action-expand => {
-                    manufacturer-model.expanded=true
+                    toggle-expand-manufacturer(manufacturer-model.manufacturer)
                 }
                 accessible-action-default => {
                     self.accessible-action-expand()
@@ -106,31 +114,33 @@ export component FixtureListView inherits Rectangle {
                             }
                         }
 
-                        TouchArea {
+                        manufacturer-item-ta:=TouchArea {
                             width: parent.width;
                             height: parent.height;
                             clicked => {
-                                manufacturer-model.expanded = !manufacturer-model.expanded;
+                                toggle-expand-manufacturer(manufacturer-model.manufacturer);
                             }
                         }
                     }
 
-                    if manufacturer-model.expanded:layout-fixture-list:=VerticalLayout {
-                        alignment: LayoutAlignment.start;
-                        for fixture in manufacturer-model.fixtures: item := FixtureListItem {
-                            accessible-role: button;
-                            accessible-id: "fixture-list-view-f-"+manufacturer-model.manufacturer+"-"+fixture.name;
-                            accessible-label: manufacturer-model.manufacturer+"-"+fixture.name;
-                            accessible-action-default => {self.clicked()}
+                        if manufacturer-model.expanded:layout-fixture-list:=VerticalLayout {
+                            alignment: LayoutAlignment.start;
+                            for fixture in manufacturer-model.fixtures: item := FixtureListItem {
+                                accessible-role: button;
+                                accessible-id: "fixture-list-view-f-"+manufacturer-model.manufacturer+"-"+fixture.name;
+                                accessible-label: manufacturer-model.manufacturer+"-"+fixture.name;
+                                accessible-action-default => {self.clicked()}
 
-                            fixture-name: fixture.name;
-                            fixture-id: fixture.id;
-                            selected: selected-fixture-id == fixture.id;
-                            clicked => {
-                                selected-fixture-id = fixture.id;
+                                fixture-name: fixture.name;
+                                fixture-id: fixture.id;
+                                selected: selected-fixture-id == fixture.id;
+                                clicked => {
+                                    selected-fixture-id = fixture.id;
+                                }
                             }
                         }
-                    }
+
+                    FocusScope {}
                 }
             }
         }

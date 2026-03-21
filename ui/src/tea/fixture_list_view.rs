@@ -22,17 +22,19 @@ use crate::{
 pub fn setup(app: &mut App) {
     let doc_view = app.doc.lock().unwrap().state_view();
     let doc_clone = Arc::clone(&app.doc);
-    let adopter = app.ui.global::<ui::FixtureListStore>();
-    let ui_handle = app.ui.as_weak();
+    let adopter = app.ui.global::<ui::FixtureListAdopter>();
 
     let def_model = FixtureDefModel::create(&mut app.doc.lock().unwrap());
     app.shared_model_inner
         .def_model
         .set(Rc::clone(&def_model))
         .unwrap();
-    let map_model = ManufacturerModel::new(def_model);
+    let manufacturer_model = Rc::new(ManufacturerModel::new(
+        def_model,
+        app.doc.lock().unwrap().state_view(),
+    ));
 
-    adopter.set_model(Rc::new(map_model).into());
+    adopter.set_model(Rc::clone(&manufacturer_model).into());
 
     adopter.on_patch({
         let doc_view_clone = doc_view.clone();
@@ -88,15 +90,17 @@ pub fn setup(app: &mut App) {
         }
     });
 
-    adopter.on_get_modes(move |def_id| {
-        let fixture_model = ui_handle
-            .unwrap()
-            .global::<ui::FixtureListStore>()
-            .get_model()
-            .iter()
-            .find_map(|m| m.fixtures.iter().find(|fxt| fxt.id == def_id))
-            .unwrap();
-        fixture_model.modes
+    adopter.on_toggle_expand_manufacturer({
+        let model = Rc::clone(&manufacturer_model);
+        move |name| {
+            let _ = model.get_manufacturer_detail(&name).unwrap();
+            model.toggle_expanded(name);
+        }
+    });
+
+    adopter.on_get_modes({
+        let model = Rc::clone(&manufacturer_model);
+        move |def_id| model.get_fixture_detail(def_id).unwrap().modes().into()
     });
 
     adopter.on_get_next_address(move |universe| {
