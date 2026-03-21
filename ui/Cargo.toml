@@ -12,6 +12,9 @@ slint = { workspace = true }
 i-slint-backend-winit = { workspace = true }
 i-slint-core = { workspace = true }
 
+anyhow = { workspace = true }
+thiserror = { workspace =  true }
+derive-getters = { workspace = true }
 tracing-subscriber = "0.3.0"
 uuid = { workspace = true }
 tracing = { workspace = true }

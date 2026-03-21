@@ -15,6 +15,7 @@ panic = "unwind"
 version = "0.1.0"
 
 [workspace.dependencies]
+anyhow = "1.0"
 bimap = "0.6.3"
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive_more = "2.1.1"
