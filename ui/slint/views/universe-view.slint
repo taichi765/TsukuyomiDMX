@@ -1,12 +1,7 @@
 import { StyleMetrics, Palette, ScrollView } from "std-widgets.slint";
 import { BorderHorz, BorderVert } from "../styling.slint";
 
-export struct UniverseViewFixtureModel {
-    fixture-id:string,
-    name:string,
-    address:int,
-    footprint:int}
-
+export struct UniverseViewFixtureModel { fixture-id: string, name: string, address: int, footprint: int}
 export global UniverseViewStore {
     in property <[UniverseViewFixtureModel]> fixtures:[{ name:"MyFixture", address:12, footprint:5 }];
 }

@@ -1,11 +1,7 @@
 import { Palette } from "std-widgets.slint";
 import { MiddleText } from "../parts/texts.slint";
 
-export struct FixtureEntityData {
-    fixture-id:string,
-    pos:Point,
-    color:color}
-
+export struct FixtureEntityData { fixture-id: string, pos: Point, color: color}
 export global Preview2DStore {
     in property <[FixtureEntityData]> fixture-list:[
         { fixture-id:"", pos:{ x:1px, y:50px }, color:rgb(255,0,0) },

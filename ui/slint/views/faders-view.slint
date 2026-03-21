@@ -2,12 +2,7 @@ import { Palette, StyleMetrics, TabWidget, Slider } from "std-widgets.slint";
 import { PlaneText, MiddleText } from "../parts/texts.slint";
 import { Icons } from "../styling.slint";
 
-export struct FaderValues {
-    dimmer: int,
-    color-r: int,
-    color-g: int,
-    color-b: int}
-
+export struct FaderValues { dimmer: int, color-r: int, color-g: int, color-b: int}
 export global FadersStore {
     in-out property <FaderValues> values;
     in property <string> selected-fixture;

@@ -17,8 +17,8 @@ global Adopter {
             fixtures:[{ name:"HPAR64-9" }, { name:"ORION WH" }, { name:"IM-MH90S" }],
             expanded:false,
         },
-        {  
-            manufacturer:"IM-Relax", 
+        {
+            manufacturer:"IM-Relax",
             fixtures:[{ name:"IM-MH90S" }],
             expanded:false,
         }
@@ -26,9 +26,10 @@ global Adopter {
     /// Returns error message. Empty when there's no error.
     callback patch(universe: string, address: int, fixture-id: string, mode: string, pos: Point) -> string;
     callback toggle-expand-manufacturer(name: string);
-    callback get-modes(id: string)->[string];
+    callback get-modes(id: string) -> [string];
     callback get-next-address(universe: string) -> int;
 }
+
 export { Adopter as FixtureListAdopter }
 
 export component FixtureDefPanel inherits VerticalLayout {
@@ -53,7 +54,9 @@ export component FixtureDefPanel inherits VerticalLayout {
 
     list-view := FixtureListView {
         manufacturers: Adopter.model;
-        toggle-expand-manufacturer(name) => {Adopter.toggle-expand-manufacturer(name)}
+        toggle-expand-manufacturer(name) => {
+            Adopter.toggle-expand-manufacturer(name)
+        }
     }
 
     BorderHorz { }

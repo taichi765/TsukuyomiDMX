@@ -58,43 +58,45 @@ export component SplitterVert inherits Rectangle {
         debug("root changed {}",proportion)
     }
 
-    r1:=Rectangle{
+    r1 := Rectangle {
         width: 100%;
-        height: root.actual-proportion*root.height - handle.height/2;
-        x:0;
-        y:0;
-        Rectangle{
+        height: root.actual-proportion * root.height - handle.height / 2;
+        x: 0;
+        y: 0;
+        Rectangle {
             background: red;
         }
-        TouchArea {}
+
+        TouchArea { }
     }
 
-    handle:=Rectangle{
+    handle := Rectangle {
         height: 6px;
-        y:r1.height;
-        z:100;
+        y: r1.height;
+        z: 100;
         background: white;
 
         out property <float> new-proportion:ta.new-proportion;
         out property <bool> pressed:ta.pressed;
-        ta:=TouchArea{
+        ta := TouchArea {
             out property <float> new-proportion:max(0.05, min(0.95, proportion + (self.mouse-y - self.pressed-y) / root.height));
             changed pressed => {
-                if !pressed{
-                    root.proportion=ta.new-proportion;
+                if !pressed {
+                    root.proportion = ta.new-proportion;
                     debug("set");
                 }
             }
         }
     }
 
-    r2:=Rectangle{
+    r2 := Rectangle {
         width: 100%;
-        height: (1 - root.actual-proportion)*root.height - handle.height/2;
-        y:handle.y;
+        height: (1 - root.actual-proportion) * root.height - handle.height / 2;
+        y: handle.y;
         Rectangle {
             background: blue;
         }
-        TouchArea {}
+
+        TouchArea { }
     }
 }
