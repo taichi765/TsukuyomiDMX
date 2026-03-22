@@ -10,7 +10,9 @@ mod test_helpers {
     use std::{cell::RefCell, pin::Pin};
 
     use i_slint_core::model::ModelChangeListener;
-    use tsukuyomi_core::prelude::{Capability, ChannelDef, FixtureDef, FixtureMode, MergeMode};
+    use tsukuyomi_core::prelude::{
+        CapabilityInner, ChannelDef, FixtureDef, FixtureMode, MergeMode,
+    };
 
     pub struct SpyModelPeer {
         pub events: RefCell<Vec<DummyModelChangeEvent>>,

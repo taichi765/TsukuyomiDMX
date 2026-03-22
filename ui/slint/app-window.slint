@@ -43,7 +43,8 @@ export component AppWindow inherits Window {
     default-font-family: "Inter";
 
     property <bool> show-save-dialog;
-    property <string> error-message <=> GlobalMessage.error-message;
+    // TODO: in propertyにすべき
+    in-out property <string> error-message <=> GlobalMessage.error-message;
     in property <image> texture;
     out property <TopLevelTabs> current-tab: index-to-tabs-enum(main-pane.current-index);
     out property <EditorTabs> editor-tab-current-index: editor-tab.current-index;
@@ -234,8 +235,13 @@ export component AppWindow inherits Window {
         }
     }
 
+    // TODO: 別のウィンドウを出したほうが良さそう
     error-dialog := Dialog {
         visible: root.error-message != "";
+        max-width: 0.5 * parent.width;
+        max-height: 0.5 * parent.height;
+        background: Palette.accent-foreground;
+
         MiddleText {
             text: root.error-message;
         }

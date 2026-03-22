@@ -1,3 +1,4 @@
+use i_slint_backend_winit::WinitWindowAccessor;
 use slint::{ComponentHandle, Model};
 use std::{
     cell::OnceCell,
@@ -31,6 +32,7 @@ impl App {
         let doc = Arc::new(Mutex::new(
             Doc::try_new().expect("failed to initialize doc"),
         ));
+
         let ui = ui::AppWindow::new().unwrap();
         let dispatcher = Self::create_dispatcher();
         Self {
@@ -48,8 +50,42 @@ impl App {
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
         fixture_list_view::setup(self);
+        self.setup_window();
+
         self.ui.run()?;
         Ok(())
+    }
+
+    /// Maximize, Toggle fullscreenなどの初期化
+    fn setup_window(&mut self) {
+        self.ui.on_start_drag({
+            let ui_handle = self.ui.as_weak();
+
+            move || {
+                let ui = ui_handle.unwrap();
+                ui.window().with_winit_window(|w| w.drag_window());
+            }
+        });
+
+        self.ui.on_minimize({
+            let ui_handle = self.ui.as_weak();
+
+            move || {
+                let ui = ui_handle.unwrap();
+                ui.window().set_minimized(true);
+            }
+        });
+
+        // TODO: toggle-fullscreen
+
+        self.ui.on_close({
+            let ui_handle = self.ui.as_weak();
+
+            move || {
+                let ui = ui_handle.unwrap();
+                ui.window().hide().unwrap()
+            }
+        });
     }
 
     fn create_dispatcher() -> Dispatcher {
