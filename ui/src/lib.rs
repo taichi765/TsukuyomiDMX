@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use i_slint_backend_winit::WinitWindowAccessor;
 
-use slint::wgpu_27::{WGPUConfiguration, WGPUSettings};
+use slint::wgpu_28::{WGPUConfiguration, WGPUSettings};
 use slint::{Timer, TimerMode};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -37,6 +37,15 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
         .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    // Use wgpu to render 3D Preview
+    slint::BackendSelector::new()
+        .require_wgpu_28(WGPUConfiguration::Automatic(WGPUSettings::default()))
+        .select()
+        .expect("unable to create Slint backend WGPU based renderer");
+
+    // TODO: language switch(preferences)
+    slint::init_translations!(concat!(env!("CARGO_MANIFEST_DIR"), "/translations/"));
 
     let mut app = App::new();
     app.run()?;
