@@ -109,9 +109,23 @@ pub fn setup(app: &mut App) {
         }
     });
 
-    adopter.on_get_modes({
+    adopter.on_update_current_fixture_modes({
+        let ui_handle = app.ui.as_weak();
         let model = Rc::clone(&manufacturer_model);
-        move |def_id| model.get_fixture_detail(def_id).unwrap().modes().into()
+        move |def_id| match model.get_fixture_detail(def_id) {
+            Ok(fxt_data) => {
+                ui_handle
+                    .unwrap()
+                    .global::<ui::FixtureListAdopter>()
+                    .set_current_fixture_modes(fxt_data.modes().into());
+            }
+            Err(_) => {
+                // TODO: improve error message
+                ui_handle
+                    .unwrap()
+                    .set_error_message("failed to load definition".to_shared_string());
+            }
+        }
     });
 
     adopter.on_get_next_address(move |universe| {

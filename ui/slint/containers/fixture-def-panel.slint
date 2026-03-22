@@ -23,10 +23,11 @@ global Adopter {
             expanded:false,
         }
     ];
+    in property <[string]> current-fixture-modes;
     /// Returns error message. Empty when there's no error.
     callback patch(universe: string, address: int, fixture-id: string, mode: string, pos: Point) -> string;
     callback toggle-expand-manufacturer(name: string);
-    callback get-modes(id: string) -> [string];
+    callback update-current-fixture-modes(id: string);
     callback get-next-address(universe: string) -> int;
 }
 
@@ -34,7 +35,6 @@ export { Adopter as FixtureListAdopter }
 
 export component FixtureDefPanel inherits VerticalLayout {
     property <string> selected-fixture-id <=> list-view.selected-fixture-id;
-    property <[string]> fixture-modes-cache;
     property <int> next-address-cache;
 
     init => {
@@ -43,7 +43,7 @@ export component FixtureDefPanel inherits VerticalLayout {
     }
 
     changed selected-fixture-id => {
-        fixture-modes-cache = Adopter.get-modes(selected-fixture-id);
+        Adopter.update-current-fixture-modes(selected-fixture-id);
     }
 
     animate width { duration: 250ms; }
@@ -65,7 +65,7 @@ export component FixtureDefPanel inherits VerticalLayout {
         fixture-id: selected-fixture-id;
         // TODO: hard code
         universes: ["Universe 1", "Universe 2"];
-        modes: fixture-modes-cache;
+        modes: Adopter.current-fixture-modes;
         address-default: next-address-cache;
 
         changed selected-universe => {
