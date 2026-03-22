@@ -178,7 +178,7 @@ mod tests {
         setup(&mut app);
 
         let list_view: Vec<_> =
-            ElementHandle::find_by_accessible_label(&app.ui, "Fixture List View").collect();
+            ElementHandle::find_by_element_type_name(&app.ui, "FixtureListView").collect();
         assert_eq!(list_view.len(), 1);
         let list_view = &list_view[0];
 
