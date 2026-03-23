@@ -1,6 +1,6 @@
 import {
     FixtureListView,
-    ManufacturerModel,
+    ManufacturerData,
 } from "../views/fixture-list-view.slint";
 import { BorderHorz, BorderVert } from "../styling.slint";
 import { FixtureSingleView } from "../views/fixture-single-view.slint";
@@ -10,7 +10,7 @@ import { GlobalMessage } from "../global-state.slint";
 
 
 global Adopter {
-    in property <[ManufacturerModel]> model:[
+    in property <[ManufacturerData]> model:[
         // dummy model
         {
             manufacturer:"Stage Evolution",

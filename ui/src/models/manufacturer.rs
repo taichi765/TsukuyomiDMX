@@ -30,7 +30,7 @@ pub struct ManufacturerModel {
 }
 
 impl Model for ManufacturerModel {
-    type Data = ui::ManufacturerModel;
+    type Data = ui::ManufacturerData;
 
     fn row_count(&self) -> usize {
         self.source_model.row_count()
@@ -195,9 +195,9 @@ pub struct ManufacturerModelItem {
     fixtures: OnceCell<Vec<FixtureItem>>,
 }
 
-impl Into<ui::ManufacturerModel> for ManufacturerModelItem {
-    fn into(self) -> ui::ManufacturerModel {
-        ui::ManufacturerModel {
+impl Into<ui::ManufacturerData> for ManufacturerModelItem {
+    fn into(self) -> ui::ManufacturerData {
+        ui::ManufacturerData {
             manufacturer: self.name,
             expanded: self.expanded,
             fixtures: Rc::new(VecModel::from(
@@ -228,9 +228,9 @@ impl FixtureItem {
     }
 }
 
-impl Into<ui::FixtureModel> for FixtureItem {
-    fn into(self) -> ui::FixtureModel {
-        ui::FixtureModel {
+impl Into<ui::FixtureData> for FixtureItem {
+    fn into(self) -> ui::FixtureData {
+        ui::FixtureData {
             id: self.id.to_shared_string(),
             name: self.name,
             modes: self

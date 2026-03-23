@@ -2,9 +2,13 @@ import { StyleMetrics, Palette, ScrollView } from "std-widgets.slint";
 import { BorderHorz, BorderVert } from "../styling.slint";
 
 export struct UniverseViewFixtureModel { fixture-id: string, name: string, address: int, footprint: int}
-export global UniverseViewStore {
-    in property <[UniverseViewFixtureModel]> fixtures:[{ name:"MyFixture", address:12, footprint:5 }];
+global Adopter {
+    in property <[UniverseViewFixtureModel]> fixtures:[
+        // dummy
+        { name:"MyFixture", address:12, footprint:5 }];
 }
+
+export {Adopter as UniverseViewAdopter }
 
 export component UniverseView inherits Rectangle {
     property <length> grid-width: 26px;
@@ -75,7 +79,7 @@ export component UniverseView inherits Rectangle {
         }
     }
 
-    for fxt in UniverseViewStore.fixtures: Rectangle {
+    for fxt in Adopter.fixtures: Rectangle {
         x: round(mod(fxt.address,root.col-num)) * root.grid-width;
         y: round(fxt.address / root.col-num) * grid-height;
         width: fxt.footprint * grid-width;

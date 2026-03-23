@@ -2,10 +2,10 @@ import { Icons } from "../styling.slint";
 import { Palette, ScrollView, LineEdit } from "std-widgets.slint";
 import { PlaneText, MiddleText } from "../parts/texts.slint";
 
-export struct FixtureModel { id: string, name: string, modes: [string]}
-export struct ManufacturerModel {
+export struct FixtureData { id: string, name: string, modes: [string]}
+export struct ManufacturerData {
     manufacturer: string,
-    fixtures: [FixtureModel],
+    fixtures: [FixtureData],
     expanded: bool,
 }
 component FixtureListItem inherits Rectangle {
@@ -78,7 +78,7 @@ component FixtureListItem inherits Rectangle {
 }
 
 export component FixtureListView inherits Rectangle {
-    in property <[ManufacturerModel]> manufacturers;
+    in property <[ManufacturerData]> manufacturers;
     out property <string> selected-fixture-id;
     property <int> focused-manufacturer;
     callback toggle-expand-manufacturer(name: string);
