@@ -34,7 +34,7 @@ mod ui {
 pub fn run_main() -> Result<(), Box<dyn Error>> {
     // Initialize logger
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 

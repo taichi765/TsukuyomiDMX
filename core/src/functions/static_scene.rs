@@ -9,6 +9,7 @@ use crate::{
 
 pub type SceneValue = HashMap<String, u8>;
 
+#[derive(Debug)]
 pub struct StaticSceneData {
     id: FunctionId,
     name: String,

@@ -172,7 +172,9 @@ mod tests {
     use tsukuyomi_core::doc::FakeFixtureDefRegistry;
     #[test]
     fn manufacturer_expands_after_click() {
-        testing::init_no_event_loop();
+        // slint::spwan_local() requires event loop
+        testing::init_integration_test_with_system_time();
+
         // TODO: DefRegistryのfakeを使う
         let mut app = App::new();
         setup(&mut app);

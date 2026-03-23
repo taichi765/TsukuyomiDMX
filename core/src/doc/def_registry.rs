@@ -1,6 +1,7 @@
 use std::{cell::OnceCell, collections::HashMap, fs, io, path::PathBuf, sync::Arc};
 
 use thiserror::Error;
+use tracing::{debug, field::debug, instrument};
 
 use crate::{
     fixture_def::FixtureDefConverseError,
@@ -15,8 +16,10 @@ pub trait FixtureDefRegistry {
 }
 
 /// ファイルからFixtureDefをロードしてキャッシュする
+#[derive(derive_more::Debug)]
 pub struct FixtureDefRegistryImpl {
     search_path: PathBuf, // TODO: Vecの方がよい？
+    #[debug(skip)]
     defs: HashMap<FixtureDefId, FixtureDefCatalogItem>,
 }
 
@@ -65,7 +68,9 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
             .map_err(|e| FixtureDefLookupError::LoadFailed(Arc::clone(e)))
     }
 
+    #[instrument]
     fn load(&mut self) -> Result<(), io::Error> {
+        debug!("loading fixture defs...");
         let new = self
             .search_path
             .read_dir()?
@@ -100,6 +105,7 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
 
         self.defs.clear();
         self.defs = new;
+        debug!("loaded fixture defs successfully");
         Ok(())
     }
 

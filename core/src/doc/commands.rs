@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, fmt::Debug};
 
 pub use fixtures::*;
 pub use functions::*;
@@ -7,7 +7,7 @@ pub use universes::*;
 
 use crate::doc::{DocEffect, state::DocState};
 
-pub(super) trait DocCommand {
+pub(super) trait DocCommand: Debug {
     /// 逆コマンドを返す。
     #[must_use]
     fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect);
@@ -44,7 +44,7 @@ mod fixtures {
 
     impl<T> DocCommand for AddFixtureCommand<T>
     where
-        T: Iterator<Item = (UniverseId, DmxAddress)> + 'static,
+        T: Iterator<Item = (UniverseId, DmxAddress)> + Debug + 'static,
     {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let id = self.fixture.id();
@@ -98,7 +98,7 @@ mod fixtures {
 
     impl<T> DocCommand for UpdateFixtureCommand<T>
     where
-        T: Iterator<Item = (UniverseId, DmxAddress)> + Clone + 'static,
+        T: Iterator<Item = (UniverseId, DmxAddress)> + Clone + Debug + 'static,
     {
         fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand + 'static>, DocEffect) {
             let rev_change = state.with_fixtures(|it| {

@@ -5,6 +5,7 @@ pub use commands::*;
 mod decider;
 mod def_registry;
 pub use def_registry::*;
+use tracing::{debug, instrument};
 mod state;
 
 use std::{
@@ -27,8 +28,11 @@ declare_id_newtype!(OutputPluginId);
 ///
 /// Orchestrates `decider`, `commands`, `subscribers` etc.
 /// This is in application layer.
+#[derive(derive_more::Debug)]
 pub struct Doc {
+    #[debug(skip)]
     state: Arc<DocState>,
+    #[debug(skip)]
     subscribers: Vec<Box<dyn Fn(&DocEffect)>>,
     undo_stack: Vec<Box<dyn DocCommand>>,
     redo_stack: Vec<Box<dyn DocCommand>>,
@@ -36,6 +40,7 @@ pub struct Doc {
 
 impl Doc {
     pub fn try_new() -> Result<Self, std::io::Error> {
+        debug!("hello from core");
         let def_resource_path = {
             let mut p = dirs::data_local_dir().unwrap();
             p.push("tsukuyomidmx");
@@ -72,6 +77,7 @@ impl Doc {
     }
 
     /// Undo.
+    #[instrument]
     pub fn undo(&mut self) {
         let cmd = self
             .undo_stack
@@ -83,6 +89,7 @@ impl Doc {
     }
 
     /// Redo.
+    #[instrument]
     pub fn redo(&mut self) {
         let cmd = self
             .redo_stack
@@ -94,6 +101,7 @@ impl Doc {
     }
 
     /// Adds fixture.
+    #[instrument]
     pub fn add_fixture(&mut self, fixture: Fixture) -> Result<(), FixtureAddError> {
         let cmd = decider::add_fixture(self.state_view(), fixture)?;
         self.apply_command(cmd);
@@ -101,6 +109,7 @@ impl Doc {
     }
 
     /// Updates fixture.
+    #[instrument]
     pub fn update_fixture(
         &mut self,
         id: FixtureId,
@@ -113,25 +122,30 @@ impl Doc {
 
     /// Removes fixture.
     /// If the fixture didn't exist, [FixtureRemoveError::FixtureNotFound][`FixtureRemoveError`] will be returned.
+    #[instrument]
     pub fn remove_fixture(&mut self, id: &FixtureId) -> Result<(), FixtureRemoveError> {
         let cmd = decider::remove_fixture(self.state_view(), id)?;
         self.apply_command(cmd);
         Ok(())
     }
 
+    #[instrument]
     pub fn add_function(&mut self, _value: FunctionData) -> Result<DocEffect, ()> {
         todo!()
     }
 
+    #[instrument]
     pub fn update_function(&mut self, _new: FunctionData) -> Result<DocEffect, ()> {
         todo!()
     }
 
+    #[instrument]
     pub fn remove_function(&mut self, _id: &FunctionId) -> Result<DocEffect, ()> {
         todo!()
     }
 
     /// 外部が関わる操作なのでDocCommandでのundo/redoはできない
+    #[instrument]
     pub fn reload_defs(&mut self) -> Result<(), std::io::Error> {
         let ret = self.state.load_defs();
         if ret.is_ok() {

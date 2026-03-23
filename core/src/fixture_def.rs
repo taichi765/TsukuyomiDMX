@@ -5,6 +5,7 @@ use std::{
 };
 
 use bimap::BiHashMap;
+use derive_getters::Getters;
 use thiserror::Error;
 
 use crate::{
@@ -272,31 +273,32 @@ impl Iterator for AddressIter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters)]
 pub struct ChannelDef {
     merge_mode: MergeMode,
-    kind: Capability,
+    capability: Capability,
 }
 
 impl ChannelDef {
-    pub fn new(merge_mode: MergeMode, kind: Capability) -> Self {
-        Self { merge_mode, kind }
+    pub fn new(merge_mode: MergeMode, capability: Capability) -> Self {
+        Self {
+            merge_mode,
+            capability,
+        }
     }
+}
 
-    pub fn merge_mode(&self) -> MergeMode {
-        self.merge_mode
-    }
-
-    pub fn kind(&self) -> &Capability {
-        &self.kind
-    }
+#[derive(Debug, Clone)]
+pub enum Capability {
+    Single(CapabilityInner),
+    Multiple(Vec<CapabilityInner>),
 }
 
 // TODO: Add more kinds
 /// Channel's capability
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum Capability {
+pub enum CapabilityInner {
     Intensity,
     Red,
     Blue,
@@ -318,7 +320,7 @@ mod ofl {
 
     use crate::{
         fixture::MergeMode,
-        prelude::{Capability, ChannelDef, FixtureDef, FixtureDefId},
+        prelude::{CapabilityInner, ChannelDef, FixtureDef, FixtureDefId},
     };
 
     impl TryFrom<(String, ofl_schemas::Fixture)> for FixtureDef {
@@ -374,6 +376,10 @@ mod ofl {
         ChannelTemplateEmpty,
         #[error("no capability found")]
         NoCapability,
+        #[error("MatrixInsert is not suppported at the moment")]
+        UnknownModeChannel(o::ModeChannel),
+        #[error("the feature is not yet suppoted")]
+        NotSupported,
     }
 
     fn map_channel_templates(
@@ -417,17 +423,17 @@ mod ofl {
                 Some(o::Precedence::LTP) => MergeMode::LTP,
                 None => MergeMode::HTP,
             },
-            kind: if let Some(cap) = ch.capability {
-                map_channel_capability(cap)
+            capability: if let Some(cap) = ch.capability {
+                Capability::Single(map_channel_capability(cap))
             } else if let Some(caps) = ch.capabilities {
-                todo!()
+                Capability::Multiple(caps.into_iter().map(map_channel_capability).collect())
             } else {
                 return Err(FixtureDefConverseErrorInner::NoCapability);
             },
         })
     }
 
-    fn map_channel_capability(cap: o::Capability) -> Capability {
+    fn map_channel_capability(cap: o::Capability) -> CapabilityInner {
         match cap {
             o::Capability::Intensity {
                 dmx_range,
@@ -435,15 +441,47 @@ mod ofl {
                 brightness_start,
                 brightness_end,
                 common,
-            } => Capability::Intensity,
-            _ => Capability::Unknown,
+            } => CapabilityInner::Intensity,
+            _ => CapabilityInner::Unknown,
         }
     }
 
     fn map_modes(
-        input: Vec<o::Mode>,
+        modes: Vec<o::Mode>,
     ) -> Result<HashMap<String, FixtureMode>, Vec<FixtureDefConverseErrorInner>> {
-        todo!()
+        let results = modes.into_iter().map(|m| {
+            let ch_res = m
+                .channels
+                .into_iter()
+                .enumerate()
+                .map(|(offset, ch)| match ch {
+                    o::ModeChannel::Key(channel_name) => Ok((offset, channel_name)),
+                    ch => Err(FixtureDefConverseErrorInner::UnknownModeChannel(ch)),
+                });
+
+            if ch_res.clone().any(|el| el.is_err()) {
+                return Err(ch_res.filter_map(Result::err).collect::<Vec<_>>());
+            };
+            Ok((
+                m.name,
+                FixtureMode {
+                    channel_order: ch_res
+                        .filter_map(Result::ok)
+                        .map(|(offset, ch_name)| (ch_name, offset))
+                        .collect::<BiHashMap<_, _>>(),
+                },
+            ))
+        });
+        if results.clone().any(|res| res.is_err()) {
+            Err(results
+                .filter_map(Result::err)
+                .fold(Vec::new(), |mut errors, mut v| {
+                    errors.append(&mut v);
+                    errors
+                }))
+        } else {
+            Ok(results.filter_map(Result::ok).collect())
+        }
     }
 }
 

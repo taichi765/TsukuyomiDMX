@@ -55,7 +55,7 @@ pub(super) fn update_fixture(
     id: FixtureId,
     change: FixtureChange,
 ) -> Result<
-    UpdateFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)> + Clone>,
+    UpdateFixtureCommand<impl Iterator<Item = (UniverseId, DmxAddress)> + Clone + Debug>,
     FixtureUpdateError,
 > {
     let new_occupied_addresses = state.with_fixtures_and_defs(|fxts, defs| {

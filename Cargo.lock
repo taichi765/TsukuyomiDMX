@@ -5222,6 +5222,7 @@ dependencies = [
  "assert_matches",
  "bimap",
  "derive-getters",
+ "derive_more",
  "dirs",
  "ofl_schemas",
  "rayon",

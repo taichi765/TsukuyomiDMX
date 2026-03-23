@@ -24,6 +24,7 @@ pub trait FunctionDataGetters {
     fn name(&self) -> &str;
 }
 
+#[derive(Debug)]
 pub enum FunctionData {
     StaticScene(StaticSceneData),
     Chaser(ChaserData),

@@ -99,7 +99,7 @@ export component FixtureListView inherits Rectangle {
                 accessible-expandable: true;
                 accessible-expanded: m_data.expanded;
                 accessible-action-expand => {
-                    toggle-expand-manufacturer(m_data.manufacturer)
+                    toggle-expand-manufacturer(m_data.manufacturer);
                 }
                 accessible-action-default => {
                     self.accessible-action-expand()

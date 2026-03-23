@@ -8,6 +8,7 @@ use std::{collections::HashMap, time::Duration};
 
 //TODO: フェードインの実装
 
+#[derive(Debug)]
 pub struct ChaserData {
     id: FunctionId,
     name: String,
@@ -125,6 +126,7 @@ impl ChaserRuntime {
     }*/
 }
 
+#[derive(Debug)]
 struct ChaserStep {
     function_id: FunctionId,
     fade_in: Duration,
