@@ -84,6 +84,44 @@ impl FixtureDef {
         }
     }
 
+    /// Creates dummy [`FixtureDef`].
+    pub fn new_dummy() -> Self {
+        let mut def = FixtureDef::new("Test Manufacturer", "Test Model");
+        def.insert_channel(
+            "Dimmer",
+            ChannelDef::new(
+                MergeMode::HTP,
+                Capability::Single(CapabilityInner::Intensity),
+            ),
+        );
+        def.insert_channel(
+            "Red",
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Red)),
+        );
+        def.insert_channel(
+            "Green",
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Green)),
+        );
+        def.insert_channel(
+            "Blue",
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Blue)),
+        );
+        def.insert_mode(
+            "4 Channel",
+            FixtureMode::new(
+                vec![
+                    ("Dimmer".into(), 0),
+                    ("Red".into(), 1),
+                    ("Green".into(), 2),
+                    ("Blue".into(), 3),
+                ]
+                .into_iter(),
+            )
+            .unwrap(),
+        );
+        def
+    }
+
     pub fn id(&self) -> &FixtureDefId {
         &self.id
     }

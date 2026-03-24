@@ -83,7 +83,7 @@ impl Model for FixtureDefModel {
 #[cfg(test)]
 mod tests {
     use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer};
-    use crate::test_helpers::{make_fixture_def, make_fixture_def_2};
+    use crate::test_helpers::make_fixture_def_2;
 
     use super::*;
     use i_slint_core::model::ModelChangeListenerContainer;
@@ -93,7 +93,7 @@ mod tests {
     fn def_map_model_works() {
         // Arrange
         let mut def_rg = FakeFixtureDefRegistry::new();
-        let def = make_fixture_def();
+        let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
         let def_2 = make_fixture_def_2();
