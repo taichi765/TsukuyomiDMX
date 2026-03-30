@@ -29,6 +29,7 @@ pub struct ManufacturerModel {
     notify: ModelNotify,
 }
 
+// TODO: FixtureDefModelのresetedをlistenする
 impl Model for ManufacturerModel {
     type Data = ui::ManufacturerData;
 

@@ -1,7 +1,14 @@
 //! [`Doc`]に登録したコールバックが呼ばれたとき、[`FixtureMapModel`]のlistenerに通知が行く。
 //! listenerは[`FixtureMapModel::row_data()`]を呼ぶことで最新のデータを得る。
 
-use std::{any::Any, borrow::Cow, cell::RefCell, collections::HashMap, pin::Pin, rc::Rc};
+use std::{
+    any::Any,
+    borrow::Cow,
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    pin::Pin,
+    rc::Rc,
+};
 
 use i_slint_core::model::ModelChangeListener;
 use slint::{Model, ModelNotify, ModelTracker};
@@ -14,14 +21,14 @@ use tsukuyomi_core::{
 #[derive(Debug)]
 pub struct FixtureMapModel<F> {
     f: F,
-    inner: Rc<FixtureModelInner>,
+    inner: Rc<FixtureModel>,
 }
 
 impl<F, R> FixtureMapModel<F>
 where
     F: Fn(&Fixture) -> R,
 {
-    pub fn new(inner: Rc<FixtureModelInner>, f: F) -> Self {
+    pub fn new(inner: Rc<FixtureModel>, f: F) -> Self {
         Self { f, inner }
     }
 }
@@ -50,23 +57,26 @@ where
 }
 
 /// 複数の[`FixtureMapModel`]の間で共有される。
+/// [`FixtureMapModel`]を経由せずに使うこともできる。
 #[derive(derive_more::Debug)]
-pub struct FixtureModelInner {
+pub struct FixtureModel {
     #[debug(skip)]
     state: DocStateView,
     #[debug(skip)]
     notify: ModelNotify,
     keys: RefCell<Vec<FixtureId>>,
     index: RefCell<HashMap<FixtureId, usize>>,
+    latest_removed: Cell<Option<FixtureId>>,
 }
 
-impl FixtureModelInner {
-    fn create(doc: &mut Doc) -> Rc<Self> {
+impl FixtureModel {
+    pub fn create(doc: &mut Doc) -> Rc<Self> {
         let me = Rc::new(Self {
             state: doc.state_view(),
             notify: ModelNotify::default(),
             keys: RefCell::new(Vec::new()),
             index: RefCell::new(HashMap::new()),
+            latest_removed: Cell::new(None),
         });
 
         let me_clone = Rc::clone(&me);
@@ -93,6 +103,7 @@ impl FixtureModelInner {
                         *r -= 1
                     }
                 });
+                me.latest_removed.set(Some(id.to_owned()));
                 me.notify.row_removed(row, 1)
             }
             _ => (),
@@ -104,7 +115,7 @@ impl FixtureModelInner {
         self.state.with_fixtures(|it| it.iter().count())
     }
 
-    fn with_row<F, R>(&self, idx: usize, f: F) -> Option<R>
+    pub fn with_row<F, R>(&self, idx: usize, f: F) -> Option<R>
     where
         F: FnOnce(&Fixture) -> R,
     {
@@ -113,6 +124,14 @@ impl FixtureModelInner {
             let fxt = it.get(&id)?;
             Some(f(fxt))
         })
+    }
+
+    pub fn latest_removed(&self) -> Option<FixtureId> {
+        self.latest_removed.get()
+    }
+
+    pub fn model_tracker(&self) -> &dyn ModelTracker {
+        &self.notify
     }
 }
 
@@ -128,7 +147,6 @@ mod tests {
     use tsukuyomi_core::prelude::*;
 
     use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer};
-    use crate::test_helpers::make_fixture_def;
 
     use super::*;
 
@@ -142,12 +160,12 @@ mod tests {
     fn fixture_map_model_works() {
         let mut def_rg = FakeFixtureDefRegistry::new();
 
-        let def = make_fixture_def();
+        let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
 
         let mut doc = Doc::new_with_def_registry(Box::new(def_rg));
-        let inner = FixtureModelInner::create(&mut doc);
+        let inner = FixtureModel::create(&mut doc);
         let map_model = FixtureMapModel::new(Rc::clone(&inner), |fxt| DummyStruct {
             name: fxt.name().to_shared_string(),
             id: fxt.id().to_shared_string(),

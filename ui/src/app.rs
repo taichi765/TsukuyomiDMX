@@ -12,8 +12,8 @@ use tsukuyomi_core::{
 };
 
 use crate::{
-    models::{FixtureDefModel, FixtureModelInner},
-    tea::fixture_list_view,
+    models::{FixtureDefModel, FixtureModel},
+    tea::{fixture_list_view, universe_view},
     ui,
 };
 
@@ -23,7 +23,6 @@ pub struct App {
     pub ui: ui::AppWindow,
     pub state: AppState,
     pub dispatcher: Dispatcher,
-    pub local_models: LocalModels,
     pub shared_model_inner: SharedInnerModel,
 }
 
@@ -40,7 +39,6 @@ impl App {
             ui,
             state: AppState {},
             dispatcher,
-            local_models: LocalModels {},
             shared_model_inner: SharedInnerModel {
                 def_model: OnceCell::new(),
                 fixture_model: OnceCell::new(),
@@ -49,7 +47,17 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        self.shared_model_inner
+            .def_model
+            .set(FixtureDefModel::create(&mut self.doc.lock().unwrap()))
+            .unwrap();
+        self.shared_model_inner
+            .fixture_model
+            .set(FixtureModel::create(&mut self.doc.lock().unwrap()))
+            .unwrap();
+
         fixture_list_view::setup(self);
+        universe_view::setup(self);
         self.setup_window();
 
         self.ui.run()?;
@@ -95,12 +103,10 @@ impl App {
 
 pub struct AppState {}
 
-pub struct LocalModels {}
-
 /// これらのModelにMapModel等を使ってuiに渡す、共通化部分
 pub struct SharedInnerModel {
     pub def_model: OnceCell<Rc<FixtureDefModel>>,
-    pub fixture_model: OnceCell<Rc<FixtureModelInner>>,
+    pub fixture_model: OnceCell<Rc<FixtureModel>>,
 }
 
 pub enum AppAction {}

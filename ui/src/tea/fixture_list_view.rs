@@ -25,13 +25,8 @@ pub fn setup(app: &mut App) {
     let doc_clone = Arc::clone(&app.doc);
     let adopter = app.ui.global::<ui::FixtureListAdopter>();
 
-    let def_model = FixtureDefModel::create(&mut app.doc.lock().unwrap());
-    app.shared_model_inner
-        .def_model
-        .set(Rc::clone(&def_model))
-        .unwrap();
     let manufacturer_model = Rc::new(ManufacturerModel::new(
-        def_model,
+        app.shared_model_inner.def_model.get().unwrap().clone(),
         app.doc.lock().unwrap().state_view(),
     ));
 
@@ -177,6 +172,12 @@ mod tests {
 
         // TODO: DefRegistryのfakeを使う
         let mut app = App::new();
+
+        app.shared_model_inner
+            .def_model
+            .set(FixtureDefModel::create(&mut app.doc.lock().unwrap()))
+            .unwrap();
+
         setup(&mut app);
 
         let list_view: Vec<_> =
