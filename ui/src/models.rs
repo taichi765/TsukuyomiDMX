@@ -5,7 +5,7 @@ pub use fixture_def::*;
 mod manufacturer;
 pub use manufacturer::*;
 mod universe_view;
-pub use universe_view::UniModel as UniverseViewModel;
+pub use universe_view::UniverseViewModel;
 
 #[cfg(test)]
 mod test_helpers {

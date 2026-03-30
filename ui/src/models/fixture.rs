@@ -126,6 +126,16 @@ impl FixtureModel {
         })
     }
 
+    pub fn with_fixture<F, R>(&self, fxt_id: FixtureId, f: F) -> Option<R>
+    where
+        F: FnOnce(&Fixture) -> R,
+    {
+        self.state.with_fixtures(|it| {
+            let fxt = it.get(&fxt_id)?;
+            Some(f(fxt))
+        })
+    }
+
     pub fn latest_removed(&self) -> Option<FixtureId> {
         self.latest_removed.get()
     }

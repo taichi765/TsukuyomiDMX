@@ -1,93 +1,73 @@
 import { StyleMetrics, Palette, ScrollView } from "std-widgets.slint";
 import { BorderHorz, BorderVert } from "../styling.slint";
 
-export struct UniverseViewFixtureModel { fixture-id: string, name: string, address: int, footprint: int}
+export struct UniverseViewFixtureData { 
+    fixture-id: string, 
+    text: string, 
+    row: int,
+    col: int, 
+    length: int,
+    is-odd: bool}
+
+
 global Adopter {
-    in property <[UniverseViewFixtureModel]> fixtures:[
+    in property <[UniverseViewFixtureData]> fixtures:[
         // dummy
-        { name:"MyFixture", address:12, footprint:5 }];
+        { fixture-id:"dummy", text:"MyFixture", row:0, col:0, length:5 }];
+    in property <[int]> rows;
+    in property <[int]> cols;
 }
 
 export {Adopter as UniverseViewAdopter }
 
 export component UniverseView inherits Rectangle {
-    property <length> grid-width: 26px;
-    //max(26px, root.width / root.col-num);
-    // FIXME: magic number
-    property <length> grid-height: 26px;
-    //max(26px, root.height / root.row-num);
-    property <int> col-num: 32;
-    property <int> row-num: 16;
+    property <length> grid-width: root.width/Adopter.cols.length;
+    property <length> grid-height: root.height/Adopter.rows.length;
 
     background: Palette.background;
-    //ScrollView {
-    VerticalLayout {
-        for num[i] in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]: VerticalLayout {
-            HorizontalLayout {
-                for num2[j] in [
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11,
-                    12,
-                    13,
-                    14,
-                    15,
-                    16,
-                    17,
-                    18,
-                    19,
-                    20,
-                    21,
-                    22,
-                    23,
-                    24,
-                    25,
-                    26,
-                    27,
-                    28,
-                    29,
-                    30,
-                    31,
-                    32
-                ]: HorizontalLayout {
-                    Rectangle {
-                        width: root.grid-width - 1px; //TODO: レスポンシブにしたい
-                        height: root.grid-height - 1px;
-                        background: Palette.alternate-background;
-                        Text {
-                            text: (num - 1) * root.col-num + num2;
+    
+    ScrollView {
+        VerticalLayout {
+            for i in Adopter.rows: VerticalLayout {
+                if i != 0:BorderHorz {
+                    height: 1px;
+                }
+                HorizontalLayout {
+                    for j in Adopter.cols: HorizontalLayout {
+                        if j != 0 && compute-address()<=512 :BorderVert {
+                            width: 1px;
                         }
-                    }
 
-                    if j != root.col-num:BorderVert {
-                        width: 1px;
+                        if compute-address()<=512: Rectangle {
+                            width: root.grid-width - 1px; //TODO: レスポンシブにしたい
+                            height: root.grid-height - 1px;
+                            background: Palette.alternate-background;
+
+                            Text {
+                                text: compute-address();
+                            }
+                        }
+
+                        function compute-address()->int {
+                            i * Adopter.cols.length+ j + 1
+                        }
                     }
                 }
             }
-
-            if i != root.row-num:BorderHorz {
-                height: 1px;
-            }
         }
-    }
 
-    for fxt in Adopter.fixtures: Rectangle {
-        x: round(mod(fxt.address,root.col-num)) * root.grid-width;
-        y: round(fxt.address / root.col-num) * grid-height;
-        width: fxt.footprint * grid-width;
-        height: grid-height;
-        background: Palette.accent-background;
-        Text {
-            text: fxt.name;
-            color: Palette.foreground;
+        for fxt in Adopter.fixtures: Rectangle {
+            x: fxt.col * root.grid-width;
+            y: fxt.row * root.grid-height;
+            width: fxt.length * root.grid-width;
+            height: root.grid-height;
+            // TODO: 色のチョイスを変える
+            background: fxt.is-odd ? Palette.accent-background : Palette.alternate-background;
+            Text {
+                text: fxt.text;
+                overflow: elide;
+                color: Palette.foreground;
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ use std::{
     rc::Rc,
     sync::{Arc, Mutex},
 };
+use tracing::debug;
 use tsukuyomi_core::{
     doc::Doc,
     prelude::{Fixture, FixtureDefId},
@@ -28,12 +29,14 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        debug!("creating App instance");
         let doc = Arc::new(Mutex::new(
             Doc::try_new().expect("failed to initialize doc"),
         ));
 
         let ui = ui::AppWindow::new().unwrap();
         let dispatcher = Self::create_dispatcher();
+        debug!("App instance created");
         Self {
             doc,
             ui,
@@ -47,19 +50,28 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        debug!("creating FixtureDefModel");
         self.shared_model_inner
             .def_model
             .set(FixtureDefModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
+        debug!("FuxtureDefModel created");
+        debug!("creating FixtureModel");
         self.shared_model_inner
             .fixture_model
             .set(FixtureModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
+        debug!("FixtureModel created");
 
+        debug!("setting up FixtureListView");
         fixture_list_view::setup(self);
+        debug!("FixtureListView was set up");
+        debug!("setting up UniverseView");
         universe_view::setup(self);
+        debug!("UniverseView was set up");
         self.setup_window();
 
+        debug!("Starting ui...");
         self.ui.run()?;
         Ok(())
     }

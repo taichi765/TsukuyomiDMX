@@ -11,13 +11,13 @@ use i_slint_core::model::{ModelChangeListener, ModelChangeListenerContainer};
 use slint::{Model, ModelNotify, ModelTracker, SharedString, ToSharedString};
 use tsukuyomi_core::{
     doc::DocStateView,
-    prelude::{DmxAddress, Fixture, FixtureId},
+    prelude::{DmxAddress, Fixture, FixtureId, UniverseId},
 };
 
 use crate::{models::FixtureModel, ui};
 
 /// FixtureModelをSlint側で扱いやすい形に変える
-pub struct UniModel<S: SourceModel, P: FixtureInfoProvider>(
+pub struct UniverseViewModel<S: SourceModel, P: FixtureInfoProvider>(
     Pin<Box<ModelChangeListenerContainer<ModelInner<S, P>>>>,
 );
 
@@ -27,6 +27,7 @@ pub trait SourceModel {
     /// 直近のremoveされたfixtureのidを返す。一度もremoveされていない場合はNone。
     fn get_removed_id(&self) -> Option<FixtureId>;
     fn model_tracker(&self) -> &dyn ModelTracker;
+    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId>;
 }
 
 impl SourceModel for FixtureModel {
@@ -40,6 +41,10 @@ impl SourceModel for FixtureModel {
 
     fn model_tracker(&self) -> &dyn ModelTracker {
         self.model_tracker()
+    }
+
+    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
+        self.with_fixture(fxt_id, |fxt| fxt.universe_id())
     }
 }
 
@@ -59,6 +64,7 @@ impl FixtureInfoProvider for DocStateView {
             Some(fxt.address())
         })
     }
+
     fn get_footprint(&self, fxt_id: FixtureId) -> Option<usize> {
         self.with_fixtures_and_defs(|fxts, defs| {
             let fxt = fxts.get(&fxt_id)?;
@@ -66,12 +72,13 @@ impl FixtureInfoProvider for DocStateView {
             Some(def.mode(fxt.fixture_mode()).unwrap().footprint())
         })
     }
+
     fn get_name(&self, fxt_id: FixtureId) -> Option<SharedString> {
         self.with_fixtures(|it| Some(it.get(&fxt_id)?.name().to_shared_string()))
     }
 }
 
-impl<S, P> Model for UniModel<S, P>
+impl<S, P> Model for UniverseViewModel<S, P>
 where
     S: SourceModel + 'static,
     P: FixtureInfoProvider + 'static,
@@ -100,7 +107,7 @@ where
                 col: info.col as i32,
                 row: info.row as i32,
                 fixture_id: fxt_id.to_shared_string(),
-                is_odd: self.0.is_odd(fxt_id, *n).unwrap(),
+                is_odd: self.0.is_odd(fxt_id).unwrap(),
                 length: info.length as i32,
                 text: info.text.clone(),
             })
@@ -115,7 +122,7 @@ where
     }
 }
 
-impl<S, P> UniModel<S, P>
+impl<S, P> UniverseViewModel<S, P>
 where
     S: SourceModel + 'static,
     P: FixtureInfoProvider + 'static,
@@ -139,6 +146,7 @@ struct ModelInner<S, P> {
     source_model: Rc<S>,
     info_provider: P,
     // OPTIM: ほとんどの場合FixtureInfoは一つだけなので、smallvec等使ってスタックに置いたほうがいい気がする
+    // FIXME: Universeごとにわける
     /// 行マタギの場合一つのFixtureに対し[`FixtureInfo`]が複数存在する
     data: RefCell<HashMap<FixtureId, Vec<FixtureInfo>>>,
     row_order: RefCell<Vec<(FixtureId, usize)>>,
@@ -240,7 +248,10 @@ where
     fn reset(self: Pin<&Self>) {}
 }
 
-impl<S, P> ModelInner<S, P> {
+impl<S, P> ModelInner<S, P>
+where
+    S: SourceModel,
+{
     fn new(source_model: Rc<S>, doc: P, col_count: usize) -> Self {
         Self {
             source_model,
@@ -253,18 +264,21 @@ impl<S, P> ModelInner<S, P> {
     }
 
     /// Returns `None` if there was no such combination of (fxt_id, n).
-    fn is_odd(&self, fxt_id: &FixtureId, n: usize) -> Option<bool> {
+    fn is_odd(&self, fxt_id: &FixtureId) -> Option<bool> {
+        let univ = self.source_model.get_universe(*fxt_id)?;
+        //self.data.borrow().iter().filter(|(id,_)|);
         let count = self
             .row_order
             .borrow()
             .iter()
+            .filter(|(id, val)| self.source_model.get_universe(*id) == univ)
             .try_fold(0usize, |count, (id, val)| {
                 if id == fxt_id && *val == n {
                     ControlFlow::Break(count)
                 } else {
                     ControlFlow::Continue(count + 1)
                 }
-            });
+            }); // FIXME
         match count {
             ControlFlow::Break(count) => Some(count % 2 != 0),
             ControlFlow::Continue(_) => None,
@@ -428,10 +442,11 @@ mod tests {
         let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
+        // TODO: StubFixtureInfoProviderを使う
         let mut doc = Doc::new_with_def_registry(Box::new(def_rg));
         let source_model = Rc::new(FakeSourceModel::new());
 
-        let model = UniModel::new(Rc::clone(&source_model), doc.state_view(), COL_COUNT);
+        let model = UniverseViewModel::new(Rc::clone(&source_model), doc.state_view(), COL_COUNT);
 
         let fxt = Fixture::new(
             "Test Fixture",
@@ -466,7 +481,7 @@ mod tests {
         let source_model = Rc::new(FakeSourceModel::new());
         let stub = StubFixtureInfoProvider::new(22, 4, "Test Fixture");
 
-        let model = UniModel::new(Rc::clone(&source_model), stub, COL_COUNT);
+        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
         let fxt = Fixture::new(
             "Test Fixture",
@@ -506,10 +521,11 @@ mod tests {
         let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         def_rg.insert(def_id.clone(), def);
+        // TODO: StubFixtureInfoProviderを使う
         let mut doc = Doc::new_with_def_registry(Box::new(def_rg));
         let source_model = FixtureModel::create(&mut doc);
 
-        let model = UniModel::new(Rc::clone(&source_model), doc.state_view(), COL_COUNT);
+        let model = UniverseViewModel::new(Rc::clone(&source_model), doc.state_view(), COL_COUNT);
 
         let fxt = Fixture::new(
             "Test Fixture",
@@ -545,7 +561,7 @@ mod tests {
     fn model_updates_after_fixture_removed() {
         let source_model = Rc::new(FakeSourceModel::new());
         let stub = StubFixtureInfoProvider::new(10, 4, "Test Fixture");
-        let model = UniModel::new(Rc::clone(&source_model), stub, COL_COUNT);
+        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
         let def_id = FixtureDef::new_dummy().id().to_owned();
         let fxt = Fixture::new(
