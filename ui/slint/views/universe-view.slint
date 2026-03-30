@@ -21,11 +21,10 @@ global Adopter {
 export {Adopter as UniverseViewAdopter }
 
 export component UniverseView inherits Rectangle {
-    property <length> grid-width: root.width/Adopter.cols.length;
-    property <length> grid-height: root.height/Adopter.rows.length;
+    property <length> grid-width: root.width / Adopter.cols.length;
+    property <length> grid-height: root.height / Adopter.rows.length;
 
     background: Palette.background;
-    
     ScrollView {
         VerticalLayout {
             for i in Adopter.rows: VerticalLayout {
@@ -34,11 +33,11 @@ export component UniverseView inherits Rectangle {
                 }
                 HorizontalLayout {
                     for j in Adopter.cols: HorizontalLayout {
-                        if j != 0 && compute-address()<=512 :BorderVert {
+                        if j != 0 && compute-address() <= 512:BorderVert {
                             width: 1px;
                         }
 
-                        if compute-address()<=512: Rectangle {
+                        if compute-address() <= 512: Rectangle {
                             width: root.grid-width - 1px; //TODO: レスポンシブにしたい
                             height: root.grid-height - 1px;
                             background: Palette.alternate-background;
@@ -48,8 +47,8 @@ export component UniverseView inherits Rectangle {
                             }
                         }
 
-                        function compute-address()->int {
-                            i * Adopter.cols.length+ j + 1
+                        function compute-address() -> int {
+                            i * Adopter.cols.length + j + 1
                         }
                     }
                 }
