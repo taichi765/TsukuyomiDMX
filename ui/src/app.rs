@@ -4,11 +4,16 @@ use std::{
     cell::OnceCell,
     error::Error,
     rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Sender},
+    },
+    thread,
 };
-use tracing::debug;
+use tracing::{debug, instrument};
 use tsukuyomi_core::{
     doc::Doc,
+    engine::{Engine, EngineCommand, EngineMessage},
     prelude::{Fixture, FixtureDefId},
 };
 
@@ -25,6 +30,10 @@ pub struct App {
     pub state: AppState,
     pub dispatcher: Dispatcher,
     pub shared_model_inner: SharedInnerModel,
+
+    pub engine_handle: OnceCell<thread::JoinHandle<()>>,
+    pub command_tx: OnceCell<mpsc::Sender<EngineCommand>>,
+    pub error_rx: OnceCell<mpsc::Receiver<EngineMessage>>,
 }
 
 impl App {
@@ -39,6 +48,9 @@ impl App {
         debug!("App instance created");
         Self {
             doc,
+            engine_handle: OnceCell::new(),
+            command_tx: OnceCell::new(),
+            error_rx: OnceCell::new(),
             ui,
             state: AppState {},
             dispatcher,
@@ -50,33 +62,31 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        debug!("creating FixtureDefModel");
         self.shared_model_inner
             .def_model
             .set(FixtureDefModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
-        debug!("FuxtureDefModel created");
-        debug!("creating FixtureModel");
         self.shared_model_inner
             .fixture_model
             .set(FixtureModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
-        debug!("FixtureModel created");
 
-        debug!("setting up FixtureListView");
         fixture_list_view::setup(self);
-        debug!("FixtureListView was set up");
-        debug!("setting up UniverseView");
         universe_view::setup(self);
-        debug!("UniverseView was set up");
         self.setup_window();
+        self.setup_engine();
 
-        debug!("Starting ui...");
         self.ui.run()?;
+        self.engine_handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("failed to finish Engine thread successfully");
         Ok(())
     }
 
     /// Maximize, Toggle fullscreenなどの初期化
+    #[instrument(skip_all)]
     fn setup_window(&mut self) {
         self.ui.on_start_drag({
             let ui_handle = self.ui.as_weak();
@@ -106,6 +116,25 @@ impl App {
                 ui.window().hide().unwrap()
             }
         });
+    }
+
+    #[instrument(skip_all)]
+    fn setup_engine(&mut self) {
+        let (command_tx, command_rx) = mpsc::channel::<EngineCommand>();
+        let (error_tx, error_rx) = mpsc::channel::<EngineMessage>();
+
+        let engine = Engine::new(self.doc.lock().unwrap().state_view(), command_rx, error_tx);
+
+        let engine_handle = std::thread::Builder::new()
+            .name("tsukuyomidmx-engine".into())
+            .spawn(move || {
+                debug!("starting engine loop");
+                engine.start_loop()
+            })
+            .unwrap();
+        self.engine_handle.set(engine_handle).unwrap();
+        self.command_tx.set(command_tx).unwrap();
+        self.error_rx.set(error_rx).unwrap();
     }
 
     fn create_dispatcher() -> Dispatcher {

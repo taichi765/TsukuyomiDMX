@@ -1,14 +1,19 @@
-use std::{cell::OnceCell, collections::HashMap, fs, io, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+};
 
 use thiserror::Error;
-use tracing::{debug, field::debug, instrument};
+use tracing::{debug, instrument};
 
 use crate::{
     fixture_def::FixtureDefConverseError,
     prelude::{FixtureDef, FixtureDefId},
 };
 
-pub trait FixtureDefRegistry {
+pub trait FixtureDefRegistry: Send + Sync {
     fn contains(&self, id: &FixtureDefId) -> bool;
     fn load(&mut self) -> Result<(), io::Error>;
     fn get<'a>(&'a self, id: &FixtureDefId) -> Result<&'a FixtureDef, FixtureDefLookupError>;
@@ -33,7 +38,7 @@ struct FixtureDefCatalogItem {
     manufacturer: String,
     model: String,
     path: PathBuf,
-    val: OnceCell<Result<FixtureDef, Arc<FixtureDefLoadError>>>,
+    val: OnceLock<Result<FixtureDef, Arc<FixtureDefLoadError>>>,
 }
 
 impl FixtureDefRegistryImpl {
@@ -96,7 +101,7 @@ impl FixtureDefRegistry for FixtureDefRegistryImpl {
                                 manufacturer: manufacturer.clone(), // TODO: Cow使った方がいいのでは？
                                 model,
                                 path: file.path(),
-                                val: OnceCell::new(),
+                                val: OnceLock::new(),
                             },
                         );
                     });

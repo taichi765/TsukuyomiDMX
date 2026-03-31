@@ -4,7 +4,7 @@ use std::{
 };
 
 use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
-use tracing::{debug, trace_span};
+use tracing::{debug, instrument, trace_span};
 use tsukuyomi_core::{
     doc::{
         Doc, DocStateView, FixtureAddError, FixtureDefNotFoundError, ModeNotFoundError,
@@ -20,6 +20,7 @@ use crate::{
     ui,
 };
 
+#[instrument(skip_all)]
 pub fn setup(app: &mut App) {
     let doc_view = app.doc.lock().unwrap().state_view();
     let doc_clone = Arc::clone(&app.doc);

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, ModelExt, ModelRc, VecModel};
-use tracing::trace_span;
+use tracing::{instrument, trace_span};
 use tsukuyomi_core::{doc::DocStateView, prelude::UniverseId};
 
 use crate::{
@@ -10,6 +10,7 @@ use crate::{
     ui,
 };
 
+#[instrument(skip_all)]
 pub fn setup(app: &mut App) {
     let adopter = app.ui.global::<ui::UniverseViewAdopter>();
     let model = Rc::new(UniverseViewModel::new(
