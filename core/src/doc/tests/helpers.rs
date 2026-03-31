@@ -21,7 +21,7 @@ pub(crate) fn make_simple_fixture(def_id: FixtureDefId) -> Fixture {
         UniverseId::new(0),
         DmxAddress::MIN,
         def_id.clone(),
-        "Mode 1",
+        "4 Channel",
         0.,
         0.,
     )

@@ -66,9 +66,9 @@ pub enum FunctionCommand {
         value: u8,
     },
     StartFade {
-        from_id: Uuid,
-        to_id: Uuid,
-        chaser_id: Uuid,
+        from_id: FunctionId,
+        to_id: FunctionId,
+        chaser_id: FunctionId,
         duration: Duration,
     },
 }

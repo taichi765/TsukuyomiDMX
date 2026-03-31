@@ -1,6 +1,5 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tracing::{info, trace, warn};
-use uuid::Uuid;
+use tracing::{error, info, instrument, trace, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
@@ -24,7 +23,7 @@ pub struct Engine {
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
-    active_runtimes: HashMap<FunctionId, Box<dyn FunctionRuntime>>,
+    active_runtimes: Vec<Box<dyn FunctionRuntime>>,
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     universe_states: HashMap<UniverseId, UniverseState>,
     output_map_cache: HashMap<OutputPluginId, Vec<UniverseId>>,
@@ -43,7 +42,7 @@ impl Engine {
             doc,
             command_rx,
             message_tx,
-            active_runtimes: HashMap::new(),
+            active_runtimes: Vec::new(),
             output_plugins: HashMap::new(),
             universe_states: HashMap::new(),
             output_map_cache: HashMap::new(),
@@ -179,28 +178,32 @@ impl Engine {
 
     ///既にstartしてた場合は何もしない
     fn start_function(&mut self, function_id: FunctionId) {
-        let runtime = self.doc.with_functions(|it| {
+        let _runtime = self.doc.with_functions(|it| {
             it.get(&function_id)
                 .expect("todo: エラー返す")
                 .create_runtime()
         });
-        self.active_runtimes.insert(function_id, runtime);
+        todo!()
+        //self.active_runtimes.insert(function_id, runtime);
     }
 
     ///既にstopしてた/そもそも存在しなかった場合、何もしない
-    fn stop_function(&mut self, function_id: FunctionId) {
-        self.active_runtimes.remove(&function_id);
+    fn stop_function(&mut self, _function_id: FunctionId) {
+        todo!()
+        //self.active_runtimes.remove(&function_id);
     }
 
-    fn write_universe(&mut self, _fixture_id: FixtureId, _channel: &str, _value: u8) {
-        todo!("resolve_addressをどっかから取ってくる")
-        /*match self.doc.read().resolve_address(fixture_id, channel) {
-            Ok((universe_id, address)) => {
+    fn write_universe(&mut self, fixture_id: FixtureId, channel: &str, value: u8) {
+        match self.doc.resolve_address(fixture_id, channel) {
+            Ok(resolved_address) => {
                 let universe = self
                     .universe_states
-                    .get_mut(&universe_id)
-                    .expect(format!("universe states not found: {:?}", universe_id).as_str()); // FIXME: EngineMessageで通知する
-                universe.set_value(address, value);
+                    .get_mut(&resolved_address.universe)
+                    .expect(
+                        format!("universe states not found: {:?}", resolved_address.universe)
+                            .as_str(),
+                    ); // TODO: EngineMessageで通知する
+                universe.set_value(resolved_address, value);
             }
             Err(e) => {
                 if let Err(send_err) =
@@ -216,10 +219,16 @@ impl Engine {
                     error!("engine: failed to send error: {}", send_err);
                 }
             }
-        }*/
+        }
     }
 
-    fn start_fade(&mut self, _from_id: Uuid, _to_id: Uuid, _chaser_id: Uuid, _duration: Duration) {
+    fn start_fade(
+        &mut self,
+        _from_id: FunctionId,
+        _to_id: FunctionId,
+        _chaser_id: FunctionId,
+        _duration: Duration,
+    ) {
         //必要な値だけを取り出す
         /*let (from_values, to_values) = {
             let from_scene = self.get_function(from_id).as_ref();
@@ -248,30 +257,29 @@ impl Engine {
             to_values,
             duration,
         );
+        todo!();
         let fader_id = fader.id();
         self.push_function(Box::new(fader))
             .expect("functionの追加に失敗しました");
         self.start_function(fader_id);*/
     }
 
-    // FIXME: universe_settingsごとプッシュ型の方がいいか？
+    #[instrument(skip_all)]
     fn update_output_map_cache(&mut self) {
-        todo!()
-        /*trace!("updating output map cache");
-        let doc = self.doc.read();
-        let mut new_map: HashMap<OutputPluginId, Vec<UniverseId>> = HashMap::new();
-        for (u_id, setting) in doc.universe_settings() {
-            trace!("plugin in doc({u_id:?}):{:?}", setting.output_plugins());
-            setting.output_plugins().iter().for_each(|p_id| {
-                if let Some(universes) = new_map.get_mut(p_id) {
-                    universes.push(*u_id);
-                } else {
-                    new_map.insert(*p_id, vec![*u_id]);
-                }
-            });
-        }
-
-        self.output_map_cache = new_map;*/
+        let new_map = self.doc.with_universe_settings(|settings| {
+            let mut new_map: HashMap<OutputPluginId, Vec<UniverseId>> = HashMap::new();
+            for (u_id, setting) in settings {
+                setting.output_plugins().iter().for_each(|p_id| {
+                    if let Some(universes) = new_map.get_mut(p_id) {
+                        universes.push(*u_id);
+                    } else {
+                        new_map.insert(*p_id, vec![*u_id]);
+                    }
+                })
+            }
+            new_map
+        });
+        self.output_map_cache = new_map;
     }
 }
 

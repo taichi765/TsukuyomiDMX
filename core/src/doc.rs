@@ -5,7 +5,6 @@ pub use commands::*;
 mod decider;
 mod def_registry;
 pub use def_registry::*;
-use tracing::{debug, instrument};
 mod state;
 
 use std::{
@@ -21,6 +20,7 @@ use crate::{
     prelude::ChannelDef,
     universe::{DmxAddress, UniverseId},
 };
+use tracing::{debug, instrument};
 
 declare_id_newtype!(OutputPluginId);
 
@@ -174,7 +174,7 @@ impl Clone for DocStateView {
     }
 }
 
-// RefCell borrow
+// RwLock helpers
 impl DocStateView {
     pub fn with_fixtures<F, R>(&self, f: F) -> R
     where
@@ -209,6 +209,13 @@ impl DocStateView {
         F: FnOnce(&AddressIndex) -> R,
     {
         self.0.with_address_index(f)
+    }
+
+    pub fn with_universe_settings<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<UniverseId, UniverseSetting>) -> R,
+    {
+        self.0.with_universe_settings(f)
     }
 }
 

@@ -43,7 +43,7 @@ global Adopter {
         23
     ];
     // dummy
-    callback universe-changed(selected-index:int);
+    callback universe-changed(selected-index: int);
 }
 
 export {Adopter as UniverseViewAdopter }
@@ -68,7 +68,7 @@ export component UniverseView inherits Rectangle {
             }
         }
 
-        view:=ScrollView {
+        view := ScrollView {
             VerticalLayout {
                 for i in Adopter.rows: VerticalLayout {
                     if i != 0:BorderHorz {

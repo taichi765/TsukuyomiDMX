@@ -17,7 +17,7 @@ fn add_fixture_works() {
         UniverseId::new(0),
         DmxAddress::MIN,
         def_id.clone(),
-        "Mode 1",
+        "4 Channel",
         0.,
         0.,
     );
@@ -59,7 +59,7 @@ fn update_fixture_rename_works() {
         UniverseId::new(0),
         DmxAddress::MIN,
         def_id.clone(),
-        "Mode 1",
+        "4 Channel",
         0.,
         0.,
     );
@@ -102,7 +102,7 @@ fn remove_fixture_works() {
         UniverseId::new(0),
         DmxAddress::MIN,
         def_id.clone(),
-        "Mode 1",
+        "4 Channel",
         0.,
         0.,
     );
