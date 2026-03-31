@@ -23,6 +23,7 @@ use slint::wgpu_28::{WGPUConfiguration, WGPUSettings};
 use slint::{Timer, TimerMode};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tsukuyomi_core::engine::{Engine, EngineCommand, EngineMessage};
 use tsukuyomi_core::prelude::*;
 
@@ -33,6 +34,7 @@ mod ui {
 }
 
 pub fn run_main() -> Result<(), Box<dyn Error>> {
+    // TODO: TSUKUYOMIDMX_LOG_LEVELで指定できるようにする
     // Initialize logger
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)

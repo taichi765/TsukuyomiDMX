@@ -4,7 +4,7 @@ use std::{
 };
 
 use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
-use tracing::debug;
+use tracing::{debug, trace_span};
 use tsukuyomi_core::{
     doc::{
         Doc, DocStateView, FixtureAddError, FixtureDefNotFoundError, ModeNotFoundError,
@@ -36,6 +36,16 @@ pub fn setup(app: &mut App) {
         let doc_view_clone = doc_view.clone();
 
         move |universe, address, fixture_def_id, mode, pos| {
+            // TODO: これらをproc-macro(attribute macro)にしたい
+            let _span = trace_span!(
+                "FixtureListView::on_patch",
+                ?universe,
+                address,
+                ?fixture_def_id,
+                ?mode,
+                ?pos
+            )
+            .entered();
             let universe_id = parse_universe_id(universe.as_str());
             let def_id = FixtureDefId::try_from(fixture_def_id.as_str()).unwrap();
             let default_fxt_name = {
@@ -89,41 +99,42 @@ pub fn setup(app: &mut App) {
     adopter.on_toggle_expand_manufacturer({
         let model = Rc::clone(&manufacturer_model);
         move |name| {
-            let now = std::time::Instant::now();
+            let _span =
+                trace_span!("FixtureListView::on_toggle_expand_manufacturer", ?name).entered();
             let model = Rc::clone(&model);
             slint::spawn_local(async move {
                 model.get_manufacturer_detail(&name).unwrap();
                 model.toggle_expanded(&name);
             })
             .unwrap();
-            let elapsed = now.elapsed();
-            debug!(
-                callback = "FixtureListViewAdopter::toggle-expand-manufacturer",
-                elapsed = ?elapsed
-            );
         }
     });
 
     adopter.on_update_current_fixture_modes({
         let ui_handle = app.ui.as_weak();
         let model = Rc::clone(&manufacturer_model);
-        move |def_id| match model.get_fixture_detail(def_id) {
-            Ok(fxt_data) => {
-                ui_handle
-                    .unwrap()
-                    .global::<ui::FixtureListAdopter>()
-                    .set_current_fixture_modes(fxt_data.modes().into());
-            }
-            Err(_) => {
-                // TODO: improve error message
-                ui_handle
-                    .unwrap()
-                    .set_error_message("failed to load definition".to_shared_string());
+        move |def_id| {
+            let _span =
+                trace_span!("FixtureListView::on_update_current_fixture_modes", ?def_id).entered();
+            match model.get_fixture_detail(def_id) {
+                Ok(fxt_data) => {
+                    ui_handle
+                        .unwrap()
+                        .global::<ui::FixtureListAdopter>()
+                        .set_current_fixture_modes(fxt_data.modes().into());
+                }
+                Err(_) => {
+                    // TODO: improve error message
+                    ui_handle
+                        .unwrap()
+                        .set_error_message("failed to load definition".to_shared_string());
+                }
             }
         }
     });
 
     adopter.on_get_next_address(move |universe| {
+        let _span = trace_span!("FixtureListView::on_get_next_address", ?universe).entered();
         let uni_id = parse_universe_id(&universe);
         let max = doc_view.current_max_address(uni_id);
         match max {

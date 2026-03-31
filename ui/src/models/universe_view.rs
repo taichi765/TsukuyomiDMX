@@ -52,12 +52,21 @@ impl SourceModel for FixtureModel {
 ///
 /// TestのときにDocStateViewをstubしたいのでトレイト化
 pub trait FixtureInfoProvider {
+    // TODO: occupied_addressesをもらったほうがいい
+    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId>;
     fn get_address(&self, fxt_id: FixtureId) -> Option<DmxAddress>;
     fn get_footprint(&self, fxt_id: FixtureId) -> Option<usize>;
     fn get_name(&self, fxt_id: FixtureId) -> Option<SharedString>;
 }
 
 impl FixtureInfoProvider for DocStateView {
+    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
+        self.with_fixtures(|it| {
+            let fxt = it.get(&fxt_id)?;
+            Some(fxt.universe_id())
+        })
+    }
+
     fn get_address(&self, fxt_id: FixtureId) -> Option<DmxAddress> {
         self.with_fixtures(|it| {
             let fxt = it.get(&fxt_id)?;
@@ -83,7 +92,7 @@ where
     S: SourceModel + 'static,
     P: FixtureInfoProvider + 'static,
 {
-    type Data = ui::UniverseViewFixtureData;
+    type Data = (UniverseId, ui::UniverseViewFixtureData);
 
     fn row_count(&self) -> usize {
         self.0
@@ -103,13 +112,18 @@ where
             .get(fxt_id)?
             .iter()
             .nth(*n)
-            .map(|info| ui::UniverseViewFixtureData {
-                col: info.col as i32,
-                row: info.row as i32,
-                fixture_id: fxt_id.to_shared_string(),
-                is_odd: self.0.is_odd(fxt_id).unwrap(),
-                length: info.length as i32,
-                text: info.text.clone(),
+            .map(|info| {
+                (
+                    info.universe,
+                    ui::UniverseViewFixtureData {
+                        col: info.col as i32,
+                        row: info.row as i32,
+                        fixture_id: fxt_id.to_shared_string(),
+                        is_odd: false, // default
+                        length: info.length as i32,
+                        text: info.text.clone(),
+                    },
+                )
             })
     }
 
@@ -169,6 +183,7 @@ where
 
         // TODO: クロスユニバースの処理を考えるとfootprint()よりoccupied_addresses()を使ったほうがいいかも
         let infos = Self::compute_fixture_info(
+            self.info_provider.get_universe(fxt_id).unwrap(),
             self.info_provider.get_address(fxt_id).unwrap().value(),
             self.info_provider.get_footprint(fxt_id).unwrap(),
             self.info_provider
@@ -194,6 +209,7 @@ where
     fn row_changed(self: Pin<&Self>, row: usize) {
         let fxt_id = self.source_model.get_id(row).unwrap();
         let new_infos = Self::compute_fixture_info(
+            self.info_provider.get_universe(fxt_id).unwrap(),
             self.info_provider.get_address(fxt_id).unwrap().value(),
             self.info_provider.get_footprint(fxt_id).unwrap(),
             self.info_provider
@@ -263,29 +279,8 @@ where
         }
     }
 
-    /// Returns `None` if there was no such combination of (fxt_id, n).
-    fn is_odd(&self, fxt_id: &FixtureId) -> Option<bool> {
-        let univ = self.source_model.get_universe(*fxt_id)?;
-        //self.data.borrow().iter().filter(|(id,_)|);
-        let count = self
-            .row_order
-            .borrow()
-            .iter()
-            .filter(|(id, val)| self.source_model.get_universe(*id) == univ)
-            .try_fold(0usize, |count, (id, val)| {
-                if id == fxt_id && *val == n {
-                    ControlFlow::Break(count)
-                } else {
-                    ControlFlow::Continue(count + 1)
-                }
-            }); // FIXME
-        match count {
-            ControlFlow::Break(count) => Some(count % 2 != 0),
-            ControlFlow::Continue(_) => None,
-        }
-    }
-
     fn compute_fixture_info(
+        universe: UniverseId,
         address: usize,
         footprint: usize,
         name: SharedString,
@@ -295,6 +290,7 @@ where
 
         let mut infos = Vec::new();
         loop {
+            // FIXME: クロスユニバースのときoverflowする
             let cur_adr = address + footprint - remaining_len;
             let row = cur_adr / col_count;
             let col = cur_adr % col_count - 1;
@@ -306,6 +302,7 @@ where
                 "".to_shared_string()
             };
             infos.push(FixtureInfo {
+                universe,
                 row,
                 col,
                 length,
@@ -323,6 +320,7 @@ where
 
 #[derive(Debug)]
 struct FixtureInfo {
+    universe: UniverseId,
     row: usize,
     col: usize,
     length: usize,
@@ -356,6 +354,10 @@ mod tests {
 
         fn get_removed_id(&self) -> Option<FixtureId> {
             self.latest_removed.get()
+        }
+
+        fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
+            todo!()
         }
 
         fn model_tracker(&self) -> &dyn ModelTracker {
@@ -407,14 +409,16 @@ mod tests {
     }
 
     struct StubFixtureInfoProvider {
+        univ: UniverseId,
         adr: DmxAddress,
         footprint: usize,
         name: SharedString,
     }
 
     impl StubFixtureInfoProvider {
-        fn new(adr: usize, footprint: usize, name: impl ToSharedString) -> Self {
+        fn new(univ: u8, adr: usize, footprint: usize, name: impl ToSharedString) -> Self {
             Self {
+                univ: UniverseId::new(univ),
                 adr: DmxAddress::new(adr).unwrap(),
                 footprint,
                 name: name.to_shared_string(),
@@ -423,6 +427,10 @@ mod tests {
     }
 
     impl FixtureInfoProvider for StubFixtureInfoProvider {
+        fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
+            Some(self.univ)
+        }
+
         fn get_address(&self, _fxt_id: FixtureId) -> Option<DmxAddress> {
             Some(self.adr)
         }
@@ -479,7 +487,7 @@ mod tests {
         let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         let source_model = Rc::new(FakeSourceModel::new());
-        let stub = StubFixtureInfoProvider::new(22, 4, "Test Fixture");
+        let stub = StubFixtureInfoProvider::new(0, 22, 4, "Test Fixture");
 
         let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
@@ -560,7 +568,7 @@ mod tests {
     #[test]
     fn model_updates_after_fixture_removed() {
         let source_model = Rc::new(FakeSourceModel::new());
-        let stub = StubFixtureInfoProvider::new(10, 4, "Test Fixture");
+        let stub = StubFixtureInfoProvider::new(0, 10, 4, "Test Fixture");
         let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
         let def_id = FixtureDef::new_dummy().id().to_owned();

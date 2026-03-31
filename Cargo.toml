@@ -28,7 +28,7 @@ serde_json = "1.0.149"
 
 # Slint dependencies
 # Use forked version to use pre-release features
-slint = { git = "https://github.com/taichi765/slint", features = ["backend-winit", "renderer-femtovg-wgpu", "unstable-wgpu-28", "gettext"] }
+slint = { git = "https://github.com/taichi765/slint",default-features = true,features = ["std","accessibility","backend-default","backend-winit", "renderer-femtovg-wgpu", "unstable-wgpu-28", "gettext"] }
 # Must match the version of slint, see https://github.com/slint-ui/slint/blob/master/internal/backends/winit/README.md
 i-slint-backend-winit = { git = "https://github.com/taichi765/slint" }
 i-slint-backend-testing = { git = "https://github.com/taichi765/slint" }
