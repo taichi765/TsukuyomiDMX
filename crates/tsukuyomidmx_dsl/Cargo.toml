@@ -1,0 +1,8 @@
+[package]
+name = "tsukuyomidmx_dsl"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+tree-sitter = "0.26.8"
+tree-sitter-tsukuyomidmx = { path = "../tree-sitter-tsukuyomidmx" }

@@ -1,0 +1,9 @@
+import { blink } from "../blink.tkd";
+
+const color = "#FF0000";
+
+red_blink().apply(".front")
+
+module red_blink(){
+    blink().color(color)
+}

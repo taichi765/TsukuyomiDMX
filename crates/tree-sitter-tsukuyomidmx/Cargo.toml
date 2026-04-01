@@ -1,0 +1,34 @@
+[package]
+name = "tree-sitter-tsukuyomidmx"
+description = "tree-sitter parser for TsukuyomiDMX's DSL"
+version = "0.1.0"
+authors = ["taichi765 <taichi0209.youtub@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "tsukuyomidmx"]
+categories = ["parser-implementations", "parsing", "text-editors"]
+repository = "https://github.com/taichi765/tsukuyomi"
+edition = "2021"
+autoexamples = false
+
+build = "bindings/rust/build.rs"
+include = [
+  "bindings/rust/*",
+  "grammar.js",
+  "queries/*",
+  "src/*",
+  "tree-sitter.json",
+  "/LICENSE",
+]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = "0.1"
+
+[build-dependencies]
+cc = "1.2"
+
+[dev-dependencies]
+tree-sitter = "0.26.8"

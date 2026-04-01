@@ -4,7 +4,7 @@ members=[
     "crates/tsukuyomidmx_core",
     "crates/slint_model_ext",
     "crates/ofl_schemes"
-]
+, "crates/tsukuyomidmx_dsl"]
 resolver="3"
 
 [profile.release]

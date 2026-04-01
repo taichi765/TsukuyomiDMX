@@ -1,0 +1,13 @@
+==================
+Module Declaration
+==================
+
+module my_module(color: color){
+    dimmer(255).color(color)
+}
+
+---
+(source_file
+    (module_declaration
+        ()
+    ))

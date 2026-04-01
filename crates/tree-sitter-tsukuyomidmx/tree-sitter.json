@@ -1,0 +1,41 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "tsukuyomidmx",
+      "camelcase": "TsukuyomiDmx",
+      "title": "TsukuyomiDmx DSL",
+      "scope": "source.tsukuyomidmx",
+      "file-types": [
+        "tkd"
+      ],
+      "injection-regex": "^tsukuyomidmx$",
+      "class-name": "TreeSitterTsukuyomidmx"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "tree-sitter parser for TsukuyomiDMX's DSL",
+    "authors": [
+      {
+        "name": "taichi765",
+        "email": "taichi0209.youtub@gmail.com",
+        "url": "https://github.com/taichi765"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/taichi765/Tsukuyomi"
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "java": false,
+    "node": false,
+    "python": false,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
+}
