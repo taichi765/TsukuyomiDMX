@@ -91,20 +91,20 @@ impl FixtureDef {
             "Dimmer",
             ChannelDef::new(
                 MergeMode::HTP,
-                Capability::Single(CapabilityInner::Intensity),
+                Capability::Single(CapabilityKind::Intensity),
             ),
         );
         def.insert_channel(
             "Red",
-            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Red)),
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Red)),
         );
         def.insert_channel(
             "Green",
-            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Green)),
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Green)),
         );
         def.insert_channel(
             "Blue",
-            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Blue)),
+            ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Blue)),
         );
         def.insert_mode(
             "4 Channel",
@@ -328,15 +328,15 @@ impl ChannelDef {
 
 #[derive(Debug, Clone)]
 pub enum Capability {
-    Single(CapabilityInner),
-    Multiple(Vec<CapabilityInner>),
+    Single(CapabilityKind),
+    Multiple(Vec<CapabilityKind>),
 }
 
 // TODO: Add more kinds
 /// Channel's capability
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum CapabilityInner {
+pub enum CapabilityKind {
     Intensity,
     Red,
     Blue,
@@ -358,7 +358,7 @@ mod ofl {
 
     use crate::{
         fixture::MergeMode,
-        prelude::{CapabilityInner, ChannelDef, FixtureDef, FixtureDefId},
+        prelude::{CapabilityKind, ChannelDef, FixtureDef, FixtureDefId},
     };
 
     impl TryFrom<(String, ofl_schemas::Fixture)> for FixtureDef {
@@ -471,7 +471,7 @@ mod ofl {
         })
     }
 
-    fn map_channel_capability(cap: o::Capability) -> CapabilityInner {
+    fn map_channel_capability(cap: o::Capability) -> CapabilityKind {
         match cap {
             o::Capability::Intensity {
                 dmx_range,
@@ -479,8 +479,8 @@ mod ofl {
                 brightness_start,
                 brightness_end,
                 common,
-            } => CapabilityInner::Intensity,
-            _ => CapabilityInner::Unknown,
+            } => CapabilityKind::Intensity,
+            _ => CapabilityKind::Unknown,
         }
     }
 

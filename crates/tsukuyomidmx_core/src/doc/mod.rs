@@ -40,7 +40,6 @@ pub struct Doc {
 
 impl Doc {
     pub fn try_new() -> Result<Self, std::io::Error> {
-        debug!("hello from core");
         let def_resource_path = {
             let mut p = dirs::data_local_dir().unwrap();
             p.push("tsukuyomidmx");

@@ -58,7 +58,7 @@ pub mod prelude {
         doc::{Doc, OutputPluginId},
         fixture::{Fixture, FixtureId, MergeMode},
         fixture_def::{
-            Capability, CapabilityInner, ChannelDef, FixtureDef, FixtureDefId, FixtureMode,
+            Capability, CapabilityKind, ChannelDef, FixtureDef, FixtureDefId, FixtureMode,
         },
         functions::FunctionId,
         universe::{DmxAddress, UniverseId},
