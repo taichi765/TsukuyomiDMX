@@ -1,12 +1,12 @@
 [package]
-name = "tsukuyomi-ui"
+name = "tsukuyomidmx"
 version = { workspace=true }
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tsukuyomi-core = { path = "../core" }
+tsukuyomidmx-core = { path = "../tsukuyomidmx_core" }
 
 slint = { workspace = true }
 i-slint-backend-winit = { workspace = true }

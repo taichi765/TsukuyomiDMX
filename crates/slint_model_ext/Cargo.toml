@@ -4,7 +4,7 @@ edition = "2024"
 version.workspace = true
 
 [dependencies]
-i-slint-core = { path = "../../slint/internal/core" }
+i-slint-core = { path = "../../../slint/internal/core" }
 slint = { workspace = true }
 
 derive_more = { workspace = true, features = ["debug"] }

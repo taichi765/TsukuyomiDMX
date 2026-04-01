@@ -1,5 +1,5 @@
 [package]
-name = "tsukuyomi-core"
+name = "tsukuyomidmx-core"
 version = { workspace = true }
 edition = "2024"
 
@@ -18,4 +18,4 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 
-ofl_schemas = { path = "../schemas" }
+ofl_schemas = { path = "../ofl_schemes" }

@@ -1,9 +1,9 @@
 [workspace]
 members=[
-    "ui",
-    "core",
-    "slint_model_ext",
-    "schemas"
+    "crates/tsukuyomidmx",
+    "crates/tsukuyomidmx_core",
+    "crates/slint_model_ext",
+    "crates/ofl_schemes"
 ]
 resolver="3"
 
