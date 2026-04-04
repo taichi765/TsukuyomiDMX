@@ -1,14 +1,14 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use thiserror::Error;
 use tracing::{error, info, instrument, trace, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::functions::{FunctionCommand, FunctionId, FunctionRuntime};
+use crate::functions::{AppliedFunctionId, FunctionCommand, FunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
 use crate::universe::UniverseId;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::Display;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -27,6 +27,7 @@ pub struct Engine {
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     universe_states: HashMap<UniverseId, UniverseState>,
     output_map_cache: HashMap<OutputPluginId, Vec<UniverseId>>,
+    /// シンプル卓など一時的な値
     live_values: HashMap<(FixtureId, String), u8>,
 
     should_shutdown: bool,
@@ -62,7 +63,7 @@ impl Engine {
             // apply live values before running function, so LTP channels will be overridden.
             let live_values = self.live_values.clone();
             live_values.iter().for_each(|((id, ch), v)| {
-                self.write_universe(*id, ch, *v);
+                self.write_universe_with_channel_name(*id, ch, *v);
             });
 
             self.run_active_functions();
@@ -121,15 +122,16 @@ impl Engine {
     }
 
     fn run_active_functions(&mut self) {
-        let mut commands_list = Vec::new();
-        {
-            for (function_id, runtime) in &mut self.active_runtimes {
-                self.doc.with_functions(|it| {
-                    let data = it.get(function_id).expect("todo: これはsafe?");
-                    commands_list.append(&mut runtime.run(data, TICK_DURATION));
-                });
-            }
-        }
+        let commands_list = self
+            .active_runtimes
+            .iter_mut()
+            .fold(Vec::new(), |mut acc, rt| {
+                let mut commands = self
+                    .doc
+                    .with_functions(|it| rt.run(it.get(&rt.fun_id()).unwrap(), TICK_DURATION)); // TODO: 動的に変わるようにする
+                acc.append(&mut commands);
+                acc
+            });
 
         for command in commands_list {
             match command {
@@ -139,7 +141,7 @@ impl Engine {
                     fixture_id,
                     channel,
                     value,
-                } => self.write_universe(fixture_id, &channel, value),
+                } => self.write_universe(fixture_id, channel, value),
                 FunctionCommand::StartFade {
                     from_id,
                     to_id,
@@ -163,11 +165,9 @@ impl Engine {
                 };
                 if let Err(e) = plugin.send_dmx(*u_id, DmxFrame::from(universe_data.values)) {
                     self.message_tx
-                        .send(EngineMessage::ErrorOccured(EngineError {
-                            context: ErrorContext::SendingDmx {
-                                universe_id: *u_id,
-                                plugin_id: *p_id,
-                            },
+                        .send(EngineMessage::ErrorOccured(EngineError::SendingDmx {
+                            universe_id: *u_id,
+                            plugin_id: *p_id,
                             source: Box::new(e),
                         }))
                         .unwrap();
@@ -177,23 +177,43 @@ impl Engine {
     }
 
     ///既にstartしてた場合は何もしない
-    fn start_function(&mut self, function_id: FunctionId) {
-        let _runtime = self.doc.with_functions(|it| {
-            it.get(&function_id)
-                .expect("todo: エラー返す")
-                .create_runtime()
+    fn start_function(&mut self, function_id: AppliedFunctionId) {
+        let res = self.doc.with_functions(|it| {
+            let Some(function) = it.get(&function_id) else {
+                return Err(EngineMessage::ErrorOccured(EngineError::FunctionNotFound {
+                    function_id,
+                }));
+            };
+
+            Ok(function.create_runtime())
         });
-        todo!()
-        //self.active_runtimes.insert(function_id, runtime);
+
+        match res {
+            Err(e) => self
+                .message_tx
+                .send(e)
+                .expect("failed to send message from engine thread"),
+            Ok(rt) => self.active_runtimes.push(rt),
+        }
     }
 
     ///既にstopしてた/そもそも存在しなかった場合、何もしない
-    fn stop_function(&mut self, _function_id: FunctionId) {
+    fn stop_function(&mut self, _function_id: AppliedFunctionId) {
         todo!()
         //self.active_runtimes.remove(&function_id);
     }
 
-    fn write_universe(&mut self, fixture_id: FixtureId, channel: &str, value: u8) {
+    #[allow(unused)]
+    fn write_universe(&mut self, fxt_id: FixtureId, channel: usize, value: u8) {
+        todo!()
+    }
+
+    fn write_universe_with_channel_name(
+        &mut self,
+        fixture_id: FixtureId,
+        channel: &str,
+        value: u8,
+    ) {
         match self.doc.resolve_address(fixture_id, channel) {
             Ok(resolved_address) => {
                 let universe = self
@@ -206,16 +226,13 @@ impl Engine {
                 universe.set_value(resolved_address, value);
             }
             Err(e) => {
-                if let Err(send_err) =
-                    self.message_tx
-                        .send(EngineMessage::ErrorOccured(EngineError {
-                            context: ErrorContext::ResolvingAddress {
-                                fixture_id,
-                                channel: String::from(channel),
-                            },
-                            source: Box::new(e),
-                        }))
-                {
+                if let Err(send_err) = self.message_tx.send(EngineMessage::ErrorOccured(
+                    EngineError::ResolvingAddress {
+                        fixture_id,
+                        channel: channel.to_string(),
+                        source: Box::new(e),
+                    },
+                )) {
                     error!("engine: failed to send error: {}", send_err);
                 }
             }
@@ -224,9 +241,9 @@ impl Engine {
 
     fn start_fade(
         &mut self,
-        _from_id: FunctionId,
-        _to_id: FunctionId,
-        _chaser_id: FunctionId,
+        _from_id: AppliedFunctionId,
+        _to_id: AppliedFunctionId,
+        _chaser_id: AppliedFunctionId,
         _duration: Duration,
     ) {
         //必要な値だけを取り出す
@@ -287,8 +304,8 @@ impl Engine {
 #[derive(Debug)]
 pub enum EngineCommand {
     // Commands
-    StartFunction(FunctionId),
-    StopFunction(FunctionId),
+    StartFunction(AppliedFunctionId),
+    StopFunction(AppliedFunctionId),
     AddPlugin(Box<dyn Plugin>),
     SetLiveValue {
         fixture_id: FixtureId,
@@ -310,37 +327,27 @@ pub enum EngineMessage {
 
 // TODO: thiserror使う
 /// The errors occured in [`Engine`]
-#[derive(Debug)]
-pub struct EngineError {
-    context: ErrorContext,
-    source: Box<dyn Error + Send + Sync>,
-}
-
-impl Display for EngineError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}: {}", self.context, self.source)
-    }
-}
-
-impl Error for EngineError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(self.source.as_ref())
-    }
-}
-
-#[derive(Debug)]
-pub enum ErrorContext {
+#[derive(Debug, Error)]
+pub enum EngineError {
+    #[error("")]
     ResolvingAddress {
         fixture_id: FixtureId,
         channel: String,
+        source: Box<dyn Error + Send + Sync>,
     },
+    #[error("")]
     RunningFunction {
-        function_id: FunctionId,
+        function_id: AppliedFunctionId,
+        source: Box<dyn Error + Send>,
     },
+    #[error("")]
     SendingDmx {
         universe_id: UniverseId,
         plugin_id: OutputPluginId,
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
+    #[error("function {function_id} not found in Doc")]
+    FunctionNotFound { function_id: AppliedFunctionId },
 }
 
 pub(crate) struct UniverseState {

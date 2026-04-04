@@ -7,6 +7,7 @@ use std::{
 use bimap::BiHashMap;
 use derive_getters::Getters;
 use thiserror::Error;
+use tracing::warn;
 
 use crate::{
     fixture::MergeMode,
@@ -165,6 +166,35 @@ impl FixtureDef {
     ) -> Option<ChannelDef> {
         self.channel_templates.insert(name.into(), channel)
     }
+
+    /// modeの中でdimmer(ないしそれに類するチャンネル)がどこにあるか調べる。
+    ///
+    /// modeが存在しないとき、Dimmerチャンネルを含まない場合はNoneが返る。
+    pub fn find_dimmer_channel_in_mode(&self, mode_name: &str) -> Option<usize> {
+        let mode = self.modes.get(mode_name)?;
+
+        let mut channels = self
+            .channel_templates
+            .iter()
+            .filter(|(_, ch)| match ch.capability {
+                Capability::Single(CapabilityKind::Intensity) => true,
+                _ => false, // TODO: Multiのときの処理
+            });
+        let (ch_name, _) = channels.next()?;
+        if channels.next().is_some() {
+            warn!(?self.id, mode_name, "multiple intensity channel was found. the first one is taken.");
+        }
+
+        let ret = mode.get_offset_by_channel(ch_name).unwrap();
+        Some(ret)
+    }
+
+    /// modeの中でRGBチャンネルを探す。
+    ///
+    /// TODO: ambigousになりそう
+    pub fn find_rgb_channel_in_mode(&self, mode_name: &str) -> Option<[usize; 3]> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Error)]
@@ -268,6 +298,10 @@ impl FixtureMode {
 
     pub fn get_channel_by_offset(&self, offset: usize) -> Option<&str> {
         self.channel_order.get_by_right(&offset).map(|s| s.as_str())
+    }
+
+    pub fn contains_channel(&self, channel: &str) -> bool {
+        self.channel_order.contains_left(channel)
     }
 }
 

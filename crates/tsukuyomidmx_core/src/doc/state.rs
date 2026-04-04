@@ -3,8 +3,8 @@ use std::{collections::HashMap, sync::RwLock};
 use crate::{
     doc::{UniverseSetting, def_registry::FixtureDefRegistry},
     fixture::{Fixture, FixtureId},
-    functions::FunctionData,
-    prelude::{DmxAddress, FunctionId, UniverseId},
+    functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
+    prelude::{DmxAddress, UniverseId},
 };
 
 /// Get fixture id by address.
@@ -17,7 +17,8 @@ pub type AddressIndex = HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>;
 pub(super) struct DocState {
     fixtures: RwLock<HashMap<FixtureId, Fixture>>,
     fixture_defs: RwLock<Box<dyn FixtureDefRegistry>>,
-    functions: RwLock<HashMap<FunctionId, FunctionData>>,
+    functions: RwLock<HashMap<AppliedFunctionId, Function>>,
+    function_prototypes: RwLock<HashMap<FunctionPrototypeId, FunctionPrototype>>,
 
     universe_settings: RwLock<HashMap<UniverseId, UniverseSetting>>,
     address_index: RwLock<AddressIndex>,
@@ -29,6 +30,7 @@ impl DocState {
             fixtures: RwLock::new(HashMap::new()),
             fixture_defs: RwLock::new(def_registry),
             functions: RwLock::new(HashMap::new()),
+            function_prototypes: RwLock::new(HashMap::new()),
 
             universe_settings: RwLock::new(HashMap::new()),
             address_index: RwLock::new(AddressIndex::new()),
@@ -61,10 +63,18 @@ impl DocState {
 
     pub fn with_functions<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FunctionId, FunctionData>) -> R,
+        F: FnOnce(&HashMap<AppliedFunctionId, Function>) -> R,
     {
         let functions = self.functions.read().unwrap();
         f(&functions)
+    }
+
+    pub fn with_function_prototypes<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
+    {
+        let prototypes = self.function_prototypes.read().unwrap();
+        f(&prototypes)
     }
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
@@ -97,15 +107,6 @@ impl DocState {
     {
         let mut fixtures = self.fixtures.write().unwrap();
         f(&mut fixtures)
-    }
-
-    #[allow(unused)]
-    pub(super) fn with_functions_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<FunctionId, FunctionData>) -> R,
-    {
-        let mut functions = self.functions.write().unwrap();
-        f(&mut functions)
     }
 
     pub(super) fn with_address_index_mut<F, R>(&self, f: F) -> R

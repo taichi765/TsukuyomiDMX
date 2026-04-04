@@ -60,7 +60,7 @@ pub mod prelude {
         fixture_def::{
             Capability, CapabilityKind, ChannelDef, FixtureDef, FixtureDefId, FixtureMode,
         },
-        functions::FunctionId,
+        functions::AppliedFunctionId,
         universe::{DmxAddress, UniverseId},
     };
 }

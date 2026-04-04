@@ -16,11 +16,11 @@ use crate::{
     doc::state::{AddressIndex, DocState},
     fixture::{Fixture, FixtureChange, FixtureId},
     fixture_def::FixtureDefId,
-    functions::{FunctionData, FunctionId},
+    functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
     prelude::ChannelDef,
     universe::{DmxAddress, UniverseId},
 };
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 declare_id_newtype!(OutputPluginId);
 
@@ -128,18 +128,32 @@ impl Doc {
         Ok(())
     }
 
-    #[instrument]
-    pub fn add_function(&mut self, _value: FunctionData) -> Result<DocEffect, ()> {
+    #[instrument(skip_all)]
+    pub fn add_function(&mut self, _value: Function) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument(skip_all)]
+    pub fn update_function(&mut self, _new: Function) -> Result<(), ()> {
         todo!()
     }
 
     #[instrument]
-    pub fn update_function(&mut self, _new: FunctionData) -> Result<DocEffect, ()> {
+    pub fn remove_function(&mut self, _id: &AppliedFunctionId) -> Result<(), ()> {
         todo!()
     }
 
-    #[instrument]
-    pub fn remove_function(&mut self, _id: &FunctionId) -> Result<DocEffect, ()> {
+    #[instrument(skip_all)]
+    pub fn add_function_prototype(&mut self, _value: FunctionPrototype) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument(skip_all)]
+    pub fn update_function_prototype(&mut self, _new: FunctionPrototype) -> Result<(), ()> {
+        todo!()
+    }
+
+    pub fn remove_function_prototype(&mut self, _id: FunctionPrototypeId) -> Result<(), ()> {
         todo!()
     }
 
@@ -191,7 +205,7 @@ impl DocStateView {
 
     pub fn with_functions<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&HashMap<FunctionId, FunctionData>) -> R,
+        F: FnOnce(&HashMap<AppliedFunctionId, Function>) -> R,
     {
         self.0.with_functions(f)
     }
@@ -293,9 +307,13 @@ pub enum DocEffect {
     FixtureDefUpdated(FixtureDefId),
     FixtureDefRemoved(FixtureDefId),
 
-    FunctionAdded(FunctionId),
-    FunctionUpdated(FunctionId),
-    FunctionRemoved(FunctionId),
+    FunctionAdded(AppliedFunctionId),
+    FunctionUpdated(AppliedFunctionId),
+    FunctionRemoved(AppliedFunctionId),
+
+    FunctionPrototypeAdded(FunctionPrototypeId),
+    FunctionPrototypeUpdated(FunctionPrototypeId),
+    FunctionPrototypeRemoved(FunctionPrototypeId),
 
     AddressIndexChanged((UniverseId, DmxAddress), (FixtureId, usize)),
     DefRegistryLoaded,

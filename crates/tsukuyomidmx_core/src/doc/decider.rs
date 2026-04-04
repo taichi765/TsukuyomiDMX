@@ -3,13 +3,13 @@
 
 use std::fmt::Debug;
 
+use super::DocStateView;
 use super::errors::*;
-use super::{DocEffect, DocStateView};
 use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
 use crate::doc::state::AddressIndex;
 use crate::fixture::FixtureChange;
 use crate::fixture_def::AddressIter;
-use crate::functions::FunctionData;
+use crate::functions::{AppliedFunctionId, Function};
 use crate::prelude::*;
 
 pub(super) fn add_fixture(
@@ -108,17 +108,17 @@ pub(super) fn remove_fixture(
 }
 
 #[allow(unused)]
-pub(super) fn add_function(_state: DocStateView, _value: FunctionData) -> Result<DocEffect, ()> {
+pub(super) fn add_function(_state: DocStateView, _value: Function) -> Result<(), ()> {
     todo!()
 }
 
 #[allow(unused)]
-pub(super) fn update_function(_state: DocStateView, _new: FunctionData) -> Result<DocEffect, ()> {
+pub(super) fn update_function(_state: DocStateView, _new: Function) -> Result<(), ()> {
     todo!()
 }
 
 #[allow(unused)]
-pub(super) fn remove_function(_state: DocStateView, _id: &FunctionId) -> Result<DocEffect, ()> {
+pub(super) fn remove_function(_state: DocStateView, _id: &AppliedFunctionId) -> Result<(), ()> {
     todo!()
 }
 
