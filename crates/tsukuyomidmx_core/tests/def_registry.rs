@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use tsukuyomi_core::doc::{FixtureDefRegistry, FixtureDefRegistryImpl};
+use tsukuyomidmx_core::doc::{FixtureDefRegistry, FixtureDefRegistryImpl};
 
 #[test]
 fn iter_metadata_works() {

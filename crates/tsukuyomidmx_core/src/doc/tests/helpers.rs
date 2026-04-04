@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::{
     doc::{Doc, DocEffect, DocState, FakeFixtureDefRegistry},
-    fixture::{Fixture, MergeMode},
-    fixture_def::{Capability, CapabilityInner, ChannelDef, FixtureDef, FixtureDefId, FixtureMode},
+    fixture::Fixture,
+    fixture_def::{FixtureDef, FixtureDefId},
     universe::{DmxAddress, UniverseId},
 };
 
