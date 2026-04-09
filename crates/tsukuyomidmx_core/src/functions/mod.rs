@@ -21,12 +21,13 @@ declare_id_newtype!(AppliedFunctionId);
 
 pub trait FunctionRuntime: Send {
     fn fun_id(&self) -> AppliedFunctionId;
-    fn run(&mut self, function: &Function, elapsed: Duration) -> Vec<FunctionCommand>;
+    fn run(&mut self, doc: DocStateView, elapsed: Duration) -> Vec<FunctionCommand>;
 }
 
 /// bind_to()でFixtureに関連付けたあとのfunction.
 ///
 /// Goboなどmodel-specificなチャンネルを制御する。
+#[derive(Debug)]
 pub enum Function {
     Simple(SimpleFunction),
     Sequence(SequenceFunction),
@@ -35,11 +36,19 @@ pub enum Function {
 
 impl Function {
     /// infallible
-    pub fn create_runtime(&self) -> Box<dyn FunctionRuntime> {
+    pub fn create_runtime(&self, doc: DocStateView) -> Box<dyn FunctionRuntime> {
         match self {
             Function::Simple(fun) => fun.create_runtime_inner(),
-            Function::Sequence(fun) => fun.create_runtime_inner(),
+            Function::Sequence(fun) => fun.create_runtime_inner(doc),
             Function::Parallel(fun) => fun.create_runtime_inner(),
+        }
+    }
+
+    pub fn id(&self) -> AppliedFunctionId {
+        match self {
+            Function::Simple(fun) => fun.id,
+            Function::Sequence(fun) => fun.id,
+            Function::Parallel(fun) => fun.id,
         }
     }
 }
@@ -47,6 +56,7 @@ impl Function {
 /// bind_to()でFixtureに関連付けられる前のfunction.
 ///
 /// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
+#[derive(Debug)]
 pub enum FunctionPrototype {
     Simple(SimpleFunctionPrototype),
     Sequence(SequenceFunctionPrototype),
@@ -54,9 +64,9 @@ pub enum FunctionPrototype {
 }
 
 impl FunctionPrototype {
-    fn bind_to(
+    pub fn bind_to(
         self,
-        args: impl Iterator<Item = Vec<FixtureId>>,
+        args: impl Iterator<Item = Vec<FixtureId>> + Clone,
         doc: DocStateView,
         diag: &mut Diagnostics,
     ) -> Option<Function> {
@@ -103,11 +113,12 @@ impl Diagnostics {
 }
 
 /// [`FunctionRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
+#[derive(Debug)]
 pub enum FunctionCommand {
     /// if the function is already started, `Engine` do nothing.
     StartFunction(AppliedFunctionId),
-    /// if the function is already stoped, `Engine` do nothing.
-    StopFuntion(AppliedFunctionId),
+    /// 実行中のFunctionをstopする
+    StopFuntion,
     WriteUniverse {
         fixture_id: FixtureId,
         channel: usize,
@@ -121,12 +132,14 @@ pub enum FunctionCommand {
     },
 }
 
+#[derive(Debug)]
 pub struct SimpleFunctionPrototype {
     id: FunctionPrototypeId,
     dimmer: Option<u8>,
     color: Option<[u8; 3]>,
 }
 
+#[derive(Debug)]
 pub struct SimpleFunction {
     id: AppliedFunctionId,
     /// (id, offset) -> value
@@ -137,7 +150,7 @@ pub struct SimpleFunctionRuntime(AppliedFunctionId);
 
 impl SimpleFunctionPrototype {
     fn bind_to_inner(
-        self,
+        &self,
         mut args: impl Iterator<Item = Vec<FixtureId>>,
         doc: DocStateView,
         diag: &mut Diagnostics,
@@ -196,6 +209,13 @@ impl SimpleFunctionPrototype {
 }
 
 impl SimpleFunction {
+    pub fn new(values: HashMap<(FixtureId, usize), u8>) -> Function {
+        Function::Simple(Self {
+            id: AppliedFunctionId::new(),
+            values,
+        })
+    }
+
     fn create_runtime_inner(&self) -> Box<dyn FunctionRuntime> {
         Box::new(SimpleFunctionRuntime(self.id))
     }
@@ -206,57 +226,124 @@ impl FunctionRuntime for SimpleFunctionRuntime {
         self.0
     }
 
-    fn run(&mut self, function: &Function, _elapsed: Duration) -> Vec<FunctionCommand> {
-        let Function::Simple(fun) = function else {
-            unreachable!()
-        };
-        fun.values
-            .iter()
-            .fold(Vec::new(), |mut acc, ((fxt_id, offset), val)| {
-                acc.push(FunctionCommand::WriteUniverse {
-                    fixture_id: *fxt_id,
-                    channel: *offset,
-                    value: *val,
-                });
-                acc
-            })
+    fn run(&mut self, doc: DocStateView, _elapsed: Duration) -> Vec<FunctionCommand> {
+        doc.with_functions(|it| {
+            let Function::Simple(fun) = it.get(&self.0).unwrap() else {
+                unreachable!()
+            };
+            fun.values
+                .iter()
+                .fold(Vec::new(), |mut acc, ((fxt_id, offset), val)| {
+                    acc.push(FunctionCommand::WriteUniverse {
+                        fixture_id: *fxt_id,
+                        channel: *offset,
+                        value: *val,
+                    });
+                    acc
+                })
+        })
     }
 }
 
+#[derive(Debug)]
 pub struct SequenceFunctionPrototype {
     // TODO: Box<dyn AppliedFunction>のみ or Box<dyn FunctionPrototype>のみにしたい
-    steps: Vec<SequenceStep<FunctionPrototype>>,
+    steps: Vec<SequenceStep<FunctionPrototype, FunctionPrototypeId>>,
 }
 
+#[derive(Debug)]
 pub struct SequenceFunction {
-    steps: Vec<SequenceStep<Function>>,
+    id: AppliedFunctionId,
+    steps: Vec<SequenceStep<Function, AppliedFunctionId>>,
+}
+
+#[derive(Debug)]
+pub struct SequenceStep<T, U> {
+    /// fade_in, fade_outを除いた時間
+    duration: Duration,
+    fade_in: Duration,
+    fade_out: Duration,
+    body: FunctionBodyOrId<T, U>, // TODO: 他のFunctionのIdを持っておいたほうが良いのでは？
+}
+
+#[derive(Debug)]
+enum FunctionBodyOrId<T, U> {
+    Body(T),
+    Id(U),
+}
+
+impl FunctionBodyOrId<Function, AppliedFunctionId> {
+    /// Bodyのときはcreate_runtime()を呼ぶだけ、Idだったらdocを使う
+    fn create_runtime(&self, doc: DocStateView) -> Box<dyn FunctionRuntime> {
+        match self {
+            Self::Body(fun) => fun.create_runtime(doc),
+            Self::Id(fun_id) => {
+                doc.with_functions(|it| it.get(fun_id).unwrap().create_runtime(doc.clone()))
+            }
+        }
+    }
 }
 
 pub struct SequenceFunctionRuntime {
     fun_id: AppliedFunctionId,
-}
-
-pub struct SequenceStep<T> {
-    duration: Duration,
-    fade_in: Duration,
-    fade_out: Duration,
-    body: T,
+    time_to_next_step: Duration,
+    current_step: usize,
+    current_step_runtime: Box<dyn FunctionRuntime>,
 }
 
 impl SequenceFunctionPrototype {
     fn bind_to_inner(
-        self,
-        _args: impl Iterator<Item = Vec<FixtureId>>,
-        _doc: DocStateView,
-        _diag: &mut Diagnostics,
+        &self,
+        args: impl Iterator<Item = Vec<FixtureId>> + Clone,
+        doc: DocStateView,
+        diag: &mut Diagnostics,
     ) -> Option<SequenceFunction> {
-        todo!()
+        let steps = self.steps.iter().map(|step| match &step.body {
+            FunctionBodyOrId::Body(fun) => match fun {
+                FunctionPrototype::Simple(fun) => fun
+                    .bind_to_inner(args.clone(), doc.clone(), diag)
+                    .map(|fun| SequenceStep {
+                        duration: step.duration,
+                        fade_in: step.fade_in,
+                        fade_out: step.fade_out,
+                        body: FunctionBodyOrId::Body(Function::Simple(fun)),
+                    }),
+                FunctionPrototype::Sequence(fun) => fun
+                    .bind_to_inner(args.clone(), doc.clone(), diag)
+                    .map(|fun| SequenceStep {
+                        duration: step.duration,
+                        fade_in: step.fade_in,
+                        fade_out: step.fade_out,
+                        body: FunctionBodyOrId::Body(Function::Sequence(fun)),
+                    }),
+                FunctionPrototype::Parallel(fun) => fun
+                    .bind_to_inner(args.clone(), doc.clone(), diag)
+                    .map(|fun| SequenceStep {
+                        duration: step.duration,
+                        fade_in: step.fade_in,
+                        fade_out: step.fade_out,
+                        body: FunctionBodyOrId::Body(Function::Parallel(fun)),
+                    }),
+            },
+            FunctionBodyOrId::Id(_fun_id) => todo!(),
+        });
+
+        let steps = steps.collect::<Option<Vec<_>>>()?;
+        Some(SequenceFunction {
+            id: AppliedFunctionId::new(),
+            steps,
+        })
     }
 }
 
 impl SequenceFunction {
-    fn create_runtime_inner(&self) -> Box<dyn FunctionRuntime> {
-        todo!()
+    fn create_runtime_inner(&self, doc: DocStateView) -> Box<dyn FunctionRuntime> {
+        Box::new(SequenceFunctionRuntime {
+            fun_id: self.id,
+            time_to_next_step: self.steps.get(0).unwrap().total_duration(),
+            current_step: 0,
+            current_step_runtime: self.steps.get(0).unwrap().body.create_runtime(doc),
+        })
     }
 }
 
@@ -265,14 +352,52 @@ impl FunctionRuntime for SequenceFunctionRuntime {
         self.fun_id
     }
 
-    fn run(&mut self, _function: &Function, _elapsed: Duration) -> Vec<FunctionCommand> {
-        todo!()
+    fn run(&mut self, doc: DocStateView, elapsed: Duration) -> Vec<FunctionCommand> {
+        // TODO: fade_inとfade_out
+        let mut commands = self.current_step_runtime.run(doc.clone(), elapsed);
+
+        if self.time_to_next_step >= elapsed {
+            // ステップ継続
+            self.time_to_next_step -= elapsed;
+            return commands;
+        }
+        doc.with_functions(|it| {
+            let Function::Sequence(fun) = it.get(&self.fun_id).unwrap() else {
+                unreachable!()
+            };
+
+            if fun.steps.len() == self.current_step {
+                //全ステップ終わった
+                commands.push(FunctionCommand::StopFuntion);
+            } else {
+                // 次のステップ
+
+                let next_step = fun.steps.get(self.current_step).unwrap();
+                self.current_step += 1;
+                self.time_to_next_step =
+                    next_step.total_duration() + elapsed - self.time_to_next_step;
+                self.current_step_runtime = next_step.body.create_runtime(doc.clone());
+            }
+        });
+
+        commands
     }
 }
 
+impl<T, U> SequenceStep<T, U> {
+    /// fade_inとfade_out含めた時間
+    fn total_duration(&self) -> Duration {
+        self.fade_in + self.duration + self.fade_out
+    }
+}
+
+#[derive(Debug)]
 pub struct ParallelFunctionPrototype {}
 
-pub struct ParallelFunction {}
+#[derive(Debug)]
+pub struct ParallelFunction {
+    id: AppliedFunctionId,
+}
 
 pub struct ParallelFunctionRuntime {
     fun_id: AppliedFunctionId,
@@ -280,7 +405,7 @@ pub struct ParallelFunctionRuntime {
 
 impl ParallelFunctionPrototype {
     fn bind_to_inner(
-        self,
+        &self,
         _args: impl Iterator<Item = Vec<FixtureId>>,
         _doc: DocStateView,
         _diag: &mut Diagnostics,
@@ -300,7 +425,15 @@ impl FunctionRuntime for ParallelFunctionRuntime {
         self.fun_id
     }
 
-    fn run(&mut self, _function: &Function, _elapsed: Duration) -> Vec<FunctionCommand> {
+    fn run(&mut self, _doc: DocStateView, _elapsed: Duration) -> Vec<FunctionCommand> {
         todo!()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sequence_run_works() {}
 }

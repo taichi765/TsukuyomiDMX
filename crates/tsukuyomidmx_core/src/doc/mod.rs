@@ -128,32 +128,55 @@ impl Doc {
         Ok(())
     }
 
-    #[instrument(skip_all)]
-    pub fn add_function(&mut self, _value: Function) -> Result<(), ()> {
-        todo!()
+    #[instrument]
+    pub fn add_function(&mut self, fun: Function) -> Result<(), AddFunctionError> {
+        let cmd = decider::add_function(self.state_view(), fun)?;
+        self.apply_command(cmd);
+        Ok(())
     }
 
-    #[instrument(skip_all)]
+    #[instrument]
     pub fn update_function(&mut self, _new: Function) -> Result<(), ()> {
         todo!()
     }
 
     #[instrument]
-    pub fn remove_function(&mut self, _id: &AppliedFunctionId) -> Result<(), ()> {
-        todo!()
+    pub fn remove_function(&mut self, id: AppliedFunctionId) -> Result<(), RemoveFunctionError> {
+        let cmd = decider::remove_function(self.state_view(), id)?;
+        self.apply_command(cmd);
+        Ok(())
     }
 
-    #[instrument(skip_all)]
+    #[instrument]
     pub fn add_function_prototype(&mut self, _value: FunctionPrototype) -> Result<(), ()> {
         todo!()
     }
 
-    #[instrument(skip_all)]
+    #[instrument]
     pub fn update_function_prototype(&mut self, _new: FunctionPrototype) -> Result<(), ()> {
         todo!()
     }
 
     pub fn remove_function_prototype(&mut self, _id: FunctionPrototypeId) -> Result<(), ()> {
+        todo!()
+    }
+
+    pub fn add_universe(&mut self) {
+        let cmd = AddUniverseCommand::new();
+        self.apply_command(cmd);
+    }
+
+    pub fn add_output_plugin(
+        &mut self,
+        universe: UniverseId,
+        plugin: OutputPluginInfo,
+    ) -> Result<(), AddOutputPluginError> {
+        let cmd = decider::add_output_plugin(self.state_view(), universe, plugin)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    pub fn remove_output_plugin(&mut self) {
         todo!()
     }
 
@@ -210,6 +233,13 @@ impl DocStateView {
         self.0.with_functions(f)
     }
 
+    pub fn with_function_prototypes<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
+    {
+        self.0.with_function_prototypes(f)
+    }
+
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&HashMap<FixtureId, Fixture>, &dyn FixtureDefRegistry) -> R,
@@ -235,7 +265,7 @@ impl DocStateView {
 // Utilities
 impl DocStateView {
     ///
-    pub fn resolve_address(
+    pub fn resolve_address_with_channel_name(
         &self,
         fixture_id: FixtureId,
         channel: &str,
@@ -268,6 +298,37 @@ impl DocStateView {
                     .unwrap(); // TODO: この辺の処理はFixtureModeのメソッドにしたい
                 Ok((channel_def, address))
             })?;
+
+        Ok(ResolvedAddress {
+            channel_def,
+            universe: address.0,
+            address: address.1,
+        })
+    }
+
+    pub fn resolve_address_with_offset(
+        &self,
+        fxt_id: FixtureId,
+        offset: usize,
+    ) -> Result<ResolvedAddress, ResolveError> {
+        let (channel_def, address) = self.with_fixtures_and_defs(|fxts, defs| {
+            let fxt = fxts.get(&fxt_id).ok_or(FixtureNotFoundError(fxt_id))?;
+            let def = defs.get(fxt.fixture_def()).unwrap();
+            let mode = def.mode(fxt.fixture_mode()).unwrap();
+            let channel_name = mode.get_channel_by_offset(offset).ok_or(
+                ResolveError::ChannelWithOffsetNotFound {
+                    fixture_def: def.id().to_owned(),
+                    mode: fxt.fixture_mode().to_owned(),
+                    offset,
+                },
+            )?;
+            let channel_def = def.channel_template(channel_name).unwrap().to_owned();
+            let address = mode
+                .occupied_addresses(fxt.universe_id(), fxt.address())
+                .nth(offset)
+                .unwrap();
+            Ok::<_, ResolveError>((channel_def, address))
+        })?;
 
         Ok(ResolvedAddress {
             channel_def,
@@ -330,18 +391,26 @@ pub trait EventStore {
     fn append(&self, event: DocEffect);
 }
 
+#[derive(Debug)]
 pub struct UniverseSetting {
-    output_plugins: HashSet<OutputPluginId>,
+    // TODO: idじゃなくてUSBベンダーとかを保持しておかないとどうしようもない
+    output_plugins: HashMap<OutputPluginId, OutputPluginInfo>,
+}
+
+#[derive(Debug)]
+pub enum OutputPluginInfo {
+    Artnet { target_ip: String },
+    FTDI,
 }
 
 impl UniverseSetting {
     pub fn new() -> Self {
         Self {
-            output_plugins: HashSet::new(),
+            output_plugins: HashMap::new(),
         }
     }
 
-    pub fn output_plugins(&self) -> &HashSet<OutputPluginId> {
+    pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
         &self.output_plugins
     }
 }

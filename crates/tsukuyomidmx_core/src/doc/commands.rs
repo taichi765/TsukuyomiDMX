@@ -176,21 +176,188 @@ mod fixtures {
 }
 
 mod functions {
-    pub struct AddFunctionCommand {}
+    use crate::{
+        doc::{DocCommand, DocEffect},
+        functions::Function,
+        prelude::AppliedFunctionId,
+    };
+
+    #[derive(Debug)]
+    pub struct AddFunctionCommand {
+        fun: Function,
+    }
+
+    impl DocCommand for AddFunctionCommand {
+        fn apply(
+            self: Box<Self>,
+            state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, DocEffect) {
+            let id = self.fun.id();
+            state.with_functions_mut(|it| it.insert(id, self.fun));
+            (
+                Box::new(RemoveFunctionCommand::new(id)),
+                DocEffect::FunctionAdded(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    impl AddFunctionCommand {
+        pub fn new(fun: Function) -> Self {
+            Self { fun }
+        }
+    }
 
     pub struct UpdateFunctionCommand {}
 
-    pub struct RemoveFunctionCommand {}
+    #[derive(Debug)]
+    pub struct RemoveFunctionCommand(AppliedFunctionId);
+
+    impl DocCommand for RemoveFunctionCommand {
+        fn apply(
+            self: Box<Self>,
+            state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, DocEffect) {
+            let removed = state.with_functions_mut(|it| it.remove(&self.0)).unwrap();
+            let id = removed.id();
+            (
+                Box::new(AddFunctionCommand::new(removed)),
+                DocEffect::FunctionRemoved(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    impl RemoveFunctionCommand {
+        pub fn new(id: AppliedFunctionId) -> Self {
+            Self(id)
+        }
+    }
 }
 
 mod plugins {
-    pub struct AddOutputCommand {}
+    use crate::{
+        doc::{DocCommand, DocEffect, OutputPluginId, OutputPluginInfo},
+        prelude::UniverseId,
+    };
 
-    pub struct RemoveOutputCommand {}
+    #[derive(Debug)]
+    pub struct AddOutputPluginCommand {
+        univ: UniverseId,
+        plugin: OutputPluginInfo,
+    }
+
+    impl DocCommand for AddOutputPluginCommand {
+        fn apply(
+            self: Box<Self>,
+            state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, crate::doc::DocEffect) {
+            let (univ, p_id) = state.with_universe_settings_mut(|it| {
+                let setting = it.get_mut(&self.univ).unwrap();
+                let p_id = OutputPluginId::new();
+                setting.output_plugins.insert(p_id, self.plugin);
+                (self.univ, p_id)
+            });
+            (
+                Box::new(RemoveOutputPluginCommand::new(univ, p_id)),
+                DocEffect::UniverseSettingsChanged,
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    impl AddOutputPluginCommand {
+        pub fn new(univ: UniverseId, plugin: OutputPluginInfo) -> Self {
+            Self { univ, plugin }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct RemoveOutputPluginCommand {
+        univ: UniverseId,
+        p_id: OutputPluginId,
+    }
+
+    impl DocCommand for RemoveOutputPluginCommand {
+        fn apply(
+            self: Box<Self>,
+            _state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, crate::doc::DocEffect) {
+            todo!()
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    impl RemoveOutputPluginCommand {
+        pub fn new(univ: UniverseId, p_id: OutputPluginId) -> Self {
+            Self { univ, p_id }
+        }
+    }
 }
 
 mod universes {
-    pub struct AddUniverseCommand {}
+    use crate::{
+        doc::{DocCommand, DocEffect, UniverseSetting},
+        prelude::UniverseId,
+    };
 
-    pub struct RemoveUniverseCommand {}
+    #[derive(Debug)]
+    pub struct AddUniverseCommand;
+
+    impl DocCommand for AddUniverseCommand {
+        fn apply(
+            self: Box<Self>,
+            state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, crate::doc::DocEffect) {
+            let uni_id = state.with_universe_settings_mut(|it| {
+                let uni_id = UniverseId::new(it.len() as u8);
+                it.insert(uni_id, UniverseSetting::new());
+                uni_id
+            });
+
+            (
+                Box::new(RemoveUniverseCommand(uni_id)),
+                DocEffect::UniverseAdded(uni_id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    impl AddUniverseCommand {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    #[derive(Debug)]
+    #[allow(unused)]
+    pub struct RemoveUniverseCommand(UniverseId);
+
+    impl DocCommand for RemoveUniverseCommand {
+        fn apply(
+            self: Box<Self>,
+            _state: &crate::doc::DocState,
+        ) -> (Box<dyn DocCommand>, DocEffect) {
+            todo!()
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
 }

@@ -2,7 +2,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{error, info, instrument, trace, warn};
 
-use crate::doc::{DocStateView, OutputPluginId, ResolvedAddress};
+use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
 use crate::functions::{AppliedFunctionId, FunctionCommand, FunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
@@ -23,7 +23,7 @@ pub struct Engine {
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
-    active_runtimes: Vec<Box<dyn FunctionRuntime>>,
+    active_runtime: Option<Box<dyn FunctionRuntime>>,
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     universe_states: HashMap<UniverseId, UniverseState>,
     output_map_cache: HashMap<OutputPluginId, Vec<UniverseId>>,
@@ -43,7 +43,7 @@ impl Engine {
             doc,
             command_rx,
             message_tx,
-            active_runtimes: Vec::new(),
+            active_runtime: None,
             output_plugins: HashMap::new(),
             universe_states: HashMap::new(),
             output_map_cache: HashMap::new(),
@@ -66,7 +66,7 @@ impl Engine {
                 self.write_universe_with_channel_name(*id, ch, *v);
             });
 
-            self.run_active_functions();
+            self.run_active_function();
 
             self.dispatch_outputs();
 
@@ -87,7 +87,7 @@ impl Engine {
             trace!(?cmd, "received command");
             match cmd {
                 EngineCommand::StartFunction(id) => self.start_function(id),
-                EngineCommand::StopFunction(id) => self.stop_function(id),
+                EngineCommand::StopFunction => self.stop_function(),
                 EngineCommand::AddPlugin(p) => self.add_output_plugin(p),
                 EngineCommand::UniverseAdded(id) => {
                     if let None = self.universe_states.insert(id, UniverseState::new()) {
@@ -121,22 +121,19 @@ impl Engine {
         }
     }
 
-    fn run_active_functions(&mut self) {
-        let commands_list = self
-            .active_runtimes
-            .iter_mut()
-            .fold(Vec::new(), |mut acc, rt| {
-                let mut commands = self
-                    .doc
-                    .with_functions(|it| rt.run(it.get(&rt.fun_id()).unwrap(), TICK_DURATION)); // TODO: 動的に変わるようにする
-                acc.append(&mut commands);
-                acc
-            });
+    fn run_active_function(&mut self) {
+        let Some(commands) = self
+            .active_runtime
+            .as_mut()
+            .map(|rt| rt.run(self.doc.clone(), TICK_DURATION))
+        else {
+            return;
+        };
 
-        for command in commands_list {
+        for command in commands {
             match command {
                 FunctionCommand::StartFunction(function_id) => self.start_function(function_id),
-                FunctionCommand::StopFuntion(function_id) => self.stop_function(function_id),
+                FunctionCommand::StopFuntion => self.stop_function(),
                 FunctionCommand::WriteUniverse {
                     fixture_id,
                     channel,
@@ -176,36 +173,44 @@ impl Engine {
         });
     }
 
-    ///既にstartしてた場合は何もしない
+    /// 既にactiveなfunctionがあった場合上書きされる
     fn start_function(&mut self, function_id: AppliedFunctionId) {
         let res = self.doc.with_functions(|it| {
-            let Some(function) = it.get(&function_id) else {
-                return Err(EngineMessage::ErrorOccured(EngineError::FunctionNotFound {
-                    function_id,
-                }));
-            };
-
-            Ok(function.create_runtime())
+            it.get(&function_id)
+                .map(|fun| fun.create_runtime(self.doc.clone()))
+                .ok_or(EngineError::FunctionNotFound { function_id })
         });
 
         match res {
+            Ok(rt) => self.active_runtime = Some(rt),
             Err(e) => self
                 .message_tx
-                .send(e)
+                .send(EngineMessage::ErrorOccured(e))
                 .expect("failed to send message from engine thread"),
-            Ok(rt) => self.active_runtimes.push(rt),
         }
     }
 
-    ///既にstopしてた/そもそも存在しなかった場合、何もしない
-    fn stop_function(&mut self, _function_id: AppliedFunctionId) {
-        todo!()
-        //self.active_runtimes.remove(&function_id);
+    /// 現在activeなfuncitonを止める。
+    ///
+    /// activeなfunctionが無かった場合何もしない。
+    fn stop_function(&mut self) {
+        self.active_runtime = None;
     }
 
-    #[allow(unused)]
     fn write_universe(&mut self, fxt_id: FixtureId, channel: usize, value: u8) {
-        todo!()
+        match self.doc.resolve_address_with_offset(fxt_id, channel) {
+            Ok(resolved_address) => {
+                let univ = self
+                    .universe_states
+                    .get_mut(&resolved_address.universe)
+                    .expect("todo");
+                univ.set_value(resolved_address, value);
+            }
+            Err(e) => self
+                .message_tx
+                .send(EngineMessage::ErrorOccured(EngineError::ResolveAddress(e)))
+                .expect("failed to send message from engine thread"),
+        }
     }
 
     fn write_universe_with_channel_name(
@@ -214,7 +219,10 @@ impl Engine {
         channel: &str,
         value: u8,
     ) {
-        match self.doc.resolve_address(fixture_id, channel) {
+        match self
+            .doc
+            .resolve_address_with_channel_name(fixture_id, channel)
+        {
             Ok(resolved_address) => {
                 let universe = self
                     .universe_states
@@ -286,7 +294,7 @@ impl Engine {
         let new_map = self.doc.with_universe_settings(|settings| {
             let mut new_map: HashMap<OutputPluginId, Vec<UniverseId>> = HashMap::new();
             for (u_id, setting) in settings {
-                setting.output_plugins().iter().for_each(|p_id| {
+                setting.output_plugins().iter().for_each(|(p_id, _p_info)| {
                     if let Some(universes) = new_map.get_mut(p_id) {
                         universes.push(*u_id);
                     } else {
@@ -303,9 +311,10 @@ impl Engine {
 /// Message from the main thread to [`Engine`]
 #[derive(Debug)]
 pub enum EngineCommand {
-    // Commands
     StartFunction(AppliedFunctionId),
-    StopFunction(AppliedFunctionId),
+    // Commands
+    /// 現在実行中のfunctionをstopする
+    StopFunction,
     AddPlugin(Box<dyn Plugin>),
     SetLiveValue {
         fixture_id: FixtureId,
@@ -321,20 +330,24 @@ pub enum EngineCommand {
 }
 
 /// Message from [`Engine`] to the main thread
+#[derive(Debug)]
 pub enum EngineMessage {
     ErrorOccured(EngineError),
 }
 
-// TODO: thiserror使う
 /// The errors occured in [`Engine`]
 #[derive(Debug, Error)]
 pub enum EngineError {
-    #[error("")]
+    #[error(
+        "an error occured during resolving address of channel {channel} of fixture {fixture_id:?}: {source}"
+    )]
     ResolvingAddress {
         fixture_id: FixtureId,
         channel: String,
         source: Box<dyn Error + Send + Sync>,
     },
+    #[error(transparent)]
+    ResolveAddress(#[from] ResolveError),
     #[error("")]
     RunningFunction {
         function_id: AppliedFunctionId,

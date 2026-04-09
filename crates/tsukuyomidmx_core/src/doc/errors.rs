@@ -4,6 +4,7 @@ use crate::{
     doc::def_registry,
     fixture::FixtureId,
     fixture_def::FixtureDefId,
+    prelude::AppliedFunctionId,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -17,6 +18,12 @@ pub enum ResolveError {
         fixture_def: FixtureDefId,
         mode: String,
         channel: String,
+    },
+    #[error("cannot find channel with offset {offset} in mode {mode} of def {fixture_def:?}")]
+    ChannelWithOffsetNotFound {
+        fixture_def: FixtureDefId,
+        mode: String,
+        offset: usize,
     },
 }
 
@@ -95,3 +102,25 @@ pub enum FixtureRemoveError {
     #[error(transparent)]
     FixtureNotFound(#[from] FixtureNotFoundError),
 }
+
+#[derive(Debug, Error)]
+pub enum AddFunctionError {
+    // TODO: idを使っているfunctionの場所とか出したい
+    #[error("function id {0:?} is already used")]
+    IdAlreadyUsed(AppliedFunctionId),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveFunctionError {
+    #[error("cannot find function {0:?}")]
+    FunctionNotFound(AppliedFunctionId),
+}
+
+#[derive(Debug, Error)]
+pub enum AddOutputPluginError {
+    #[error("there were no universe with id {0:?}")]
+    UniverseNotFound(UniverseId),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveOutputPluginError {}

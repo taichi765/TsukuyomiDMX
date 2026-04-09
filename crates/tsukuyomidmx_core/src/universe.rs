@@ -9,11 +9,9 @@ impl UniverseId {
     pub fn value(&self) -> u8 {
         self.0
     }
-}
 
-impl Default for UniverseId {
-    fn default() -> Self {
-        Self(1)
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
     }
 }
 

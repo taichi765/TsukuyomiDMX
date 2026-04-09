@@ -5,7 +5,8 @@ use std::fmt::Debug;
 
 use super::DocStateView;
 use super::errors::*;
-use crate::doc::commands::{AddFixtureCommand, RemoveFixtureCommand, UpdateFixtureCommand};
+use crate::doc::OutputPluginInfo;
+use crate::doc::commands::*;
 use crate::doc::state::AddressIndex;
 use crate::fixture::FixtureChange;
 use crate::fixture_def::AddressIter;
@@ -107,18 +108,47 @@ pub(super) fn remove_fixture(
     Ok(RemoveFixtureCommand::new(*id))
 }
 
-#[allow(unused)]
-pub(super) fn add_function(_state: DocStateView, _value: Function) -> Result<(), ()> {
-    todo!()
+pub(super) fn add_function(
+    state: DocStateView,
+    fun: Function,
+) -> Result<AddFunctionCommand, AddFunctionError> {
+    if state.with_functions(|it| it.contains_key(&fun.id())) {
+        return Err(AddFunctionError::IdAlreadyUsed(fun.id()));
+    }
+
+    Ok(AddFunctionCommand::new(fun))
 }
 
-#[allow(unused)]
 pub(super) fn update_function(_state: DocStateView, _new: Function) -> Result<(), ()> {
     todo!()
 }
 
-#[allow(unused)]
-pub(super) fn remove_function(_state: DocStateView, _id: &AppliedFunctionId) -> Result<(), ()> {
+pub(super) fn remove_function(
+    state: DocStateView,
+    id: AppliedFunctionId,
+) -> Result<RemoveFunctionCommand, RemoveFunctionError> {
+    if !state.with_functions(|it| it.contains_key(&id)) {
+        return Err(RemoveFunctionError::FunctionNotFound(id));
+    }
+
+    Ok(RemoveFunctionCommand::new(id))
+}
+
+pub(super) fn add_output_plugin(
+    state: DocStateView,
+    universe: UniverseId,
+    plugin: OutputPluginInfo,
+) -> Result<AddOutputPluginCommand, AddOutputPluginError> {
+    if !state.with_universe_settings(|it| it.contains_key(&universe)) {
+        return Err(AddOutputPluginError::UniverseNotFound(universe));
+    }
+
+    Ok(AddOutputPluginCommand::new(universe, plugin))
+}
+
+pub(super) fn remove_output_plugin(
+    _state: DocStateView,
+) -> Result<RemoveOutputPluginCommand, RemoveOutputPluginError> {
     todo!()
 }
 

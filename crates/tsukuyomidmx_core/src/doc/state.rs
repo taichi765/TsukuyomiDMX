@@ -41,10 +41,7 @@ impl DocState {
         self.fixture_defs.write().unwrap().load()
     }
 
-    /*pub fn universe_settings(&self) -> &HashMap<UniverseId, UniverseSetting> {
-        &self.universe_settings
-    }*/
-
+    // TODO: with_xxx系はマクロでまとめたい
     pub fn with_fixtures<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&HashMap<FixtureId, Fixture>) -> R,
@@ -109,11 +106,34 @@ impl DocState {
         f(&mut fixtures)
     }
 
+    pub(super) fn with_functions_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<AppliedFunctionId, Function>) -> R,
+    {
+        let mut functions = self.functions.write().unwrap();
+        f(&mut functions)
+    }
+
+    pub(super) fn with_function_prototypes_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
+    {
+        let mut prototypes = self.function_prototypes.write().unwrap();
+        f(&mut prototypes)
+    }
+
     pub(super) fn with_address_index_mut<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut AddressIndex) -> R,
     {
         let mut index = self.address_index.write().unwrap();
         f(&mut index)
+    }
+
+    pub(super) fn with_universe_settings_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<UniverseId, UniverseSetting>) -> R,
+    {
+        f(&mut self.universe_settings.write().unwrap())
     }
 }

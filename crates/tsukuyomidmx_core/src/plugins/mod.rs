@@ -18,6 +18,7 @@ impl Debug for dyn Plugin {
     }
 }
 
+#[derive(Debug)]
 pub struct DmxFrame {
     data: [u8; 512], // FIXME: &[u8]の方がいい？
 }
