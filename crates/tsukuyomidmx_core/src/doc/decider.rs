@@ -5,7 +5,6 @@ use std::fmt::Debug;
 
 use super::DocStateView;
 use super::errors::*;
-use crate::doc::OutputPluginInfo;
 use crate::doc::commands::*;
 use crate::doc::state::AddressIndex;
 use crate::fixture::FixtureChange;
@@ -132,24 +131,6 @@ pub(super) fn remove_function(
     }
 
     Ok(RemoveFunctionCommand::new(id))
-}
-
-pub(super) fn add_output_plugin(
-    state: DocStateView,
-    universe: UniverseId,
-    plugin: OutputPluginInfo,
-) -> Result<AddOutputPluginCommand, AddOutputPluginError> {
-    if !state.with_universe_settings(|it| it.contains_key(&universe)) {
-        return Err(AddOutputPluginError::UniverseNotFound(universe));
-    }
-
-    Ok(AddOutputPluginCommand::new(universe, plugin))
-}
-
-pub(super) fn remove_output_plugin(
-    _state: DocStateView,
-) -> Result<RemoveOutputPluginCommand, RemoveOutputPluginError> {
-    todo!()
 }
 
 /// changeを適用したあとのoccupied_addressを計算する

@@ -11,6 +11,7 @@ use crate::{
 
 const ARTNET_PORT: u16 = 6454;
 
+#[derive(Debug)]
 pub struct ArtNetPlugin {
     id: OutputPluginId,
     socket: UdpSocket,
@@ -36,6 +37,10 @@ impl ArtNetPlugin {
 }
 
 impl Plugin for ArtNetPlugin {
+    fn id(&self) -> OutputPluginId {
+        self.id
+    }
+
     fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error> {
         let command = ArtCommand::Output(Output {
             port_address: universe_id.value().into(),
@@ -45,9 +50,5 @@ impl Plugin for ArtNetPlugin {
         let buf = command.write_to_buffer().unwrap();
         self.socket.send_to(&buf, self.destination)?;
         Ok(())
-    }
-
-    fn id(&self) -> OutputPluginId {
-        self.id
     }
 }

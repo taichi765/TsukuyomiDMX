@@ -1,4 +1,4 @@
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub struct UniverseId(u8);
 
 impl UniverseId {

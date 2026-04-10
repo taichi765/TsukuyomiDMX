@@ -1,32 +1,15 @@
 use std::{
-    sync::{Arc, RwLock, mpsc},
+    sync::{Arc, mpsc},
     time::Duration,
 };
 
 use tsukuyomidmx_core::{
-    doc::{Doc, OutputPluginId},
+    doc::Doc,
     engine::{Engine, EngineCommand},
     functions::SimpleFunction,
-    plugins::{DmxFrame, Plugin},
+    plugins::{Plugin, SpyPlugin},
     prelude::{DmxAddress, Fixture, FixtureDefId, UniverseId},
 };
-
-struct SpyPlugin {
-    id: OutputPluginId,
-    data: Arc<RwLock<Vec<DmxFrame>>>,
-}
-
-impl Plugin for SpyPlugin {
-    fn id(&self) -> tsukuyomidmx_core::prelude::OutputPluginId {
-        self.id
-    }
-
-    fn send_dmx(&self, _universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error> {
-        self.data.write().unwrap().push(dmx_data);
-        println!("sending...");
-        Ok(())
-    }
-}
 
 #[test]
 fn engine_can_start_function() {
@@ -46,7 +29,7 @@ fn engine_can_start_function() {
     doc.add_fixture(fxt).unwrap();
 
     let fun = SimpleFunction::new(
-        vec![((fxt_id, 0), 255), ((fxt_id, 1), 255)]
+        vec![((fxt_id, 0), 255), ((fxt_id, 1), 200)]
             .into_iter()
             .collect(),
     );
@@ -59,19 +42,21 @@ fn engine_can_start_function() {
     let handle = std::thread::spawn(|| {
         engine.start_loop();
     });
-    let spy_plugin = SpyPlugin {
-        id: OutputPluginId::new(),
-        data: Arc::new(RwLock::new(Vec::new())),
-    };
-    let p_id = spy_plugin.id;
-    doc.add_output_plugin(UniverseId::new(0), todo!()).unwrap();
 
+    let spy_plugin = Box::new(SpyPlugin::new());
+    let p_id = spy_plugin.id();
     let data = Arc::clone(&spy_plugin.data);
     command_tx
         .send(EngineCommand::UniverseAdded(UniverseId::new(0)))
         .unwrap();
     command_tx
-        .send(EngineCommand::AddPlugin(Box::new(spy_plugin)))
+        .send(EngineCommand::AddPlugin(spy_plugin))
+        .unwrap();
+    command_tx
+        .send(EngineCommand::AddPluginDestination {
+            plugin: p_id,
+            dest_universe: UniverseId::new(0),
+        })
         .unwrap();
     command_tx
         .send(EngineCommand::StartFunction(fun_id))
@@ -83,7 +68,11 @@ fn engine_can_start_function() {
 
     command_tx.send(EngineCommand::Shutdown).unwrap();
 
-    println!("{:?}", data.read().unwrap());
+    std::thread::sleep(Duration::from_millis(500));
 
+    let guard = data.try_read().unwrap();
+    let frame = guard[0].as_slice();
+    assert_eq!(frame[0], 255);
+    assert_eq!(frame[1], 200);
     handle.join().unwrap();
 }

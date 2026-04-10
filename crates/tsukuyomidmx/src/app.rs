@@ -2,6 +2,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use slint::{ComponentHandle, Model};
 use std::{
     cell::OnceCell,
+    collections::HashMap,
     error::Error,
     rc::Rc,
     sync::{
@@ -12,9 +13,10 @@ use std::{
 };
 use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
-    doc::Doc,
+    doc::{Doc, OutputPluginId},
     engine::{Engine, EngineCommand, EngineMessage},
-    prelude::{Fixture, FixtureDefId},
+    plugins::Plugin,
+    prelude::{Fixture, FixtureDefId, UniverseId},
 };
 
 use crate::{
@@ -30,7 +32,9 @@ pub struct App {
     pub state: AppState,
     pub dispatcher: Dispatcher,
     pub shared_model_inner: SharedInnerModel,
+    pub universe_configs: HashMap<UniverseId, UniverseConfig>,
 
+    // Engine
     pub engine_handle: OnceCell<thread::JoinHandle<()>>,
     pub command_tx: OnceCell<mpsc::Sender<EngineCommand>>,
     pub error_rx: OnceCell<mpsc::Receiver<EngineMessage>>,
@@ -48,9 +52,6 @@ impl App {
         debug!("App instance created");
         Self {
             doc,
-            engine_handle: OnceCell::new(),
-            command_tx: OnceCell::new(),
-            error_rx: OnceCell::new(),
             ui,
             state: AppState {},
             dispatcher,
@@ -58,6 +59,11 @@ impl App {
                 def_model: OnceCell::new(),
                 fixture_model: OnceCell::new(),
             },
+            universe_configs: HashMap::new(),
+
+            engine_handle: OnceCell::new(),
+            command_tx: OnceCell::new(),
+            error_rx: OnceCell::new(),
         }
     }
 
@@ -164,5 +170,41 @@ impl Clone for Dispatcher {
 impl Dispatcher {
     pub fn dispatch(&self, action: AppAction) {
         (self.0)(action)
+    }
+}
+
+#[derive(Debug)]
+pub enum OutputPluginInfo {
+    Artnet { target_ip: String },
+    FTDI,
+    Preview2D,
+    Preview3D,
+}
+
+impl OutputPluginInfo {
+    pub fn create_instance(&self) -> Box<dyn Plugin> {
+        match self {
+            Self::Artnet { target_ip } => todo!(),
+            Self::FTDI => todo!(),
+            Self::Preview2D => todo!(),
+            Self::Preview3D => todo!(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UniverseConfig {
+    output_plugins: HashMap<OutputPluginId, OutputPluginInfo>,
+}
+
+impl UniverseConfig {
+    pub fn new() -> Self {
+        Self {
+            output_plugins: HashMap::new(),
+        }
+    }
+
+    pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
+        &self.output_plugins
     }
 }

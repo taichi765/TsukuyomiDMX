@@ -7,10 +7,7 @@ mod def_registry;
 pub use def_registry::*;
 mod state;
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
     doc::state::{AddressIndex, DocState},
@@ -166,16 +163,6 @@ impl Doc {
         self.apply_command(cmd);
     }
 
-    pub fn add_output_plugin(
-        &mut self,
-        universe: UniverseId,
-        plugin: OutputPluginInfo,
-    ) -> Result<(), AddOutputPluginError> {
-        let cmd = decider::add_output_plugin(self.state_view(), universe, plugin)?;
-        self.apply_command(cmd);
-        Ok(())
-    }
-
     pub fn remove_output_plugin(&mut self) {
         todo!()
     }
@@ -252,13 +239,6 @@ impl DocStateView {
         F: FnOnce(&AddressIndex) -> R,
     {
         self.0.with_address_index(f)
-    }
-
-    pub fn with_universe_settings<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<UniverseId, UniverseSetting>) -> R,
-    {
-        self.0.with_universe_settings(f)
     }
 }
 
@@ -389,30 +369,6 @@ pub struct ResolvedAddress {
 
 pub trait EventStore {
     fn append(&self, event: DocEffect);
-}
-
-#[derive(Debug)]
-pub struct UniverseSetting {
-    // TODO: idじゃなくてUSBベンダーとかを保持しておかないとどうしようもない
-    output_plugins: HashMap<OutputPluginId, OutputPluginInfo>,
-}
-
-#[derive(Debug)]
-pub enum OutputPluginInfo {
-    Artnet { target_ip: String },
-    FTDI,
-}
-
-impl UniverseSetting {
-    pub fn new() -> Self {
-        Self {
-            output_plugins: HashMap::new(),
-        }
-    }
-
-    pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
-        &self.output_plugins
-    }
 }
 
 #[cfg(test)]

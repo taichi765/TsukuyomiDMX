@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
 use crate::{
     doc::OutputPluginId,
@@ -7,14 +10,36 @@ use crate::{
 
 pub mod artnet;
 
-pub trait Plugin: Send + Sync {
-    fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error>;
+pub trait Plugin: Send + Sync + Debug {
     fn id(&self) -> OutputPluginId;
+
+    fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error>;
 }
 
-impl Debug for dyn Plugin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.id())
+#[derive(derive_more::Debug)]
+pub struct SpyPlugin {
+    id: OutputPluginId,
+    #[debug(skip)]
+    pub data: Arc<RwLock<Vec<DmxFrame>>>,
+}
+
+impl Plugin for SpyPlugin {
+    fn id(&self) -> OutputPluginId {
+        self.id
+    }
+
+    fn send_dmx(&self, _universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error> {
+        self.data.write().unwrap().push(dmx_data);
+        Ok(())
+    }
+}
+
+impl SpyPlugin {
+    pub fn new() -> Self {
+        Self {
+            id: OutputPluginId::new(),
+            data: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 }
 

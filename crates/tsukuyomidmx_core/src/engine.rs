@@ -1,13 +1,13 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
-use tracing::{error, info, instrument, trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
 use crate::functions::{AppliedFunctionId, FunctionCommand, FunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
 use crate::universe::UniverseId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
@@ -24,9 +24,12 @@ pub struct Engine {
     message_tx: Sender<EngineMessage>,
 
     active_runtime: Option<Box<dyn FunctionRuntime>>,
+    /// Pluginインスタンス
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
+    /// どのPluginがどのUniverseに出力するか
+    output_map: HashMap<OutputPluginId, HashSet<UniverseId>>,
+
     universe_states: HashMap<UniverseId, UniverseState>,
-    output_map_cache: HashMap<OutputPluginId, Vec<UniverseId>>,
     /// シンプル卓など一時的な値
     live_values: HashMap<(FixtureId, String), u8>,
 
@@ -46,7 +49,7 @@ impl Engine {
             active_runtime: None,
             output_plugins: HashMap::new(),
             universe_states: HashMap::new(),
-            output_map_cache: HashMap::new(),
+            output_map: HashMap::new(),
             live_values: HashMap::new(),
             should_shutdown: false,
         }
@@ -54,9 +57,12 @@ impl Engine {
 
     pub fn start_loop(mut self) {
         info!("starting engine...");
-        self.update_output_map_cache();
         loop {
             self.handle_engine_commands();
+
+            if self.should_shutdown {
+                break;
+            }
 
             self.universe_states.iter_mut().for_each(|(_, u)| u.clear());
 
@@ -70,16 +76,8 @@ impl Engine {
 
             self.dispatch_outputs();
 
-            if self.should_shutdown {
-                break;
-            }
             std::thread::sleep(TICK_DURATION); //TODO: フレームレートを安定させる
         }
-    }
-
-    fn add_output_plugin(&mut self, plugin: Box<dyn Plugin>) {
-        self.output_plugins.insert(plugin.id(), plugin);
-        trace!("added output plugin");
     }
 
     fn handle_engine_commands(&mut self) {
@@ -88,7 +86,6 @@ impl Engine {
             match cmd {
                 EngineCommand::StartFunction(id) => self.start_function(id),
                 EngineCommand::StopFunction => self.stop_function(),
-                EngineCommand::AddPlugin(p) => self.add_output_plugin(p),
                 EngineCommand::UniverseAdded(id) => {
                     if let None = self.universe_states.insert(id, UniverseState::new()) {
                         warn!(
@@ -115,7 +112,55 @@ impl Engine {
                         let _ = self.live_values.insert((fixture_id, channel), value);
                     }
                 }
-                EngineCommand::OutputMapChanged => self.update_output_map_cache(),
+                EngineCommand::AddPlugin(p) => {
+                    let id = p.id();
+                    self.output_plugins.insert(id, p);
+                    self.output_map.insert(id, HashSet::new());
+                }
+                EngineCommand::AddPluginDestination {
+                    plugin,
+                    dest_universe,
+                } => {
+                    if !self.output_plugins.contains_key(&plugin) {
+                        self.message_tx
+                            .send(EngineMessage::ErrorOccured(
+                                EngineError::OutputPluginNotFound { id: plugin },
+                            ))
+                            .expect("failed to send message from engine")
+                    }
+                    let dests = self.output_map.get_mut(&plugin).unwrap();
+                    if dests.contains(&dest_universe) {
+                        warn!(
+                            ?plugin,
+                            ?dest_universe,
+                            "universe already exists in output_map. command is ignored."
+                        )
+                    } else {
+                        dests.insert(dest_universe);
+                    }
+                }
+                EngineCommand::RemovePluginDestination {
+                    plugin,
+                    dest_universe,
+                } => {
+                    if !self.output_plugins.contains_key(&plugin) {
+                        self.message_tx
+                            .send(EngineMessage::ErrorOccured(
+                                EngineError::OutputPluginNotFound { id: plugin },
+                            ))
+                            .expect("failed to send message from engine");
+                    }
+                    let dests = self.output_map.get_mut(&plugin).unwrap();
+                    if !dests.contains(&dest_universe) {
+                        warn!(
+                            ?plugin,
+                            ?dest_universe,
+                            "universe does not exist in output_map. command is ignored."
+                        );
+                    } else {
+                        dests.insert(dest_universe);
+                    }
+                }
                 EngineCommand::Shutdown => self.should_shutdown = true,
             }
         }
@@ -150,7 +195,7 @@ impl Engine {
     }
 
     fn dispatch_outputs(&mut self) {
-        self.output_map_cache.par_iter().for_each(|(p_id, u_ids)| {
+        self.output_map.par_iter().for_each(|(p_id, u_ids)| {
             let Some(plugin) = self.output_plugins.get(p_id) else {
                 warn!(plugin_id = %p_id, "plugin not found"); // FIXME: message_txでエラーを送るべき？
                 return;
@@ -234,15 +279,13 @@ impl Engine {
                 universe.set_value(resolved_address, value);
             }
             Err(e) => {
-                if let Err(send_err) = self.message_tx.send(EngineMessage::ErrorOccured(
-                    EngineError::ResolvingAddress {
+                self.message_tx
+                    .send(EngineMessage::ErrorOccured(EngineError::ResolvingAddress {
                         fixture_id,
                         channel: channel.to_string(),
                         source: Box::new(e),
-                    },
-                )) {
-                    error!("engine: failed to send error: {}", send_err);
-                }
+                    }))
+                    .expect("failed to send message from engine");
             }
         }
     }
@@ -288,43 +331,32 @@ impl Engine {
             .expect("functionの追加に失敗しました");
         self.start_function(fader_id);*/
     }
-
-    #[instrument(skip_all)]
-    fn update_output_map_cache(&mut self) {
-        let new_map = self.doc.with_universe_settings(|settings| {
-            let mut new_map: HashMap<OutputPluginId, Vec<UniverseId>> = HashMap::new();
-            for (u_id, setting) in settings {
-                setting.output_plugins().iter().for_each(|(p_id, _p_info)| {
-                    if let Some(universes) = new_map.get_mut(p_id) {
-                        universes.push(*u_id);
-                    } else {
-                        new_map.insert(*p_id, vec![*u_id]);
-                    }
-                })
-            }
-            new_map
-        });
-        self.output_map_cache = new_map;
-    }
 }
 
 /// Message from the main thread to [`Engine`]
 #[derive(Debug)]
 pub enum EngineCommand {
-    StartFunction(AppliedFunctionId),
     // Commands
+    StartFunction(AppliedFunctionId),
     /// 現在実行中のfunctionをstopする
     StopFunction,
-    AddPlugin(Box<dyn Plugin>),
     SetLiveValue {
         fixture_id: FixtureId,
         channel: String,
         value: u8,
     },
+    AddPlugin(Box<dyn Plugin>),
+    AddPluginDestination {
+        plugin: OutputPluginId,
+        dest_universe: UniverseId,
+    },
+    RemovePluginDestination {
+        plugin: OutputPluginId,
+        dest_universe: UniverseId,
+    },
     Shutdown,
 
     // Events
-    OutputMapChanged, // FIXME: Docの監視にメインスレッドを介すのは正しいか？
     UniverseAdded(UniverseId),
     UniverseRemoved(UniverseId),
 }
@@ -361,6 +393,8 @@ pub enum EngineError {
     },
     #[error("function {function_id} not found in Doc")]
     FunctionNotFound { function_id: AppliedFunctionId },
+    #[error("no plugin {id:?} found")]
+    OutputPluginNotFound { id: OutputPluginId },
 }
 
 pub(crate) struct UniverseState {

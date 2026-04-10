@@ -115,12 +115,3 @@ pub enum RemoveFunctionError {
     #[error("cannot find function {0:?}")]
     FunctionNotFound(AppliedFunctionId),
 }
-
-#[derive(Debug, Error)]
-pub enum AddOutputPluginError {
-    #[error("there were no universe with id {0:?}")]
-    UniverseNotFound(UniverseId),
-}
-
-#[derive(Debug, Error)]
-pub enum RemoveOutputPluginError {}

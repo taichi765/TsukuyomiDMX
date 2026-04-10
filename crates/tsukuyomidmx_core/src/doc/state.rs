@@ -1,7 +1,10 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
 
 use crate::{
-    doc::{UniverseSetting, def_registry::FixtureDefRegistry},
+    doc::def_registry::FixtureDefRegistry,
     fixture::{Fixture, FixtureId},
     functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
     prelude::{DmxAddress, UniverseId},
@@ -19,8 +22,8 @@ pub(super) struct DocState {
     fixture_defs: RwLock<Box<dyn FixtureDefRegistry>>,
     functions: RwLock<HashMap<AppliedFunctionId, Function>>,
     function_prototypes: RwLock<HashMap<FunctionPrototypeId, FunctionPrototype>>,
+    universes: RwLock<HashSet<UniverseId>>,
 
-    universe_settings: RwLock<HashMap<UniverseId, UniverseSetting>>,
     address_index: RwLock<AddressIndex>,
 }
 
@@ -52,8 +55,8 @@ impl DocState {
             fixture_defs: RwLock::new(def_registry),
             functions: RwLock::new(HashMap::new()),
             function_prototypes: RwLock::new(HashMap::new()),
+            universes: RwLock::new(HashSet::new()),
 
-            universe_settings: RwLock::new(HashMap::new()),
             address_index: RwLock::new(AddressIndex::new()),
         }
     }
