@@ -6,6 +6,7 @@ pub mod colors;
 pub mod models;
 pub mod tea {
     pub mod fixture_list_view;
+    pub mod preview_2d;
     pub mod universe_view;
 }
 mod test_helpers;

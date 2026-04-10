@@ -6,6 +6,8 @@ mod manufacturer;
 pub use manufacturer::*;
 mod universe_view;
 pub use universe_view::UniverseViewModel;
+mod preview_2d;
+pub use preview_2d::Preview2DModel;
 
 #[cfg(test)]
 mod test_helpers {
@@ -52,6 +54,7 @@ mod test_helpers {
         }
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub enum DummyModelChangeEvent {
         Added(usize),
         Changed(usize),

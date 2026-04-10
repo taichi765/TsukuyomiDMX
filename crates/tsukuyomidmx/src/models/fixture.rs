@@ -140,6 +140,10 @@ impl FixtureModel {
         self.latest_removed.get()
     }
 
+    pub fn get_index(&self, id: FixtureId) -> Option<usize> {
+        self.index.borrow().get(&id).copied()
+    }
+
     pub fn model_tracker(&self) -> &dyn ModelTracker {
         &self.notify
     }

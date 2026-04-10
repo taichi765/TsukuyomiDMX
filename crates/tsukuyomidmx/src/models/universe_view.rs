@@ -27,7 +27,6 @@ pub trait SourceModel {
     /// 直近のremoveされたfixtureのidを返す。一度もremoveされていない場合はNone。
     fn get_removed_id(&self) -> Option<FixtureId>;
     fn model_tracker(&self) -> &dyn ModelTracker;
-    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId>;
 }
 
 impl SourceModel for FixtureModel {
@@ -41,10 +40,6 @@ impl SourceModel for FixtureModel {
 
     fn model_tracker(&self) -> &dyn ModelTracker {
         self.model_tracker()
-    }
-
-    fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
-        self.with_fixture(fxt_id, |fxt| fxt.universe_id())
     }
 }
 
@@ -356,10 +351,6 @@ mod tests {
             self.latest_removed.get()
         }
 
-        fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
-            todo!()
-        }
-
         fn model_tracker(&self) -> &dyn ModelTracker {
             &self.notify
         }
@@ -427,7 +418,7 @@ mod tests {
     }
 
     impl FixtureInfoProvider for StubFixtureInfoProvider {
-        fn get_universe(&self, fxt_id: FixtureId) -> Option<UniverseId> {
+        fn get_universe(&self, _fxt_id: FixtureId) -> Option<UniverseId> {
             Some(self.univ)
         }
 
