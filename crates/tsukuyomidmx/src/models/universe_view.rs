@@ -9,7 +9,7 @@ use std::{
 
 use i_slint_core::model::{ModelChangeListener, ModelChangeListenerContainer};
 use slint::{Model, ModelNotify, ModelTracker, SharedString, ToSharedString};
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::DocStateView,
     prelude::{DmxAddress, Fixture, FixtureId, UniverseId},
 };
@@ -332,7 +332,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use tsukuyomi_core::{
+    use tsukuyomidmx_core::{
         doc::{Doc, FakeFixtureDefRegistry},
         fixture::FixtureChange,
         prelude::{DmxAddress, Fixture, FixtureDef, UniverseId},

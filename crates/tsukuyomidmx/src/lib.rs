@@ -24,8 +24,8 @@ use slint::{Timer, TimerMode};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
-use tsukuyomi_core::engine::{Engine, EngineCommand, EngineMessage};
-use tsukuyomi_core::prelude::*;
+use tsukuyomidmx_core::engine::{Engine, EngineCommand, EngineMessage};
+use tsukuyomidmx_core::prelude::*;
 
 use crate::app::App;
 

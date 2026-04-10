@@ -2,7 +2,7 @@ use core::any::Any;
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
 use slint::{Model, ModelNotify, ModelTracker, SharedString};
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::{Doc, DocEffect, DocStateView},
     prelude::{FixtureDef, FixtureDefId},
 };
@@ -87,7 +87,7 @@ mod tests {
 
     use super::*;
     use i_slint_core::model::ModelChangeListenerContainer;
-    use tsukuyomi_core::doc::{Doc, FakeFixtureDefRegistry};
+    use tsukuyomidmx_core::doc::{Doc, FakeFixtureDefRegistry};
 
     #[test]
     fn def_map_model_works() {

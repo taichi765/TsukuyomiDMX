@@ -12,8 +12,8 @@ mod test_helpers {
     use std::{cell::RefCell, pin::Pin};
 
     use i_slint_core::model::ModelChangeListener;
-    use tsukuyomi_core::prelude::{
-        CapabilityInner, ChannelDef, FixtureDef, FixtureMode, MergeMode,
+    use tsukuyomidmx_core::prelude::{
+        CapabilityKind, ChannelDef, FixtureDef, FixtureMode, MergeMode,
     };
 
     pub struct SpyModelPeer {

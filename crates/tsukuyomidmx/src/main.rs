@@ -2,6 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tsukuyomi_ui::run_main()?;
+    tsukuyomidmx::run_main()?;
     Ok(())
 }

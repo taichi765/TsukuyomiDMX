@@ -12,7 +12,7 @@ use std::{
 
 use i_slint_core::model::ModelChangeListener;
 use slint::{Model, ModelNotify, ModelTracker};
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::{Doc, DocEffect, DocStateView},
     prelude::{Fixture, FixtureDef, FixtureDefId, FixtureId},
 };
@@ -151,10 +151,10 @@ mod tests {
 
     use i_slint_core::model::ModelChangeListenerContainer;
     use slint::{SharedString, ToSharedString};
-    use tsukuyomi_core::doc::FakeFixtureDefRegistry;
-    use tsukuyomi_core::doc::{FixtureDefLookupError, FixtureDefMetaData, FixtureDefRegistry};
-    use tsukuyomi_core::fixture::FixtureChange;
-    use tsukuyomi_core::prelude::*;
+    use tsukuyomidmx_core::doc::FakeFixtureDefRegistry;
+    use tsukuyomidmx_core::doc::{FixtureDefLookupError, FixtureDefMetaData, FixtureDefRegistry};
+    use tsukuyomidmx_core::fixture::FixtureChange;
+    use tsukuyomidmx_core::prelude::*;
 
     use crate::models::test_helpers::{DummyModelChangeEvent, SpyModelPeer};
 

@@ -5,7 +5,7 @@ use std::{
 
 use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
 use tracing::{debug, instrument, trace_span};
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::{
         Doc, DocStateView, FixtureAddError, FixtureDefNotFoundError, ModeNotFoundError,
         ValidateError,
@@ -176,7 +176,7 @@ mod tests {
 
     use super::*;
     use i_slint_backend_testing::{self as testing, ElementHandle};
-    use tsukuyomi_core::doc::FakeFixtureDefRegistry;
+    use tsukuyomidmx_core::doc::FakeFixtureDefRegistry;
     #[test]
     fn manufacturer_expands_after_click() {
         // slint::spwan_local() requires event loop

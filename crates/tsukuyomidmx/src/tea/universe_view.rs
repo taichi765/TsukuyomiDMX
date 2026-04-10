@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, ModelExt, ModelRc, VecModel};
 use tracing::{instrument, trace_span};
-use tsukuyomi_core::{doc::DocStateView, prelude::UniverseId};
+use tsukuyomidmx_core::{doc::DocStateView, prelude::UniverseId};
 
 use crate::{
     app::App,

@@ -8,7 +8,7 @@ use anyhow::Context;
 use derive_getters::Getters;
 use slint::{Model, ModelExt, ModelNotify, ModelRc, SharedString, ToSharedString, VecModel};
 use thiserror::Error;
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::{DocStateView, FixtureDefLookupError},
     prelude::FixtureDefId,
 };

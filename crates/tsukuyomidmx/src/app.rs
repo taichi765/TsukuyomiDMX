@@ -11,7 +11,7 @@ use std::{
     thread,
 };
 use tracing::{debug, instrument};
-use tsukuyomi_core::{
+use tsukuyomidmx_core::{
     doc::Doc,
     engine::{Engine, EngineCommand, EngineMessage},
     prelude::{Fixture, FixtureDefId},

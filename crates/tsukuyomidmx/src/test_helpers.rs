@@ -1,5 +1,5 @@
-use tsukuyomi_core::prelude::{
-    Capability, CapabilityInner, ChannelDef, FixtureDef, FixtureMode, MergeMode,
+use tsukuyomidmx_core::prelude::{
+    Capability, CapabilityKind, ChannelDef, FixtureDef, FixtureMode, MergeMode,
 };
 
 ///
@@ -9,24 +9,24 @@ pub fn make_fixture_def_2() -> FixtureDef {
         "Dimmer",
         ChannelDef::new(
             MergeMode::HTP,
-            Capability::Single(CapabilityInner::Intensity),
+            Capability::Single(CapabilityKind::Intensity),
         ),
     );
     def.insert_channel(
         "Red",
-        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Red)),
+        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Red)),
     );
     def.insert_channel(
         "Green",
-        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Green)),
+        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Green)),
     );
     def.insert_channel(
         "Blue",
-        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::Blue)),
+        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::Blue)),
     );
     def.insert_channel(
         "White",
-        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityInner::White)),
+        ChannelDef::new(MergeMode::HTP, Capability::Single(CapabilityKind::White)),
     );
     def.insert_mode(
         "5 Channel",
