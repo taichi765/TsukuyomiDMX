@@ -24,6 +24,27 @@ pub(super) struct DocState {
     address_index: RwLock<AddressIndex>,
 }
 
+/// with_xxx(|it|it.get()...)のようなメソッドを定義する
+macro_rules! define_rwlock_helper {
+    ($prop: ident, $typ: ty) => {
+        paste::paste! {
+            pub fn [<with_ $prop>]<F, R>(&self, f: F) -> R
+            where
+                F: FnOnce(&$typ) -> R,
+            {
+                f(&self.$prop.read().unwrap())
+            }
+
+            pub(super) fn [<with_ $prop _mut>]<F, R>(&self, f: F) -> R
+                where
+                    F: FnOnce(&mut $typ) -> R,
+            {
+                f(&mut self.$prop.write().unwrap())
+            }
+        }
+    };
+}
+
 impl DocState {
     pub fn new(def_registry: Box<dyn FixtureDefRegistry>) -> Self {
         Self {
@@ -41,37 +62,17 @@ impl DocState {
         self.fixture_defs.write().unwrap().load()
     }
 
-    // TODO: with_xxx系はマクロでまとめたい
-    pub fn with_fixtures<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FixtureId, Fixture>) -> R,
-    {
-        let fixtures = self.fixtures.read().unwrap();
-        f(&fixtures)
-    }
+    define_rwlock_helper!(fixtures, HashMap<FixtureId, Fixture>);
+    define_rwlock_helper!(functions, HashMap<AppliedFunctionId, Function>);
+    define_rwlock_helper!(function_prototypes, HashMap<FunctionPrototypeId, FunctionPrototype>);
+    define_rwlock_helper!(address_index, AddressIndex);
+    define_rwlock_helper!(universes, HashSet<UniverseId>);
 
     pub fn with_fixture_defs<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&dyn FixtureDefRegistry) -> R,
     {
-        let defs = self.fixture_defs.read().unwrap();
-        f(&(**defs))
-    }
-
-    pub fn with_functions<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<AppliedFunctionId, Function>) -> R,
-    {
-        let functions = self.functions.read().unwrap();
-        f(&functions)
-    }
-
-    pub fn with_function_prototypes<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
-    {
-        let prototypes = self.function_prototypes.read().unwrap();
-        f(&prototypes)
+        f(&(**self.fixture_defs.read().unwrap()))
     }
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
@@ -81,59 +82,5 @@ impl DocState {
         let fixtures = self.fixtures.read().unwrap();
         let defs = self.fixture_defs.read().unwrap();
         f(&fixtures, &(**defs))
-    }
-
-    pub fn with_address_index<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&AddressIndex) -> R,
-    {
-        let index = self.address_index.read().unwrap();
-        f(&index)
-    }
-
-    pub fn with_universe_settings<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<UniverseId, UniverseSetting>) -> R,
-    {
-        f(&self.universe_settings.read().unwrap())
-    }
-
-    pub(super) fn with_fixtures_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<FixtureId, Fixture>) -> R,
-    {
-        let mut fixtures = self.fixtures.write().unwrap();
-        f(&mut fixtures)
-    }
-
-    pub(super) fn with_functions_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<AppliedFunctionId, Function>) -> R,
-    {
-        let mut functions = self.functions.write().unwrap();
-        f(&mut functions)
-    }
-
-    pub(super) fn with_function_prototypes_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
-    {
-        let mut prototypes = self.function_prototypes.write().unwrap();
-        f(&mut prototypes)
-    }
-
-    pub(super) fn with_address_index_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut AddressIndex) -> R,
-    {
-        let mut index = self.address_index.write().unwrap();
-        f(&mut index)
-    }
-
-    pub(super) fn with_universe_settings_mut<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut HashMap<UniverseId, UniverseSetting>) -> R,
-    {
-        f(&mut self.universe_settings.write().unwrap())
     }
 }

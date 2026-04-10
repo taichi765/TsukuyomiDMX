@@ -1,11 +1,12 @@
 [workspace]
-members=[
+members = [
     "crates/tsukuyomidmx",
     "crates/tsukuyomidmx_core",
     "crates/slint_model_ext",
-    "crates/ofl_schemes"
-, "crates/tsukuyomidmx_dsl"]
-resolver="3"
+    "crates/ofl_schemes",
+    "crates/tsukuyomidmx_dsl",
+]
+resolver = "3"
 
 [profile.release]
 debug = true
@@ -19,6 +20,7 @@ anyhow = "1.0"
 bimap = "0.6.3"
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive_more = "2.1.1"
+paste = "1.0.15"
 tracing = "0.1"
 thiserror = "2.0.17"
 uuid = { version = "1.19.0", features = ["v4"] }
@@ -28,7 +30,15 @@ serde_json = "1.0.149"
 
 # Slint dependencies
 # Use forked version to use pre-release features
-slint = { git = "https://github.com/taichi765/slint",default-features = true,features = ["std","accessibility","backend-default","backend-winit", "renderer-femtovg-wgpu", "unstable-wgpu-28", "gettext"] }
+slint = { git = "https://github.com/taichi765/slint", default-features = true, features = [
+    "std",
+    "accessibility",
+    "backend-default",
+    "backend-winit",
+    "renderer-femtovg-wgpu",
+    "unstable-wgpu-28",
+    "gettext",
+] }
 # Must match the version of slint, see https://github.com/slint-ui/slint/blob/master/internal/backends/winit/README.md
 i-slint-backend-winit = { git = "https://github.com/taichi765/slint" }
 i-slint-backend-testing = { git = "https://github.com/taichi765/slint" }
