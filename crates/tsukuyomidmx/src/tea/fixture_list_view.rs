@@ -190,7 +190,7 @@ mod tests {
         testing::init_integration_test_with_system_time();
 
         // TODO: DefRegistryのfakeを使う
-        let mut app = App::new();
+        let mut app = App::new_empty();
 
         app.shared_model_inner
             .def_model
