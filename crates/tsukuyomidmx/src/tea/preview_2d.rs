@@ -16,7 +16,7 @@ use crate::{app::App, models::Preview2DModel, ui};
 
 #[instrument(skip_all)]
 pub fn setup(app: &mut App) {
-    let adopter = app.ui.global::<ui::Preview2DStore>();
+    let adopter = app.ui.global::<ui::Preview2DAdopter>();
 
     let (frame_tx, frame_rx) = mpsc::channel();
 

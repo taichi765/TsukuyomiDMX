@@ -2,12 +2,16 @@ import { Palette } from "std-widgets.slint";
 import { MiddleText } from "../parts/texts.slint";
 
 export struct FixtureEntityData { fixture-id: string, pos: Point, color: color}
-export global Preview2DStore {
-    in property <[FixtureEntityData]> fixture-list:[
+
+global Adopter {
+    in property <[FixtureEntityData]> model:[
+        // dummy
         { fixture-id:"", pos:{ x:1px, y:50px }, color:rgb(255,0,0) },
         { fixture-id:"", pos:{ x:60px, y:70px }, color:rgb(0,0,255) }
     ];
 }
+
+export { Adopter as Preview2DAdopter }
 
 export component Preview2D inherits Rectangle {
     VerticalLayout {
@@ -16,7 +20,7 @@ export component Preview2D inherits Rectangle {
         }
 
         body := Rectangle {
-            for fixture in Preview2DStore.fixture-list: fixture-rect := Rectangle {
+            for fixture in Adopter.model: fixture-rect := Rectangle {
                 property <bool> selected;
                 x: 100px;
                 //fixture.pos.x;
