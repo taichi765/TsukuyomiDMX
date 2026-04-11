@@ -23,6 +23,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use slint::wgpu_28::{WGPUConfiguration, WGPUSettings};
 use slint::{Timer, TimerMode};
 use tracing::Level;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, FmtSubscriber, fmt, prelude::*};
 use tsukuyomidmx_core::engine::{Engine, EngineCommand, EngineMessage};
 use tsukuyomidmx_core::prelude::*;
@@ -35,9 +36,21 @@ mod ui {
 
 pub fn run_main() -> Result<(), Box<dyn Error>> {
     // Initialize logger
+    let filter = if std::env::var("TSUKUYOMI_LOG").is_ok() {
+        EnvFilter::try_from_env("TSUKUYOMI_LOG").expect("TSUKUYOMI_LOG's format was invalid. see https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html")
+    } else {
+        EnvFilter::try_new("tsukuyomidmx=debug,tsukuyomidmx-core=debug,off").unwrap()
+    };
+    let my_layer = fmt::layer()
+        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        .with_filter(filter);
+    let external_layer = fmt::layer().with_filter(EnvFilter::new(
+        "tsukuyomidmx=off,tsukuyomidmx-core=off,info",
+    ));
+
     tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::from_default_env())
+        .with(my_layer)
+        .with(external_layer)
         .init();
 
     // Use wgpu to render 3D Preview
