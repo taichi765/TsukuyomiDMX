@@ -15,7 +15,7 @@ i-slint-core = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 derive-getters = { workspace = true }
-tracing-subscriber = "0.3.0"
+tracing-subscriber = { version = "0.3.0", features = ["env-filter"] }
 uuid = { workspace = true }
 tracing = { workspace = true }
 wgpu = { workspace = true }
