@@ -83,6 +83,12 @@ impl App {
         self.setup_engine();
 
         self.ui.run()?;
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::Shutdown)
+            .unwrap();
+
         self.engine_handle
             .take()
             .unwrap()
