@@ -1,9 +1,10 @@
 use std::{
     rc::Rc,
     sync::mpsc::{self, Sender},
+    time::Duration,
 };
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Timer, TimerMode};
 use tracing::instrument;
 use tsukuyomidmx_core::{
     doc::OutputPluginId,
@@ -27,15 +28,35 @@ pub fn setup(app: &mut App) {
     ));
 
     let plugin = Box::new(Preview2DPlugin::new(frame_tx));
+    let p_id = plugin.id();
     app.command_tx
         .get()
         .unwrap()
         .send(EngineCommand::AddPlugin(plugin))
         .unwrap();
-    // TODO: UniverseごとにAddPluginDestinationする
 
-    adopter.set_fixture_list(Rc::clone(&model).into());
-    todo!()
+    // UniverseごとにAddPluginDestinationする
+    let universes = app.doc.lock().unwrap().state_view().universes();
+    universes.into_iter().for_each(|u| {
+        app.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::AddPluginDestination {
+                plugin: p_id,
+                dest_universe: u,
+            })
+            .unwrap()
+    });
+
+    adopter.set_model(Rc::clone(&model).into());
+
+    let timer = Timer::default();
+    timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
+        model.update();
+    });
+    if let Err(_) = app.preview2d_timer.set(timer) {
+        unreachable!()
+    };
 }
 
 /// Just sends message to [PreviewController] when [`Engine`][tsukuyomi_core::engine::Engine] ticked

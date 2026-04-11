@@ -86,4 +86,8 @@ impl DocState {
         let defs = self.fixture_defs.read().unwrap();
         f(&fixtures, &(**defs))
     }
+
+    pub fn universes(&self) -> Vec<UniverseId> {
+        self.universes.read().unwrap().iter().cloned().collect()
+    }
 }

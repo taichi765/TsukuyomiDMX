@@ -1,5 +1,5 @@
 use i_slint_backend_winit::WinitWindowAccessor;
-use slint::{ComponentHandle, Model};
+use slint::{CloseRequestResponse, ComponentHandle, Model, Timer};
 use std::{
     cell::OnceCell,
     collections::HashMap,
@@ -21,7 +21,7 @@ use tsukuyomidmx_core::{
 
 use crate::{
     models::{FixtureDefModel, FixtureModel},
-    tea::{fixture_list_view, universe_view},
+    tea::{fixture_list_view, preview_2d, universe_view},
     ui,
 };
 
@@ -32,7 +32,9 @@ pub struct App {
     pub state: AppState,
     pub dispatcher: Dispatcher,
     pub shared_model_inner: SharedInnerModel,
+    /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
     pub universe_configs: HashMap<UniverseId, UniverseConfig>,
+    pub preview2d_timer: OnceCell<Timer>,
 
     // Engine
     pub engine_handle: OnceCell<thread::JoinHandle<()>>,
@@ -60,6 +62,7 @@ impl App {
                 fixture_model: OnceCell::new(),
             },
             universe_configs: HashMap::new(),
+            preview2d_timer: OnceCell::new(),
 
             engine_handle: OnceCell::new(),
             command_tx: OnceCell::new(),
@@ -79,8 +82,9 @@ impl App {
 
         fixture_list_view::setup(self);
         universe_view::setup(self);
-        self.setup_window();
         self.setup_engine();
+        self.setup_window();
+        preview_2d::setup(self);
 
         self.ui.run()?;
         self.command_tx
@@ -122,10 +126,8 @@ impl App {
 
         self.ui.on_close({
             let ui_handle = self.ui.as_weak();
-            let command_tx = self.command_tx.get().unwrap().clone();
 
             move || {
-                command_tx.send(EngineCommand::Shutdown).unwrap();
                 let ui = ui_handle.unwrap();
                 ui.window().hide().unwrap()
             }
