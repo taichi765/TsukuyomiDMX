@@ -116,8 +116,10 @@ impl App {
 
         self.ui.on_close({
             let ui_handle = self.ui.as_weak();
+            let command_tx = self.command_tx.get().unwrap().clone();
 
             move || {
+                command_tx.send(EngineCommand::Shutdown).unwrap();
                 let ui = ui_handle.unwrap();
                 ui.window().hide().unwrap()
             }
