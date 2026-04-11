@@ -197,35 +197,24 @@ impl Clone for DocStateView {
     }
 }
 
+macro_rules! define_readonly_wrapper {
+    ($fun_name: ident, $typ: ty) => {
+        pub fn $fun_name<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(&$typ) -> R,
+        {
+            self.0.$fun_name(f)
+        }
+    };
+}
+
 // RwLock helpers
 impl DocStateView {
-    pub fn with_fixtures<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FixtureId, Fixture>) -> R,
-    {
-        self.0.with_fixtures(f)
-    }
-
-    pub fn with_fixture_defs<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&dyn FixtureDefRegistry) -> R,
-    {
-        self.0.with_fixture_defs(f)
-    }
-
-    pub fn with_functions<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<AppliedFunctionId, Function>) -> R,
-    {
-        self.0.with_functions(f)
-    }
-
-    pub fn with_function_prototypes<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&HashMap<FunctionPrototypeId, FunctionPrototype>) -> R,
-    {
-        self.0.with_function_prototypes(f)
-    }
+    define_readonly_wrapper!(with_fixtures, HashMap<FixtureId, Fixture>);
+    define_readonly_wrapper!(with_fixture_defs, dyn FixtureDefRegistry);
+    define_readonly_wrapper!(with_functions, HashMap<AppliedFunctionId, Function>);
+    define_readonly_wrapper!(with_function_prototypes, HashMap<FunctionPrototypeId, FunctionPrototype>);
+    define_readonly_wrapper!(with_address_index, AddressIndex);
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
     where
@@ -234,11 +223,8 @@ impl DocStateView {
         self.0.with_fixtures_and_defs(f)
     }
 
-    pub fn with_address_index<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&AddressIndex) -> R,
-    {
-        self.0.with_address_index(f)
+    pub fn universes(&self) -> Vec<UniverseId> {
+        self.0.universes()
     }
 }
 
