@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use slint::{ComponentHandle, MapModel, Model, ToSharedString, VecModel};
+use slint::{ComponentHandle, MapModel, Model, ModelExt, SharedString, ToSharedString, VecModel};
 use tracing::{debug, instrument, trace_span};
 use tsukuyomidmx_core::{
     doc::{
@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::{
     app::{App, AppAction, Dispatcher},
-    models::{FixtureDefModel, ManufacturerModel},
+    models::{FixtureDefModel, ManufacturerModel, UniverseModel},
     ui,
 };
 
@@ -30,8 +30,11 @@ pub fn setup(app: &mut App) {
         app.shared_model_inner.def_model.get().unwrap().clone(),
         app.doc.lock().unwrap().state_view(),
     ));
+    let base_model = app.shared_model_inner.universe_model.get().unwrap();
+    let universe_model = Rc::clone(&base_model).map(|u_id| universe_id_to_shared_string(u_id));
 
     adopter.set_model(Rc::clone(&manufacturer_model).into());
+    adopter.set_universes(Rc::new(universe_model).into());
 
     adopter.on_patch({
         let doc_view_clone = doc_view.clone();
@@ -154,10 +157,9 @@ pub fn setup(app: &mut App) {
 /// "universe <number>"から<number>部分を取り出す。
 fn parse_universe_id(universe_name: &str) -> UniverseId {
     // TODO: nameを自由に付けられるようにする
-    let universe_id = universe_name
+    let universe_num = universe_name
         .split(" ")
-        .collect::<Vec<&str>>()
-        .get(1)
+        .nth(1)
         .expect(
             "cusstom universe name is not supproted at the moment: expected `universe <number>`",
         )
@@ -165,7 +167,12 @@ fn parse_universe_id(universe_name: &str) -> UniverseId {
         .expect(
             "custom universe name is not supproted at the moment: expected `universe <number>`",
         ); // TODO: エラーを返せるか？
-    UniverseId::new(universe_id)
+    UniverseId::new(universe_num - 1)
+}
+
+/// From/Intoトレイトでやったほうが良さそうだが、Universe名をどう扱うか決まってないのでとりあえずここにまとめておく
+fn universe_id_to_shared_string(id: UniverseId) -> SharedString {
+    format!("Universe {}", id.value() + 1).to_shared_string()
 }
 
 #[cfg(test)]

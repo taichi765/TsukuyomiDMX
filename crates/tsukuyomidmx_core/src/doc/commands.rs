@@ -254,10 +254,10 @@ mod universes {
             self: Box<Self>,
             state: &crate::doc::DocState,
         ) -> (Box<dyn DocCommand>, crate::doc::DocEffect) {
-            let max = state
+            let new = state
                 .with_universes(|it| it.iter().max().copied())
-                .unwrap_or(UniverseId::new(0));
-            let new = UniverseId::new(max.value() + 1);
+                .map(|max| UniverseId::new(max.value() + 1))
+                .unwrap_or(UniverseId::MIN);
             state.with_universes_mut(|it| it.insert(new));
 
             //todo!()

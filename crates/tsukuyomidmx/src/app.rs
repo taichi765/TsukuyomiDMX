@@ -4,6 +4,7 @@ use std::{
     cell::OnceCell,
     collections::HashMap,
     error::Error,
+    path::Path,
     rc::Rc,
     sync::{
         Arc, Mutex,
@@ -20,7 +21,7 @@ use tsukuyomidmx_core::{
 };
 
 use crate::{
-    models::{FixtureDefModel, FixtureModel},
+    models::{FixtureDefModel, FixtureModel, UniverseModel},
     tea::{fixture_list_view, preview_2d, universe_view},
     ui,
 };
@@ -60,6 +61,7 @@ impl App {
             shared_model_inner: SharedInnerModel {
                 def_model: OnceCell::new(),
                 fixture_model: OnceCell::new(),
+                universe_model: OnceCell::new(),
             },
             universe_configs: HashMap::new(),
             preview2d_timer: OnceCell::new(),
@@ -68,6 +70,10 @@ impl App {
             command_tx: OnceCell::new(),
             error_rx: OnceCell::new(),
         }
+    }
+
+    pub fn from_dir(dir: &Path) -> Self {
+        todo!()
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
@@ -79,12 +85,19 @@ impl App {
             .fixture_model
             .set(FixtureModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
+        self.shared_model_inner
+            .universe_model
+            .set(UniverseModel::new(&mut self.doc.lock().unwrap()))
+            .unwrap();
 
         fixture_list_view::setup(self);
         universe_view::setup(self);
         self.setup_engine();
         self.setup_window();
         preview_2d::setup(self);
+
+        // TODO: ファイルから読み込む
+        (0..2).for_each(|_| self.doc.lock().unwrap().add_universe());
 
         self.ui.run()?;
         self.command_tx
@@ -100,6 +113,8 @@ impl App {
             .expect("failed to finish Engine thread successfully");
         Ok(())
     }
+
+    fn save(&self) {}
 
     /// Maximize, Toggle fullscreenなどの初期化
     #[instrument(skip_all)]
@@ -164,6 +179,7 @@ pub struct AppState {}
 pub struct SharedInnerModel {
     pub def_model: OnceCell<Rc<FixtureDefModel>>,
     pub fixture_model: OnceCell<Rc<FixtureModel>>,
+    pub universe_model: OnceCell<Rc<UniverseModel>>,
 }
 
 pub enum AppAction {}

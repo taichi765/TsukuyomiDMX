@@ -1,19 +1,14 @@
 import { StyleMetrics, Palette, ScrollView, ComboBox } from "std-widgets.slint";
 import { BorderHorz, BorderVert } from "../styling.slint";
 
-export struct UniverseViewFixtureData { 
-    fixture-id: string, 
-    text: string, 
-    row: int,
-    col: int, 
-    length: int,
-    is-odd: bool}
+export struct UniverseViewFixtureData { fixture-id: string, text: string, row: int, col: int, length: int, is-odd: bool}
 
 
 global Adopter {
     in property <[UniverseViewFixtureData]> fixtures:[
         // dummy
         { fixture-id:"dummy", text:"MyFixture", row:0, col:0, length:5 }];
+    in property <[string]> universes;
     in property <[int]> rows:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
     // dummy
     in property <[int]> cols:[
@@ -56,13 +51,7 @@ export component UniverseView inherits Rectangle {
 
     VerticalLayout {
         ComboBox {
-            model: [
-                @tr("All Universes"),
-                @tr("Universe 1"),
-                @tr("Universe 2"),
-                @tr("Universe 3"),
-                @tr("Universe 4")
-            ];
+            model: Adopter.universes;
             selected(_current-value) => {
                 Adopter.universe-changed(self.current-index)
             }

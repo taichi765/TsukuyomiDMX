@@ -24,6 +24,7 @@ global Adopter {
         }
     ];
     in property <[string]> current-fixture-modes;
+    in property <[string]> universes;
     /// Returns error message. Empty when there's no error.
     callback patch(universe: string, address: int, fixture-id: string, mode: string, pos: Point) -> string;
     callback toggle-expand-manufacturer(name: string);
@@ -64,7 +65,7 @@ export component FixtureDefPanel inherits VerticalLayout {
     if selected-fixture-id != "":FixtureSingleView {
         fixture-id: selected-fixture-id;
         // TODO: hard code
-        universes: ["Universe 1", "Universe 2"];
+        universes: Adopter.universes;
         modes: Adopter.current-fixture-modes;
         address-default: next-address-cache;
 

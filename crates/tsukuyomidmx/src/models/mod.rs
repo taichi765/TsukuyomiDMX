@@ -8,6 +8,8 @@ mod universe_view;
 pub use universe_view::UniverseViewModel;
 mod preview_2d;
 pub use preview_2d::Preview2DModel;
+mod universe;
+pub use universe::UniverseModel;
 
 #[cfg(test)]
 mod test_helpers {

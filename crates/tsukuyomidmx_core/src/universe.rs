@@ -2,6 +2,8 @@
 pub struct UniverseId(u8);
 
 impl UniverseId {
+    pub const MIN: Self = Self(0);
+
     pub fn new(v: u8) -> Self {
         Self(v)
     }
