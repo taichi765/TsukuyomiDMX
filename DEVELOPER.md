@@ -10,7 +10,22 @@
 - Adapterでout propertyは使わない。
 - Adapterのcallbackはメッセージとしてのみ使う。バインドしたい場合はコールバックの返り値をバインドするのではなく、コールバックがin propertyを更新するようにする(Adapterのcallbackが純粋であることは誰も保証してくれないため)。
 - コンポーネント間で共有される状態はすべてAppStateにまとめる(Redux・TEA的アプローチ)。状態の更新はupdateを介してのみ行う。
-- 
+- クロージャにmoveする前準備は以下のようにブロックを作って行う。個人的にそのほうが見やすいので。
+```rust
+// Good
+adopter.on_click({
+    let ui_handle = ui.as_weak();
+    move||{
+        let ui = ui_handle.unwrap();
+    }
+})
+
+// Bad
+let ui_handle = ui.as_weak();
+adopter.on_click(||{
+    let ui = ui_handle.unwrap();
+})
+```
 
 ## Directory structure
 - `containers/` are components to handle Store and pass properties to children views.
