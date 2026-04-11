@@ -1,4 +1,6 @@
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct UniverseId(u8);
 
 impl UniverseId {
@@ -18,7 +20,7 @@ impl UniverseId {
 }
 
 /// DmxAddress with bound 1..=512.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DmxAddress(usize);
 
 impl DmxAddress {

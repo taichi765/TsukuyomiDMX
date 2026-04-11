@@ -18,6 +18,8 @@ derive-getters = { workspace = true }
 tracing-subscriber = { version = "0.3.0", features = ["env-filter"] }
 uuid = { workspace = true }
 tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 wgpu = { workspace = true }
 derive_more = { workspace = true, features = ["debug"] }
 

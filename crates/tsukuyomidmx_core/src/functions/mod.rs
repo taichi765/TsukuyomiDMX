@@ -11,6 +11,8 @@
 //pub use static_scene::SceneValue;
 //pub use static_scene::StaticSceneData;
 
+use serde::{Deserialize, Serialize};
+
 use crate::doc::DocStateView;
 use crate::fixture::FixtureId;
 use std::collections::HashMap;
@@ -27,7 +29,7 @@ pub trait FunctionRuntime: Send {
 /// bind_to()でFixtureに関連付けたあとのfunction.
 ///
 /// Goboなどmodel-specificなチャンネルを制御する。
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Function {
     Simple(SimpleFunction),
     Sequence(SequenceFunction),
@@ -56,7 +58,7 @@ impl Function {
 /// bind_to()でFixtureに関連付けられる前のfunction.
 ///
 /// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum FunctionPrototype {
     Simple(SimpleFunctionPrototype),
     Sequence(SequenceFunctionPrototype),
@@ -132,14 +134,15 @@ pub enum FunctionCommand {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SimpleFunctionPrototype {
     id: FunctionPrototypeId,
     dimmer: Option<u8>,
     color: Option<[u8; 3]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "SimpleFunctionDto", into = "SimpleFunctionDto")]
 pub struct SimpleFunction {
     id: AppliedFunctionId,
     /// (id, offset) -> value
@@ -147,6 +150,22 @@ pub struct SimpleFunction {
 }
 
 pub struct SimpleFunctionRuntime(AppliedFunctionId);
+
+/// DTO for [`SimpleFunction`].
+///
+/// DTO is requied because the key type of `HashMap` in [`SimpleFunction`] is not string.
+#[derive(Serialize, Deserialize)]
+struct SimpleFunctionDto {
+    id: AppliedFunctionId,
+    values: Vec<SimpleFunctionValueDto>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SimpleFunctionValueDto {
+    fxt_id: FixtureId,
+    offset: usize,
+    value: u8,
+}
 
 impl SimpleFunctionPrototype {
     fn bind_to_inner(
@@ -245,19 +264,49 @@ impl FunctionRuntime for SimpleFunctionRuntime {
     }
 }
 
-#[derive(Debug)]
+impl From<SimpleFunction> for SimpleFunctionDto {
+    fn from(value: SimpleFunction) -> Self {
+        Self {
+            id: value.id,
+            values: value
+                .values
+                .into_iter()
+                .map(|((fxt_id, offset), value)| SimpleFunctionValueDto {
+                    fxt_id: fxt_id,
+                    offset: offset,
+                    value: value,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<SimpleFunctionDto> for SimpleFunction {
+    fn from(value: SimpleFunctionDto) -> Self {
+        Self {
+            id: value.id,
+            values: value
+                .values
+                .into_iter()
+                .map(|v| ((v.fxt_id, v.offset), v.value))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SequenceFunctionPrototype {
     // TODO: Box<dyn AppliedFunction>のみ or Box<dyn FunctionPrototype>のみにしたい
     steps: Vec<SequenceStep<FunctionPrototype, FunctionPrototypeId>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceFunction {
     id: AppliedFunctionId,
     steps: Vec<SequenceStep<Function, AppliedFunctionId>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceStep<T, U> {
     /// fade_in, fade_outを除いた時間
     duration: Duration,
@@ -266,7 +315,7 @@ pub struct SequenceStep<T, U> {
     body: FunctionBodyOrId<T, U>, // TODO: 他のFunctionのIdを持っておいたほうが良いのでは？
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 enum FunctionBodyOrId<T, U> {
     Body(T),
     Id(U),
@@ -337,6 +386,13 @@ impl SequenceFunctionPrototype {
 }
 
 impl SequenceFunction {
+    pub fn new(steps: Vec<SequenceStep<Function, AppliedFunctionId>>) -> Function {
+        Function::Sequence(Self {
+            id: AppliedFunctionId::new(),
+            steps,
+        })
+    }
+
     fn create_runtime_inner(&self, doc: DocStateView) -> Box<dyn FunctionRuntime> {
         Box::new(SequenceFunctionRuntime {
             fun_id: self.id,
@@ -391,10 +447,10 @@ impl<T, U> SequenceStep<T, U> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelFunctionPrototype {}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelFunction {
     id: AppliedFunctionId,
 }
@@ -436,4 +492,55 @@ mod tests {
 
     #[test]
     fn sequence_run_works() {}
+
+    #[test]
+    fn simple_function_is_serialized_and_deserialized_correctly() {
+        let fxt_id = FixtureId::new();
+        let fun = SimpleFunction::new(
+            vec![((fxt_id, 0usize), 255u8), ((fxt_id, 1), 200)]
+                .into_iter()
+                .collect(),
+        );
+
+        let json = serde_json::to_string(&fun).unwrap();
+
+        let deserialized: Function = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(fun, deserialized);
+    }
+
+    #[test]
+    fn sequence_function_is_serialized_and_deserialized_correctly() {
+        let fxt_id = FixtureId::new();
+        let simple = SimpleFunction::new(
+            vec![((fxt_id, 3), 123), ((fxt_id, 4), 100)]
+                .into_iter()
+                .collect(),
+        );
+        let fun = SequenceFunction::new(vec![
+            SequenceStep {
+                duration: Duration::from_millis(500),
+                fade_in: Duration::ZERO,
+                fade_out: Duration::ZERO,
+                body: FunctionBodyOrId::Body(SimpleFunction::new(
+                    vec![((fxt_id, 0usize), 255u8), ((fxt_id, 1), 200)]
+                        .into_iter()
+                        .collect(),
+                )),
+            },
+            SequenceStep {
+                duration: Duration::from_millis(700),
+                fade_in: Duration::from_millis(100),
+                fade_out: Duration::ZERO,
+                body: FunctionBodyOrId::Id(simple.id()),
+            },
+        ]);
+
+        let json = serde_json::to_string_pretty(&fun).unwrap();
+        println!("{}", json);
+
+        let deserialized: Function = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(fun, deserialized);
+    }
 }

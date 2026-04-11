@@ -1,7 +1,7 @@
 macro_rules! declare_id_newtype {
     ($(#[$outer:meta])* $name:ident) => {
         $(#[$outer])*
-        #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
         pub struct $name(uuid::Uuid);
 
         impl $name {

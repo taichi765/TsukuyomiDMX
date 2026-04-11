@@ -5273,6 +5273,8 @@ dependencies = [
  "i-slint-backend-testing",
  "i-slint-backend-winit",
  "i-slint-core",
+ "serde",
+ "serde_json",
  "slint",
  "slint-build",
  "thiserror 2.0.17",

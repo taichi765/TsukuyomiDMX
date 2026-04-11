@@ -1,10 +1,14 @@
+use anyhow::Context;
 use i_slint_backend_winit::WinitWindowAccessor;
+use serde::{Serialize, ser::SerializeSeq};
 use slint::{CloseRequestResponse, ComponentHandle, Model, Timer};
 use std::{
     cell::OnceCell,
     collections::HashMap,
     error::Error,
-    path::Path,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
     rc::Rc,
     sync::{
         Arc, Mutex,
@@ -17,7 +21,7 @@ use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
     engine::{Engine, EngineCommand, EngineMessage},
     plugins::Plugin,
-    prelude::{Fixture, FixtureDefId, UniverseId},
+    prelude::{Fixture, FixtureDefId, FixtureId, UniverseId},
 };
 
 use crate::{
@@ -35,6 +39,7 @@ pub struct App {
     pub shared_model_inner: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
     pub universe_configs: HashMap<UniverseId, UniverseConfig>,
+    pub project_path: Option<PathBuf>,
     pub preview2d_timer: OnceCell<Timer>,
 
     // Engine
@@ -44,7 +49,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new_empty() -> Self {
         debug!("creating App instance");
         let doc = Arc::new(Mutex::new(
             Doc::try_new().expect("failed to initialize doc"),
@@ -64,6 +69,7 @@ impl App {
                 universe_model: OnceCell::new(),
             },
             universe_configs: HashMap::new(),
+            project_path: None,
             preview2d_timer: OnceCell::new(),
 
             engine_handle: OnceCell::new(),
@@ -114,7 +120,26 @@ impl App {
         Ok(())
     }
 
-    fn save(&self) {}
+    /// [`project_path`][App::project_path]に保存する。
+    fn save(&self) -> Result<(), anyhow::Error> {
+        let doc = self.doc.lock().unwrap().state_view();
+
+        let fxt_file_path = self
+            .project_path
+            .as_ref()
+            .expect("todo: ダイアログ出す")
+            .join("fixtures.json");
+        let mut fxt_file = File::create(&fxt_file_path)
+            .with_context(|| format!("file {:?} does not exist", &fxt_file_path))?;
+        doc.with_fixtures(|it| {
+            let seq = FixturesSeq(it);
+            serde_json::to_writer_pretty(&mut fxt_file, &seq).with_context(|| {
+                format!("failed to serialize fixtures to file {:?}", fxt_file_path)
+            })
+        })?;
+        fxt_file.flush().unwrap();
+        Ok(())
+    }
 
     /// Maximize, Toggle fullscreenなどの初期化
     #[instrument(skip_all)]
@@ -232,5 +257,39 @@ impl UniverseConfig {
 
     pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
         &self.output_plugins
+    }
+}
+
+/// Serialize `HashMap<FixtureId, Fixture>` without collecting items to `Vec`.
+///
+/// `HashMap<FixtureId, Fixture>` can't be serialized to JSON directory due to its key type.
+/// Plus, Map doesn't make sense as JSON because id exists in Fixture so it's redundant.
+/// However, collecting entire items to `Vec` is not memory-efficient,
+/// so [`serialize_seq()`] is suitable here.
+///
+/// [`serialize_seq()`]:serde::Serializer::serialize_seq
+struct FixturesSeq<'a>(&'a HashMap<FixtureId, Fixture>);
+
+impl<'a> Serialize for FixturesSeq<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+
+        for (_, fxt) in self.0.iter() {
+            seq.serialize_element(fxt)?;
+        }
+
+        seq.end()
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixtures_seq_serializes_correctly() {
+        todo!()
     }
 }
