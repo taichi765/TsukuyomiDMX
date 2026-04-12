@@ -4,14 +4,15 @@ use std::{
 };
 
 use crate::{
-    doc::def_registry::FixtureDefRegistry,
+    doc::{AddressIndexConstructError, FixtureDefNotFoundError, def_registry::FixtureDefRegistry},
     fixture::{Fixture, FixtureId},
     functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
     prelude::{DmxAddress, UniverseId},
 };
 
 /// Get fixture id by address.
-pub type AddressIndex = HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>;
+#[derive(derive_more::Deref)]
+pub struct AddressIndex(HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>);
 
 /// Single source of true.
 ///
@@ -61,6 +62,24 @@ impl DocState {
         }
     }
 
+    pub fn from_existing_data(
+        def_registry: Box<dyn FixtureDefRegistry>,
+        fixtures: HashMap<FixtureId, Fixture>,
+        functions: HashMap<AppliedFunctionId, Function>,
+        function_prototypes: HashMap<FunctionPrototypeId, FunctionPrototype>,
+        universes: HashSet<UniverseId>,
+    ) -> Result<Self, AddressIndexConstructError> {
+        let index = AddressIndex::from_fixtures(&fixtures, def_registry.as_ref())?;
+        Ok(Self {
+            fixtures: RwLock::new(fixtures),
+            fixture_defs: RwLock::new(def_registry),
+            functions: RwLock::new(functions),
+            function_prototypes: RwLock::new(function_prototypes),
+            universes: RwLock::new(universes),
+            address_index: RwLock::new(index),
+        })
+    }
+
     pub(super) fn load_defs(&self) -> Result<(), std::io::Error> {
         self.fixture_defs.write().unwrap().load()
     }
@@ -89,5 +108,61 @@ impl DocState {
 
     pub fn universes(&self) -> Vec<UniverseId> {
         self.universes.read().unwrap().iter().cloned().collect()
+    }
+}
+
+impl AddressIndex {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn from_fixtures(
+        fixtures: &HashMap<FixtureId, Fixture>,
+        defs: &dyn FixtureDefRegistry,
+    ) -> Result<Self, AddressIndexConstructError> {
+        let data = fixtures
+            .iter()
+            .try_fold(HashMap::new(), |mut acc, (_, fxt)| {
+                let def = defs
+                    .get(fxt.fixture_def())
+                    .map_err(|e| FixtureDefNotFoundError {
+                        fixture_id: fxt.id(),
+                        fixture_def_id: fxt.fixture_def().to_owned(),
+                        source: e,
+                    })?;
+                def.mode(fxt.fixture_mode())
+                    .unwrap()
+                    .occupied_addresses(fxt.universe_id(), fxt.address())
+                    .enumerate()
+                    .for_each(|(offset, (univ, adr))| {
+                        acc.insert((univ, adr), (fxt.id(), offset));
+                    });
+                Ok::<_, AddressIndexConstructError>(acc)
+            })?;
+        Ok(Self(data))
+    }
+
+    pub fn insert(
+        &mut self,
+        univ: UniverseId,
+        adr: DmxAddress,
+        fxt_id: FixtureId,
+        offset: usize,
+    ) -> Option<(FixtureId, usize)> {
+        self.0.insert((univ, adr), (fxt_id, offset))
+    }
+
+    pub fn remove(&mut self, univ: UniverseId, adr: DmxAddress) -> Option<(FixtureId, usize)> {
+        self.0.remove(&(univ, adr))
+    }
+
+    pub fn get(&self, univ: UniverseId, adr: DmxAddress) -> Option<&(FixtureId, usize)> {
+        self.0.get(&(univ, adr))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (UniverseId, DmxAddress, FixtureId, usize)> {
+        self.0
+            .iter()
+            .map(|((univ, adr), (fxt_id, offset))| (*univ, *adr, *fxt_id, *offset))
     }
 }

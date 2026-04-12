@@ -54,7 +54,7 @@ mod fixtures {
             self.occupied_addresses
                 .enumerate()
                 .for_each(|(offset, (u_id, adr))| {
-                    let _ = state.with_address_index_mut(|it| it.insert((u_id, adr), (id, offset)));
+                    let _ = state.with_address_index_mut(|it| it.insert(u_id, adr, id, offset));
                 });
 
             // Add to fixtures
@@ -106,15 +106,14 @@ mod fixtures {
             });
 
             self.old_occupied_addresses.clone().for_each(|(uni, adr)| {
-                let _ = state.with_address_index_mut(|index| index.remove(&(uni, adr)));
+                let _ = state.with_address_index_mut(|index| index.remove(uni, adr));
             });
             self.new_occupied_addresses
                 .clone()
                 .enumerate()
                 .for_each(|(offset, (uni, adr))| {
-                    let _ = state.with_address_index_mut(|index| {
-                        index.insert((uni, adr), (self.id, offset))
-                    });
+                    let _ = state
+                        .with_address_index_mut(|index| index.insert(uni, adr, self.id, offset));
                 });
 
             let (id, change) = (self.id, self.change);
@@ -160,7 +159,7 @@ mod fixtures {
                     .occupied_addresses(removed.universe_id(), removed.address())
             });
             occupied_addresses.clone().for_each(|(uni, adr)| {
-                let _ = state.with_address_index_mut(|index| index.remove(&(uni, adr)));
+                let _ = state.with_address_index_mut(|index| index.remove(uni, adr));
             });
             (
                 Box::new(AddFixtureCommand::new(removed, occupied_addresses)),

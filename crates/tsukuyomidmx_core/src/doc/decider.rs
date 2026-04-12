@@ -177,7 +177,7 @@ fn validate_fixture_address(
     let mut conflicts = Vec::new();
 
     for (new_offset, (new_uni, new_adr)) in occupied_addresses.enumerate() {
-        if let Some((existing_fixture_id, offset)) = address_index.get(&(new_uni, new_adr)) {
+        if let Some((existing_fixture_id, offset)) = address_index.get(new_uni, new_adr) {
             if *existing_fixture_id == fixture_id {
                 continue;
             }

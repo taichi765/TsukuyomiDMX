@@ -7,7 +7,11 @@ mod def_registry;
 pub use def_registry::*;
 mod state;
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 
 use crate::{
     doc::state::{AddressIndex, DocState},
@@ -61,6 +65,32 @@ impl Doc {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
         }
+    }
+
+    pub fn from_existing_data(
+        fixtures: HashMap<FixtureId, Fixture>,
+        functions: HashMap<AppliedFunctionId, Function>,
+        function_prototypes: HashMap<FunctionPrototypeId, FunctionPrototype>,
+        universes: HashSet<UniverseId>,
+    ) -> Result<Self, AddressIndexConstructError> {
+        let def_resource_path = {
+            let mut p = dirs::data_local_dir().unwrap();
+            p.push("tsukuyomidmx");
+            p.push("fixtures");
+            p
+        };
+        Ok(Self {
+            state: Arc::new(DocState::from_existing_data(
+                Box::new(FixtureDefRegistryImpl::new(def_resource_path)),
+                fixtures,
+                functions,
+                function_prototypes,
+                universes,
+            )?),
+            subscribers: Vec::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+        })
     }
 
     pub fn state_view(&self) -> DocStateView {
@@ -311,8 +341,8 @@ impl DocStateView {
         self.with_address_index(|index| {
             index
                 .iter()
-                .filter(|((u_id, _), _)| *u_id == universe)
-                .map(|e| e.0.1)
+                .filter(|(u_id, _, _, _)| *u_id == universe)
+                .map(|e| e.1)
                 .max()
         })
     }

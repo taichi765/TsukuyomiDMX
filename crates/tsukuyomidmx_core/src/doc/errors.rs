@@ -115,3 +115,9 @@ pub enum RemoveFunctionError {
     #[error("cannot find function {0:?}")]
     FunctionNotFound(AppliedFunctionId),
 }
+
+#[derive(Debug, Error)]
+pub enum AddressIndexConstructError {
+    #[error(transparent)]
+    FixtureDefNotFound(#[from] FixtureDefNotFoundError),
+}

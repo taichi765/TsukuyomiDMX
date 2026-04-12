@@ -69,7 +69,7 @@ impl FixtureInfoProvider for DocStateView {
         address: DmxAddress,
         _value: u8,
     ) -> Option<(FixtureId, CapabilityKind)> {
-        let (fxt_id, offset) = self.with_address_index(|it| it.get(&(univ, address)).cloned())?;
+        let (fxt_id, offset) = self.with_address_index(|it| it.get(univ, address).cloned())?;
         let cap = self.with_fixtures_and_defs(|fxts, defs| {
             let fxt = fxts.get(&fxt_id).unwrap();
             let def = defs.get(fxt.fixture_def()).unwrap();
