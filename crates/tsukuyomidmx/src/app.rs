@@ -1,7 +1,7 @@
 use anyhow::Context;
 use i_slint_backend_winit::WinitWindowAccessor;
 use i_slint_core::{input::KeyEventType, items::EventResult};
-use serde::{Serialize, ser::SerializeSeq};
+use serde::{Deserialize, Serialize, ser::SerializeSeq};
 use slint::{CloseRequestResponse, ComponentHandle, Model, Timer, language::KeyboardModifiers};
 use std::{
     cell::OnceCell,
@@ -21,6 +21,7 @@ use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
     engine::{Engine, EngineCommand, EngineMessage},
+    functions::{Function, FunctionPrototype},
     plugins::Plugin,
     prelude::{Fixture, FixtureDefId, FixtureId, UniverseId},
 };
@@ -40,7 +41,7 @@ pub struct App {
     pub shared_model_inner: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
     pub universe_configs: HashMap<UniverseId, UniverseConfig>,
-    pub project_path: Mutex<Option<PathBuf>>,
+    project_path: Mutex<Option<PathBuf>>,
     pub keymap: HashMap<(), Box<dyn Action>>,
     pub preview2d_timer: OnceCell<Timer>,
 
@@ -81,8 +82,81 @@ impl App {
         }
     }
 
-    pub fn from_dir(dir: &Path) -> Self {
-        todo!()
+    pub fn from_dir(dir: &Path) -> Result<Self, anyhow::Error> {
+        debug!("creating App instance");
+        let fxt_file_path = dir.join("fixtures.json");
+        let fxt_file = File::open(&fxt_file_path)
+            .with_context(|| format!("failed to open file {:?}", fxt_file_path))?;
+        // OPTIM: ストリーミングでVecを介さずにHashMapに変換できると嬉しいかも
+        let fixtures: Vec<Fixture> = serde_json::from_reader(&fxt_file)
+            .with_context(|| format!("failed to deserialize fixtures from {:?}", fxt_file_path))?;
+        let fixtures = fixtures.into_iter().map(|fxt| (fxt.id(), fxt)).collect();
+
+        let functions_dir = dir.join("functions");
+        let functions =
+            std::fs::read_dir(functions_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
+                let entry = entry?;
+                let file = File::open(entry.path())
+                    .with_context(|| format!("failed to open file {:?}", entry.path()))?;
+                let fun: Function = serde_json::from_reader(&file).with_context(|| {
+                    format!("failed to deserialize function from {:?}", entry.path())
+                })?;
+                acc.insert(fun.id(), fun);
+                anyhow::Ok(acc)
+            })?;
+
+        let prototypes_dir = dir.join("function-prototypes");
+        let function_prototypes =
+            std::fs::read_dir(prototypes_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
+                let entry = entry?;
+                let file = File::open(entry.path())
+                    .with_context(|| format!("failed to open file {:?}", entry.path()))?;
+                let proto: FunctionPrototype =
+                    serde_json::from_reader(&file).with_context(|| {
+                        format!(
+                            "failed to deserialize function prototype from {:?}",
+                            entry.path()
+                        )
+                    })?;
+                acc.insert(proto.id(), proto);
+                anyhow::Ok(acc)
+            })?;
+
+        let universes_path = dir.join("universes.json");
+        let universes_file = File::open(&universes_path)
+            .with_context(|| format!("failed to open file {:?}", universes_path))?;
+        let univ_dto: UniverseConfigListDto = serde_json::from_reader(&universes_file)
+            .with_context(|| {
+                format!("failed to deserialize universes from {:?}", universes_path)
+            })?;
+        let universes = univ_dto.data.iter().map(|(u_id, _)| *u_id).collect();
+        let universe_cfgs: HashMap<UniverseId, UniverseConfig> = univ_dto.into();
+
+        let doc = Arc::new(Mutex::new(Doc::from_existing_data(
+            fixtures,
+            functions,
+            function_prototypes,
+            universes,
+        )?));
+
+        Ok(Self {
+            doc: Arc::clone(&doc),
+            ui: ui::AppWindow::new().unwrap(),
+            state: AppState {},
+            dispatcher: Self::create_dispatcher(),
+            shared_model_inner: SharedInnerModel {
+                fixture_model: OnceCell::from(FixtureModel::create(&mut doc.lock().unwrap())),
+                def_model: OnceCell::from(FixtureDefModel::create(&mut doc.lock().unwrap())),
+                universe_model: OnceCell::from(UniverseModel::new(&mut doc.lock().unwrap())),
+            },
+            universe_configs: universe_cfgs,
+            project_path: Mutex::new(Some(dir.to_path_buf())),
+            keymap: HashMap::new(),
+            preview2d_timer: OnceCell::new(),
+            engine_handle: Mutex::new(OnceCell::new()),
+            command_tx: OnceCell::new(),
+            error_rx: OnceCell::new(),
+        })
     }
 
     pub fn run(self: Arc<Self>) -> Result<(), Box<dyn Error>> {
@@ -133,6 +207,7 @@ impl App {
     fn save(&self) -> Result<(), anyhow::Error> {
         self.save_fixtures()?;
         self.save_functions()?;
+        self.seva_universes()?;
 
         Ok(())
     }
@@ -184,6 +259,15 @@ impl App {
             }
             Ok(())
         })
+    }
+
+    fn seva_universes(&self) -> Result<(), anyhow::Error> {
+        let path = self.get_project_path().join("universes.json");
+        let mut file = File::create(path)?;
+        let dto = UniverseConfigListDto::from(self.universe_configs.clone());
+        serde_json::to_writer(&file, &dto)?;
+        file.flush().unwrap();
+        Ok(())
     }
 
     /// Maximize, Toggle fullscreenなどの初期化
@@ -318,7 +402,7 @@ impl Dispatcher {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OutputPluginInfo {
     Artnet { target_ip: String },
     FTDI,
@@ -337,7 +421,7 @@ impl OutputPluginInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UniverseConfig {
     output_plugins: HashMap<OutputPluginId, OutputPluginInfo>,
 }
@@ -351,6 +435,38 @@ impl UniverseConfig {
 
     pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
         &self.output_plugins
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct UniverseConfigListDto {
+    data: Vec<(UniverseId, Vec<(OutputPluginId, OutputPluginInfo)>)>,
+}
+
+impl From<HashMap<UniverseId, UniverseConfig>> for UniverseConfigListDto {
+    fn from(value: HashMap<UniverseId, UniverseConfig>) -> Self {
+        Self {
+            data: value
+                .into_iter()
+                .map(|(u_id, cfg)| (u_id, cfg.output_plugins.into_iter().collect()))
+                .collect(),
+        }
+    }
+}
+
+impl Into<HashMap<UniverseId, UniverseConfig>> for UniverseConfigListDto {
+    fn into(self) -> HashMap<UniverseId, UniverseConfig> {
+        self.data
+            .into_iter()
+            .map(|(u_id, plugins)| {
+                (
+                    u_id,
+                    UniverseConfig {
+                        output_plugins: plugins.into_iter().collect(),
+                    },
+                )
+            })
+            .collect()
     }
 }
 
