@@ -1,76 +1,89 @@
 import { Icons } from "styling.slint";
 
-export component TitleBar inherits HorizontalLayout {
+export component TitleBar {
+    in property <string> project-path:"dummy";
     callback minimize();
     callback toggle-fullscreen();
     callback close();
     callback show-tooltip(has-hover: bool, x: length, y: length, msg: string);
-    alignment: LayoutAlignment.end;
-            //height: 10%;
-            minimize-rect := Rectangle {
-        Image {
-            source: Icons.minimize;
-            colorize: white;
-        }
 
-        ta1 := TouchArea {
-            clicked => {
-                root.minimize();
-            }
-            changed has-hover => {
-                root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Minimize window");
-            }
+    HorizontalLayout {
+        alignment: LayoutAlignment.center;
+        Text {
+            text: project-path;
+            // TODO: hardcode
+            font-size: 16px;
         }
-
-        states [
-            hovered when ta1.has-hover: {
-                minimize-rect.background: grey;
-            }
-        ]
     }
 
-    maximize-rect := Rectangle {
-        Image {
-            source: Icons.maximize;
-            //TODO: restoreとmaximizeの切り替え
-                    colorize: white;
+    HorizontalLayout {
+        alignment: LayoutAlignment.end;
+
+        minimize-rect := Rectangle {
+            Image {
+                source: Icons.minimize;
+                colorize: white;
+            }
+
+            ta1 := TouchArea {
+                clicked => {
+                    root.minimize();
+                }
+                changed has-hover => {
+                    root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Minimize window");
+                }
+            }
+
+            states [
+                hovered when ta1.has-hover: {
+                    minimize-rect.background: grey;
+                }
+            ]
         }
 
-        ta2 := TouchArea {
-            clicked => {
-                root.toggle-fullscreen();
+        maximize-rect := Rectangle {
+            Image {
+                source: Icons.maximize;
+                //TODO: restoreとmaximizeの切り替え
+                        colorize: white;
             }
-            changed has-hover => {
-                root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Maximize window");
+
+            ta2 := TouchArea {
+                clicked => {
+                    root.toggle-fullscreen();
+                }
+                changed has-hover => {
+                    root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Maximize window");
+                }
             }
+
+            states [
+                hovered when ta2.has-hover: {
+                    maximize-rect.background: grey;
+                }
+            ]
         }
 
-        states [
-            hovered when ta2.has-hover: {
-                maximize-rect.background: grey;
+        close-rect := Rectangle {
+            Image {
+                source: Icons.close;
+                colorize: white;
             }
-        ]
-    }
 
-    close-rect := Rectangle {
-        Image {
-            source: Icons.close;
-            colorize: white;
+            ta3 := TouchArea {
+                clicked => {
+                    root.close();
+                }
+                changed has-hover => {
+                    root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Close window");
+                }
+            }
+
+            states [
+                hovered when ta3.has-hover: {
+                    close-rect.background: red;
+                }
+            ]
         }
-
-        ta3 := TouchArea {
-            clicked => {
-                root.close();
-            }
-            changed has-hover => {
-                root.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, "Close window");
-            }
-        }
-
-        states [
-            hovered when ta3.has-hover: {
-                close-rect.background: red;
-            }
-        ]
     }
 }

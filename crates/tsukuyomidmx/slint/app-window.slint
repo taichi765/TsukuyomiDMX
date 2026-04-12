@@ -46,6 +46,7 @@ export component AppWindow inherits Window {
     // TODO: in propertyにすべき
     in-out property <string> error-message <=> GlobalMessage.error-message;
     in property <image> texture;
+    in property <string> project-path;
     out property <TopLevelTabs> current-tab: index-to-tabs-enum(main-pane.current-index);
     out property <EditorTabs> editor-tab-current-index: editor-tab.current-index;
 
@@ -150,6 +151,7 @@ export component AppWindow inherits Window {
         if Platform.os != OperatingSystemType.macos:title-bar := VerticalLayout {
             TitleBar {
                 height: 32px;
+                project-path: root.project-path;
                 minimize => root.minimize();
                 toggle-fullscreen => root.toggle-fullscreen();
                 close => root.close();

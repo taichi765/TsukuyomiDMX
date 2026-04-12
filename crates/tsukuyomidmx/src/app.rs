@@ -2,7 +2,10 @@ use anyhow::Context;
 use i_slint_backend_winit::WinitWindowAccessor;
 use i_slint_core::{input::KeyEventType, items::EventResult};
 use serde::{Deserialize, Serialize, ser::SerializeSeq};
-use slint::{CloseRequestResponse, ComponentHandle, Model, Timer, language::KeyboardModifiers};
+use slint::{
+    CloseRequestResponse, ComponentHandle, Model, Timer, ToSharedString,
+    language::KeyboardModifiers,
+};
 use std::{
     cell::OnceCell,
     collections::HashMap,
@@ -139,15 +142,18 @@ impl App {
             universes,
         )?));
 
+        let ui = ui::AppWindow::new().unwrap();
+        ui.set_project_path(dir.to_str().unwrap().to_shared_string());
+
         Ok(Self {
             doc: Arc::clone(&doc),
-            ui: ui::AppWindow::new().unwrap(),
+            ui,
             state: AppState {},
             dispatcher: Self::create_dispatcher(),
             shared_model_inner: SharedInnerModel {
-                fixture_model: OnceCell::from(FixtureModel::create(&mut doc.lock().unwrap())),
-                def_model: OnceCell::from(FixtureDefModel::create(&mut doc.lock().unwrap())),
-                universe_model: OnceCell::from(UniverseModel::new(&mut doc.lock().unwrap())),
+                fixture_model: OnceCell::new(),
+                def_model: OnceCell::new(),
+                universe_model: OnceCell::new(),
             },
             universe_configs: universe_cfgs,
             project_path: Mutex::new(Some(dir.to_path_buf())),
