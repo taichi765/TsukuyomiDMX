@@ -13,6 +13,7 @@ mod test_helpers;
 
 use std::cell::RefCell;
 use std::error::Error;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, RwLock, Weak, mpsc};
@@ -62,7 +63,13 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
     // TODO: language switch(preferences)
     slint::init_translations!(concat!(env!("CARGO_MANIFEST_DIR"), "/translations/"));
 
-    let app = Arc::new(App::new_empty());
+    let mut args = std::env::args();
+    let app = if let Some(project_path) = args.nth(1) {
+        Arc::new(App::from_dir(Path::new(&project_path))?)
+    } else {
+        Arc::new(App::new_empty())
+    };
+
     app.run()?;
     Ok(())
 }
