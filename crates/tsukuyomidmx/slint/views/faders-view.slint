@@ -49,7 +49,8 @@ export component FadersView inherits Rectangle {
                 title: @tr("Dimmer");
                 Fader {
                     icon: Icons.dimmer;
-                    slider-height: parent.height * 0.8;
+                    slider-height: 80px;
+                    //parent.height * 0.8;
                     value-changed(value) => {
                         root.values.dimmer = round(value);
                         FadersStore.value-changed(fixture-id, "Dimmer",value);
@@ -59,7 +60,7 @@ export component FadersView inherits Rectangle {
 
             Tab {
                 title: @tr("Color");
-                property <length> slider-height: self.height * 0.8;
+                //property <length> slider-height: self.height * 0.8;
                 HorizontalLayout {
                     Fader {
                         slider-height: 80px;
