@@ -162,18 +162,26 @@ export component AppWindow inherits Window {
             BorderHorz { }
         }
 
-        content := HorizontalLayout {
-            left := LeftPanel {
-                //width: self.is-expanded ? content.width * 0.25 : 52px;
-                // FIXME: hard code
-                show-tooltip(has-hover, x, y, msg) => tooltip.show-tooltip(has-hover, x, y, msg);
-            }
+        content := Rectangle {
+            top := Rectangle {
+                y: 0;
+                height: content.height * 0.7;
 
-            BorderVert { }
+                left := LeftPanel {
+                    x: 0;
+                    width: content.width * 0.25;
 
-            center := VerticalLayout {
+                    show-tooltip(has-hover, x, y, msg) => tooltip.show-tooltip(has-hover, x, y, msg);
+                }
+
+                BorderVert {
+                    x: left.width;
+                }
+
                 main-pane := TabWidget {
-                    //height: 70%;
+                    x: left.width;
+                    width: content.width * 0.5;
+
                     Tab {
                         title: @tr("Editor");
                         editor-tab := EditorTab {
@@ -193,22 +201,36 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                BorderHorz { }
-
-                bottom-panel := HorizontalLayout {
-                    //height: 30%;
-                    //HorizontalSplit {}
-
-                    Rectangle {
-                        Text {
-                            text: "something?";
-                        }
-                    }
-
-                    BorderVert { }
-
-                    FadersView { }
+                BorderVert {
+                    x: left.width + main-pane.width;
                 }
+
+                right := RightPanel {
+                    x: left.width + main-pane.width;
+                    width: content.width * 0.25;
+                }
+            }
+
+            BorderHorz {
+                y: top.height;
+            }
+
+            bottom-panel := HorizontalLayout {
+                y: top.height;
+                height: content.height * 0.3;
+
+                //height: 30%;
+                //HorizontalSplit {}
+
+                Rectangle {
+                    Text {
+                        text: "something?";
+                    }
+                }
+
+                BorderVert { }
+
+                FadersView { }
             }
         }
     }
