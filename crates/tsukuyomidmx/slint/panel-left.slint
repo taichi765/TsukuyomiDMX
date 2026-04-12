@@ -1,7 +1,7 @@
 import { LeftSideBar } from "left-side-bar.slint";
-import { FixtureListView } from "views/fixture-list-view.slint";
 import { BorderVert, BorderHorz } from "styling.slint";
 import { FixtureDefPanel } from "./containers/fixture-def-panel.slint";
+import { FunctionListView } from "views/function-list-view.slint";
 export component LeftPanel inherits Rectangle {
     // current-indexが-1のとき何も表示しない
     property <int> current-index <=> side-var.current-index;
@@ -17,11 +17,7 @@ export component LeftPanel inherits Rectangle {
 
         if current-index != -1: content := Rectangle {
             if current-index == 0:fixture-panel := FixtureDefPanel { }
-            if current-index == 1:function-panel := Rectangle {
-                Text {
-                    text: "this is function list view!";
-                }
-            }
+            if current-index == 1:function-panel := FunctionListView { }
         }
     }
 }

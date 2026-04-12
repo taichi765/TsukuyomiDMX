@@ -1,0 +1,90 @@
+
+
+import { LargeText, PlaneText } from "../parts/texts.slint";
+import { Icons } from "../styling.slint";
+
+export enum FunctionType{
+    Simple,
+    Sequence,
+    Parallel,
+    SimplePrototype,
+    SequencePrototype,
+    ParallelPrototype
+}
+
+export struct FunctionData {
+    id: string,
+    type: FunctionType,
+    name: string,
+}
+
+component FunctionListViewItem {
+    in property <string> id;
+    in property <string> name;
+    in property <FunctionType> type;
+    pure function get-image(type: FunctionType) -> image {
+        // TODO: それぞれのアイコンを作る
+        if type == FunctionType.Simple {
+            return Icons.dimmer;
+        }
+        if type == FunctionType.Sequence {
+            return Icons.dimmer;
+        }
+        if type == FunctionType.Parallel {
+            return Icons.dimmer;
+        }
+        if type == FunctionType.SimplePrototype {
+            return Icons.dimmer;
+        }
+        if type == FunctionType.SequencePrototype {
+            return Icons.dimmer;
+        }
+        if type == FunctionType.ParallelPrototype {
+            return Icons.dimmer;
+        }
+
+        // unreachable
+        return Icons.dimmer;
+    }
+    HorizontalLayout {
+        Image {
+            source: get-image(type);
+        }
+
+        PlaneText {
+            text: name;
+        }
+    }
+}
+
+global Adopter {
+    in property <[FunctionData]> model:[
+        // dummy
+        {
+            id:"",
+            type: FunctionType.Simple,
+            name:"Scene 1",
+        },
+        {
+            id: "",
+            type: FunctionType.SequencePrototype,
+            name: "Scene 2",
+        }
+    ];
+}
+
+export { Adopter as FunctionListViewAdopter }
+
+export component FunctionListView {
+    VerticalLayout {
+        LargeText {
+            text: @tr("Functions");
+        }
+
+        for fun in Adopter.model: FunctionListViewItem {
+            id: fun.id;
+            name: fun.name;
+            type: fun.type;
+        }
+    }
+}

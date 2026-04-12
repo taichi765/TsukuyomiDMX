@@ -1,0 +1,38 @@
+import { PlaneText } from "parts/texts.slint";
+import { Button } from "std-widgets.slint";
+import { Icons } from "styling.slint";
+import { SimpleFunctionView } from "views/simple-function-view.slint";
+export component RightPanel inherits Rectangle {
+    property <bool> is-hidden;
+    if !is-hidden:VerticalLayout {
+        HorizontalLayout {
+            height: 32px;
+            alignment: LayoutAlignment.space-between;
+            PlaneText {
+                text: @tr("SimpleFunctionView");
+            }
+
+            close-btn := Rectangle {
+                accessible-role: button;
+                Image {
+                    source: Icons.close;
+                    colorize: white;
+                }
+
+                ta := TouchArea {
+                    clicked => {
+                        is-hidden = true;
+                    }
+                }
+
+                states [
+                    hovered when ta.has-hover: {
+                        close-btn.background: gray;
+                    }
+                ]
+            }
+        }
+
+        SimpleFunctionView { }
+    }
+}
