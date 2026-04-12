@@ -49,10 +49,13 @@ export component AppWindow inherits Window {
     out property <TopLevelTabs> current-tab: index-to-tabs-enum(main-pane.current-index);
     out property <EditorTabs> editor-tab-current-index: editor-tab.current-index;
 
+    // Window events
     callback start_drag();
     callback minimize();
     callback toggle-fullscreen();
     callback close();
+
+    callback key-pressed(ev: KeyEvent) -> EventResult;
 
     pure function index-to-tabs-enum(index: int) -> TopLevelTabs {
         if index == 0 {
@@ -252,6 +255,12 @@ export component AppWindow inherits Window {
             clicked => {
                 root.error-message = "";
             }
+        }
+    }
+
+    focus := FocusScope {
+        key-pressed(event) => {
+            root.key-pressed(event)
         }
     }
 

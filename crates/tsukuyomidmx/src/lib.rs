@@ -62,7 +62,7 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
     // TODO: language switch(preferences)
     slint::init_translations!(concat!(env!("CARGO_MANIFEST_DIR"), "/translations/"));
 
-    let mut app = App::new_empty();
+    let app = Arc::new(App::new_empty());
     app.run()?;
     Ok(())
 }

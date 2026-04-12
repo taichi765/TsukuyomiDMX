@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[instrument(skip_all)]
-pub fn setup(app: &mut App) {
+pub fn setup(app: &App) {
     let adopter = app.ui.global::<ui::UniverseViewAdopter>();
     let model_base = Rc::new(UniverseViewModel::new(
         app.shared_model_inner.fixture_model.get().cloned().unwrap(),

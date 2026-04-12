@@ -1,7 +1,8 @@
 use anyhow::Context;
 use i_slint_backend_winit::WinitWindowAccessor;
+use i_slint_core::{input::KeyEventType, items::EventResult};
 use serde::{Serialize, ser::SerializeSeq};
-use slint::{CloseRequestResponse, ComponentHandle, Model, Timer};
+use slint::{CloseRequestResponse, ComponentHandle, Model, Timer, language::KeyboardModifiers};
 use std::{
     cell::OnceCell,
     collections::HashMap,
@@ -11,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, RwLock,
         mpsc::{self, Sender},
     },
     thread,
@@ -39,11 +40,12 @@ pub struct App {
     pub shared_model_inner: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
     pub universe_configs: HashMap<UniverseId, UniverseConfig>,
-    pub project_path: Option<PathBuf>,
+    pub project_path: Mutex<Option<PathBuf>>,
+    pub keymap: HashMap<(), Box<dyn Action>>,
     pub preview2d_timer: OnceCell<Timer>,
 
     // Engine
-    pub engine_handle: OnceCell<thread::JoinHandle<()>>,
+    engine_handle: Mutex<OnceCell<thread::JoinHandle<()>>>,
     pub command_tx: OnceCell<mpsc::Sender<EngineCommand>>,
     pub error_rx: OnceCell<mpsc::Receiver<EngineMessage>>,
 }
@@ -69,10 +71,11 @@ impl App {
                 universe_model: OnceCell::new(),
             },
             universe_configs: HashMap::new(),
-            project_path: None,
+            project_path: Mutex::new(None),
+            keymap: HashMap::new(),
             preview2d_timer: OnceCell::new(),
 
-            engine_handle: OnceCell::new(),
+            engine_handle: Mutex::new(OnceCell::new()),
             command_tx: OnceCell::new(),
             error_rx: OnceCell::new(),
         }
@@ -82,7 +85,7 @@ impl App {
         todo!()
     }
 
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn run(self: Arc<Self>) -> Result<(), Box<dyn Error>> {
         self.shared_model_inner
             .def_model
             .set(FixtureDefModel::create(&mut self.doc.lock().unwrap()))
@@ -96,16 +99,20 @@ impl App {
             .set(UniverseModel::new(&mut self.doc.lock().unwrap()))
             .unwrap();
 
-        fixture_list_view::setup(self);
-        universe_view::setup(self);
+        fixture_list_view::setup(&self);
+        universe_view::setup(&self);
         self.setup_engine();
         self.setup_window();
-        preview_2d::setup(self);
+        preview_2d::setup(&self);
+        self.register_global_actions();
+        self.register_key_bindings();
 
         // TODO: ファイルから読み込む
         (0..2).for_each(|_| self.doc.lock().unwrap().add_universe());
 
         self.ui.run()?;
+
+        // 後片付け
         self.command_tx
             .get()
             .unwrap()
@@ -113,6 +120,8 @@ impl App {
             .unwrap();
 
         self.engine_handle
+            .lock()
+            .unwrap()
             .take()
             .unwrap()
             .join()
@@ -179,7 +188,7 @@ impl App {
 
     /// Maximize, Toggle fullscreenなどの初期化
     #[instrument(skip_all)]
-    fn setup_window(&mut self) {
+    fn setup_window(&self) {
         self.ui.on_start_drag({
             let ui_handle = self.ui.as_weak();
 
@@ -211,7 +220,7 @@ impl App {
     }
 
     #[instrument(skip_all)]
-    fn setup_engine(&mut self) {
+    fn setup_engine(&self) {
         let (command_tx, command_rx) = mpsc::channel::<EngineCommand>();
         let (error_tx, error_rx) = mpsc::channel::<EngineMessage>();
 
@@ -224,7 +233,11 @@ impl App {
                 engine.start_loop()
             })
             .unwrap();
-        self.engine_handle.set(engine_handle).unwrap();
+        self.engine_handle
+            .lock()
+            .unwrap()
+            .set(engine_handle)
+            .unwrap();
         self.command_tx.set(command_tx).unwrap();
         self.error_rx.set(error_rx).unwrap();
     }
@@ -287,9 +300,10 @@ pub struct SharedInnerModel {
     pub universe_model: OnceCell<Rc<UniverseModel>>,
 }
 
-pub enum AppAction {}
+/// [`AppState`]を変更するコマンド
+pub enum AppStateChange {}
 
-pub struct Dispatcher(Rc<dyn Fn(AppAction)>);
+pub struct Dispatcher(Rc<dyn Fn(AppStateChange)>);
 
 impl Clone for Dispatcher {
     /// Cheap clone.
@@ -299,8 +313,8 @@ impl Clone for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn dispatch(&self, action: AppAction) {
-        (self.0)(action)
+    pub fn dispatch(&self, change: AppStateChange) {
+        (self.0)(change)
     }
 }
 
@@ -337,6 +351,18 @@ impl UniverseConfig {
 
     pub fn output_plugins(&self) -> &HashMap<OutputPluginId, OutputPluginInfo> {
         &self.output_plugins
+    }
+}
+
+pub trait Action {
+    fn exec(&self, app: &App) -> Result<(), anyhow::Error>;
+}
+
+struct Save;
+
+impl Action for Save {
+    fn exec(&self, app: &App) -> Result<(), anyhow::Error> {
+        app.save()
     }
 }
 

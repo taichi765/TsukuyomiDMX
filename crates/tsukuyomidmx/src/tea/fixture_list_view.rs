@@ -15,13 +15,13 @@ use tsukuyomidmx_core::{
 use uuid::Uuid;
 
 use crate::{
-    app::{App, AppAction, Dispatcher},
+    app::{App, AppStateChange, Dispatcher},
     models::{FixtureDefModel, ManufacturerModel, UniverseModel},
     ui,
 };
 
 #[instrument(skip_all)]
-pub fn setup(app: &mut App) {
+pub fn setup(app: &App) {
     let doc_view = app.doc.lock().unwrap().state_view();
     let doc_clone = Arc::clone(&app.doc);
     let adopter = app.ui.global::<ui::FixtureListAdopter>();
