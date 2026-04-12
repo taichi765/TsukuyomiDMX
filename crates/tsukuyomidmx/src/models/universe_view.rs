@@ -52,6 +52,7 @@ pub trait FixtureInfoProvider {
     fn get_address(&self, fxt_id: FixtureId) -> Option<DmxAddress>;
     fn get_footprint(&self, fxt_id: FixtureId) -> Option<usize>;
     fn get_name(&self, fxt_id: FixtureId) -> Option<SharedString>;
+    fn iter_fixtures(&self) -> Vec<FixtureId>;
 }
 
 impl FixtureInfoProvider for DocStateView {
@@ -79,6 +80,11 @@ impl FixtureInfoProvider for DocStateView {
 
     fn get_name(&self, fxt_id: FixtureId) -> Option<SharedString> {
         self.with_fixtures(|it| Some(it.get(&fxt_id)?.name().to_shared_string()))
+    }
+
+    /// 初期化時にすべてのFixtureを探索するのに使う
+    fn iter_fixtures(&self) -> Vec<FixtureId> {
+        self.with_fixtures(|it| it.keys().cloned().collect::<Vec<_>>())
     }
 }
 
@@ -262,13 +268,38 @@ where
 impl<S, P> ModelInner<S, P>
 where
     S: SourceModel,
+    P: FixtureInfoProvider,
 {
     fn new(source_model: Rc<S>, doc: P, col_count: usize) -> Self {
+        let (row_order, data) = doc.iter_fixtures().iter().fold(
+            (Vec::new(), HashMap::new()),
+            |(mut row_order, mut data), fxt_id| {
+                // TODO: クロスユニバースの処理を考えるとfootprint()よりoccupied_addresses()を使ったほうがいいかも
+                let infos = Self::compute_fixture_info(
+                    doc.get_universe(*fxt_id).unwrap(),
+                    doc.get_address(*fxt_id).unwrap().value(),
+                    doc.get_footprint(*fxt_id).unwrap(),
+                    doc.get_name(*fxt_id).unwrap().to_shared_string(),
+                    col_count,
+                );
+
+                // Infoの数だけ追加
+                let added_rows = infos.len();
+                row_order.extend(
+                    std::iter::repeat_n(fxt_id, added_rows)
+                        .enumerate()
+                        .map(|(n, id)| (*id, n)),
+                );
+                data.insert(*fxt_id, infos);
+                (row_order, data)
+            },
+        );
+
         Self {
             source_model,
             info_provider: doc,
-            data: RefCell::new(HashMap::new()),
-            row_order: RefCell::new(Vec::new()),
+            data: RefCell::new(data),
+            row_order: RefCell::new(row_order),
             col_count: Cell::new(col_count),
             notify: ModelNotify::default(),
         }
@@ -400,6 +431,7 @@ mod tests {
     }
 
     struct StubFixtureInfoProvider {
+        fxt_id: FixtureId,
         univ: UniverseId,
         adr: DmxAddress,
         footprint: usize,
@@ -407,8 +439,15 @@ mod tests {
     }
 
     impl StubFixtureInfoProvider {
-        fn new(univ: u8, adr: usize, footprint: usize, name: impl ToSharedString) -> Self {
+        fn new(
+            fxt_id: FixtureId,
+            univ: u8,
+            adr: usize,
+            footprint: usize,
+            name: impl ToSharedString,
+        ) -> Self {
             Self {
+                fxt_id,
                 univ: UniverseId::new(univ),
                 adr: DmxAddress::new(adr).unwrap(),
                 footprint,
@@ -432,6 +471,10 @@ mod tests {
 
         fn get_name(&self, _fxt_id: FixtureId) -> Option<SharedString> {
             Some(self.name.clone())
+        }
+
+        fn iter_fixtures(&self) -> Vec<FixtureId> {
+            vec![self.fxt_id]
         }
     }
 
@@ -478,10 +521,6 @@ mod tests {
         let def = FixtureDef::new_dummy();
         let def_id = def.id().to_owned();
         let source_model = Rc::new(FakeSourceModel::new());
-        let stub = StubFixtureInfoProvider::new(0, 22, 4, "Test Fixture");
-
-        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
-
         let fxt = Fixture::new(
             "Test Fixture",
             UniverseId::new(0),
@@ -492,7 +531,10 @@ mod tests {
             0.,
         );
         let fxt_id = fxt.id();
+        let stub = StubFixtureInfoProvider::new(fxt_id, 0, 22, 4, "Test Fixture");
         source_model.add(fxt);
+
+        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
         let data = model.0.data.borrow();
         let row_order = model.0.row_order.borrow();
@@ -559,10 +601,8 @@ mod tests {
     #[test]
     fn model_updates_after_fixture_removed() {
         let source_model = Rc::new(FakeSourceModel::new());
-        let stub = StubFixtureInfoProvider::new(0, 10, 4, "Test Fixture");
-        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
-
         let def_id = FixtureDef::new_dummy().id().to_owned();
+
         let fxt = Fixture::new(
             "Test Fixture",
             UniverseId::new(0),
@@ -573,7 +613,10 @@ mod tests {
             0.,
         );
         let fxt_id = fxt.id();
+        let stub = StubFixtureInfoProvider::new(fxt_id, 0, 10, 4, "Test Fixture");
         source_model.add(fxt);
+
+        let model = UniverseViewModel::new(Rc::clone(&source_model), stub, COL_COUNT);
 
         source_model.remove(fxt_id);
 

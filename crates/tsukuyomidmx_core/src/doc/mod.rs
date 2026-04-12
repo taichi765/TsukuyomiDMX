@@ -79,9 +79,11 @@ impl Doc {
             p.push("fixtures");
             p
         };
+        let mut def_rg = Box::new(FixtureDefRegistryImpl::new(def_resource_path));
+        def_rg.load().expect("todo");
         Ok(Self {
             state: Arc::new(DocState::from_existing_data(
-                Box::new(FixtureDefRegistryImpl::new(def_resource_path)),
+                def_rg,
                 fixtures,
                 functions,
                 function_prototypes,

@@ -1,7 +1,7 @@
 use core::any::Any;
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
-use slint::{Model, ModelNotify, ModelTracker, SharedString};
+use slint::{Model, ModelNotify, ModelTracker, SharedString, ToSharedString};
 use tsukuyomidmx_core::{
     doc::{Doc, DocEffect, DocStateView},
     prelude::{FixtureDef, FixtureDefId},
@@ -24,10 +24,28 @@ pub struct FixtureDefModel {
 
 impl FixtureDefModel {
     pub fn create(doc: &mut Doc) -> Rc<Self> {
+        let keys: Vec<Manufacturer> = doc.state_view().with_fixture_defs(|it| {
+            it.iter_metadata()
+                .map(|meta| meta.manufacturer.to_shared_string())
+                .collect()
+        });
+        let catalog = doc.state_view().with_fixture_defs(|it| {
+            it.iter_metadata().fold(HashMap::new(), |mut map, v| {
+                if !map.contains_key(v.manufacturer) {
+                    map.insert(v.manufacturer.into(), vec![(v.id.clone(), v.model.into())]);
+                } else {
+                    map.get_mut(v.manufacturer)
+                        .unwrap()
+                        .push((v.id.clone(), v.model.into()));
+                };
+                map
+            })
+        });
+
         let me = Rc::new(Self {
             state: doc.state_view(),
-            catalog: RefCell::new(HashMap::new()),
-            keys: RefCell::new(Vec::new()),
+            catalog: RefCell::new(catalog),
+            keys: RefCell::new(keys),
             notify: ModelNotify::default(),
         });
         let me_clone = Rc::clone(&me);

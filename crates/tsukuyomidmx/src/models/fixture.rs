@@ -71,15 +71,25 @@ pub struct FixtureModel {
 
 impl FixtureModel {
     pub fn create(doc: &mut Doc) -> Rc<Self> {
+        let keys: Vec<_> = doc
+            .state_view()
+            .with_fixtures(|it| it.keys().cloned().collect());
+        let index = keys
+            .iter()
+            .enumerate()
+            .map(|(n, fxt_id)| (*fxt_id, n))
+            .collect();
         let me = Rc::new(Self {
             state: doc.state_view(),
             notify: ModelNotify::default(),
-            keys: RefCell::new(Vec::new()),
-            index: RefCell::new(HashMap::new()),
+            keys: RefCell::new(keys),
+            index: RefCell::new(index),
             latest_removed: Cell::new(None),
         });
 
         let me_clone = Rc::clone(&me);
+        dbg!(&me_clone.keys);
+        dbg!(&me_clone.index);
         doc.subscribe(Box::new(move |ef| match ef {
             DocEffect::FixtureAdded(id) => {
                 me.keys.borrow_mut().push(*id);
