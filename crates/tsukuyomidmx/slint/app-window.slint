@@ -68,7 +68,8 @@ export component AppWindow inherits Window {
         return TopLevelTabs.Editor;
     }
 
-    if Platform.os == OperatingSystemType.macos:MenuBar {
+    // TODO: Windows, Linux用のフレームレスウィンドウ
+    /*if Platform.os == OperatingSystemType.macos:*/MenuBar {
         Menu {
             title: @tr("File");
             MenuItem {
@@ -94,7 +95,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("Save");
                 activated => {
-                    show-save-dialog = true;
+                    MenuBarActions.save();
                 };
             }
 

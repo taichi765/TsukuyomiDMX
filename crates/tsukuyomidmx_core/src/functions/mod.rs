@@ -66,6 +66,14 @@ pub enum FunctionPrototype {
 }
 
 impl FunctionPrototype {
+    pub fn id(&self) -> FunctionPrototypeId {
+        match self {
+            FunctionPrototype::Simple(p) => p.id,
+            FunctionPrototype::Sequence(p) => p.id,
+            FunctionPrototype::Parallel(p) => p.id,
+        }
+    }
+
     pub fn bind_to(
         self,
         args: impl Iterator<Item = Vec<FixtureId>> + Clone,
@@ -296,6 +304,7 @@ impl From<SimpleFunctionDto> for SimpleFunction {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SequenceFunctionPrototype {
+    id: FunctionPrototypeId,
     // TODO: Box<dyn AppliedFunction>のみ or Box<dyn FunctionPrototype>のみにしたい
     steps: Vec<SequenceStep<FunctionPrototype, FunctionPrototypeId>>,
 }
@@ -448,7 +457,9 @@ impl<T, U> SequenceStep<T, U> {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParallelFunctionPrototype {}
+pub struct ParallelFunctionPrototype {
+    id: FunctionPrototypeId,
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelFunction {

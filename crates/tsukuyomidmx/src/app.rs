@@ -122,13 +122,17 @@ impl App {
 
     /// [`project_path`][App::project_path]に保存する。
     fn save(&self) -> Result<(), anyhow::Error> {
+        self.save_fixtures()?;
+        self.save_functions()?;
+
+        Ok(())
+    }
+
+    fn save_fixtures(&self) -> Result<(), anyhow::Error> {
+        // TODO: dirtyフラグ
         let doc = self.doc.lock().unwrap().state_view();
 
-        let fxt_file_path = self
-            .project_path
-            .as_ref()
-            .expect("todo: ダイアログ出す")
-            .join("fixtures.json");
+        let fxt_file_path = self.get_project_path().join("fixtures.json");
         let mut fxt_file = File::create(&fxt_file_path)
             .with_context(|| format!("file {:?} does not exist", &fxt_file_path))?;
         doc.with_fixtures(|it| {
@@ -139,6 +143,38 @@ impl App {
         })?;
         fxt_file.flush().unwrap();
         Ok(())
+    }
+
+    fn save_functions(&self) -> Result<(), anyhow::Error> {
+        // TODO: dirtyフラグ
+        let doc = self.doc.lock().unwrap().state_view();
+
+        let fun_dir = self.get_project_path().join("functions");
+        doc.with_functions(|it| {
+            for (_, fun) in it.iter() {
+                let path = fun_dir.join(fun.id().to_string());
+                let mut file = File::create(&path)
+                    .with_context(|| format!("failed to create file {:?}", path))?;
+                serde_json::to_writer(&file, &fun)
+                    .with_context(|| format!("failed to serialize function {:?}", fun.id()))?;
+                file.flush().unwrap();
+            }
+            Ok::<_, anyhow::Error>(())
+        })?;
+
+        let prototype_dir = self.get_project_path().join("function-prototypes");
+        doc.with_function_prototypes(|it| {
+            for (_, p) in it {
+                let path = prototype_dir.join(p.id().to_string());
+                let mut file = File::create(&path)
+                    .with_context(|| format!("failed to create file {:?}", path))?;
+                serde_json::to_writer_pretty(&file, &p).with_context(|| {
+                    format!("failed to serialize function prototype {:?}", p.id())
+                })?;
+                file.flush().unwrap();
+            }
+            Ok(())
+        })
     }
 
     /// Maximize, Toggle fullscreenなどの初期化
@@ -194,7 +230,51 @@ impl App {
     }
 
     fn create_dispatcher() -> Dispatcher {
-        Dispatcher(Rc::new(move |action| match action {}))
+        Dispatcher(Rc::new(move |change| match change {}))
+    }
+
+    fn register_global_actions(self: &Arc<Self>) {
+        let adopter = self.ui.global::<ui::MenuBarActions>();
+        adopter.on_save({
+            let weak = Arc::downgrade(self);
+            move || {
+                let action = Save;
+                let app = weak.upgrade().unwrap();
+                action.exec(&app).expect("failed to save");
+            }
+        });
+    }
+
+    fn register_key_bindings(self: &Arc<Self>) {
+        self.ui.on_key_pressed({
+            let weak = Arc::downgrade(self);
+
+            move |ev| match ev.text.as_str() {
+                "s" if ev.modifiers.control
+                    && !ev.modifiers.alt
+                    && !ev.modifiers.meta
+                    && !ev.modifiers.shift =>
+                {
+                    weak.upgrade().unwrap().save().unwrap();
+                    EventResult::Accept
+                }
+                _ => EventResult::Reject,
+            }
+        });
+    }
+
+    fn get_project_path(&self) -> PathBuf {
+        self.project_path
+            .lock()
+            .unwrap()
+            .get_or_insert_with(|| {
+                rfd::FileDialog::new()
+                    .set_can_create_directories(true)
+                    .set_directory("/home/taichi765/Documents") // TODO: configから読み込む
+                    .pick_folder()
+                    .unwrap()
+            })
+            .clone()
     }
 }
 
@@ -285,11 +365,46 @@ impl<'a> Serialize for FixturesSeq<'a> {
     }
 }
 
+#[cfg(test)]
 mod tests {
+    use tsukuyomidmx_core::prelude::DmxAddress;
+
     use super::*;
 
     #[test]
     fn fixtures_seq_serializes_correctly() {
-        todo!()
+        let fixtures = vec![
+            Fixture::new(
+                "Fixture 1",
+                UniverseId::MIN,
+                DmxAddress::MIN,
+                FixtureDefId::new_invalid(),
+                "Mode 1",
+                10.,
+                20.,
+            ),
+            Fixture::new(
+                "Fixture 2",
+                UniverseId::MIN,
+                DmxAddress::new(4).unwrap(),
+                FixtureDefId::new_invalid(),
+                "Mode 2",
+                20.5,
+                10.,
+            ),
+        ]
+        .into_iter()
+        .map(|fxt| (fxt.id(), fxt))
+        .collect();
+
+        let json = serde_json::to_string_pretty(&FixturesSeq(&fixtures)).unwrap();
+
+        let deserialized: Vec<Fixture> = serde_json::from_str(&json).unwrap();
+        let deserialized_map = deserialized
+            .into_iter()
+            .map(|fxt| (fxt.id(), fxt))
+            .collect();
+
+        assert_eq!(fixtures, deserialized_map);
     }
 }
