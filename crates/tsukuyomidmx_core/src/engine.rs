@@ -4,7 +4,7 @@ use tracing::{info, trace, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::functions::{AppliedFunctionId, FunctionCommand, FunctionRuntime};
+use crate::functions::{AppliedFunctionId, FunctionCommand, StandAloneFunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
 use crate::universe::UniverseId;
 use std::collections::{HashMap, HashSet};
@@ -17,13 +17,13 @@ use std::time::Duration;
 const TICK_DURATION: Duration = Duration::from_millis(100);
 
 // TODO: unwrap, expectを減らす
-/// Orchestrates [`FunctionRuntime`]s
+/// Functionを実行する
 pub struct Engine {
     doc: DocStateView,
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
-    active_runtime: Option<Box<dyn FunctionRuntime>>,
+    active_runtime: Option<Box<dyn StandAloneFunctionRuntime>>,
     /// Pluginインスタンス
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     /// どのPluginがどのUniverseに出力するか
@@ -170,7 +170,7 @@ impl Engine {
         let Some(commands) = self
             .active_runtime
             .as_mut()
-            .map(|rt| rt.run(self.doc.clone(), TICK_DURATION))
+            .map(|rt| rt.run_standalone(TICK_DURATION, self.doc.clone()))
         else {
             return;
         };
@@ -222,7 +222,7 @@ impl Engine {
     fn start_function(&mut self, function_id: AppliedFunctionId) {
         let res = self.doc.with_functions(|it| {
             it.get(&function_id)
-                .map(|fun| fun.create_runtime(self.doc.clone()))
+                .map(|fun| fun.create_standalone_runtime(self.doc.clone()))
                 .ok_or(EngineError::FunctionNotFound { function_id })
         });
 

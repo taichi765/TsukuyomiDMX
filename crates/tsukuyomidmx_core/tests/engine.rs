@@ -6,7 +6,7 @@ use std::{
 use tsukuyomidmx_core::{
     doc::Doc,
     engine::{Engine, EngineCommand},
-    functions::SimpleFunction,
+    functions::Function,
     plugins::{Plugin, SpyPlugin},
     prelude::{DmxAddress, Fixture, FixtureDefId, UniverseId},
 };
@@ -28,7 +28,8 @@ fn engine_can_start_function() {
     let fxt_id = fxt.id();
     doc.add_fixture(fxt).unwrap();
 
-    let fun = SimpleFunction::new(
+    let fun = Function::new_simple(
+        "Scene 1",
         vec![((fxt_id, 0), 255), ((fxt_id, 1), 200)]
             .into_iter()
             .collect(),

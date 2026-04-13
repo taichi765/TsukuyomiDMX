@@ -1,3 +1,6 @@
 [submodule "open-fixture-library"]
 	path = open-fixture-library
 	url = https://github.com/OpenLightingProject/open-fixture-library
+[submodule "libola-rs"]
+	path = libola-rs
+	url = https://github.com/taichi765/libola-rs
