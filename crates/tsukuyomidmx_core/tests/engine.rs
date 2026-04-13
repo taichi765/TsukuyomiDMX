@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::{Arc, mpsc},
     time::Duration,
 };
@@ -32,7 +33,7 @@ fn engine_can_start_function() {
         "Scene 1",
         vec![((fxt_id, 0), 255), ((fxt_id, 1), 200)]
             .into_iter()
-            .collect(),
+            .collect::<HashMap<_, _>>(),
     );
     let fun_id = fun.id();
     doc.add_function(fun).unwrap();

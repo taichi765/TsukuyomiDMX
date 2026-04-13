@@ -30,7 +30,7 @@ impl DmxAddress {
     /// Returns `None` when value is out of bounds (1..=512).
     /// # Examples
     /// ```
-    /// use tsukuyomi_core::universe::DmxAddress;
+    /// use tsukuyomidmx_core::universe::DmxAddress;
     ///
     /// let address1 = DmxAddress::new(0);
     /// assert!(address1.is_none());
