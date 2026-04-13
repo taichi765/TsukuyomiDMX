@@ -80,6 +80,17 @@ impl Function {
         }
     }
 
+    pub fn new_parallel(
+        name: impl Into<String>,
+        items: impl Into<Vec<FunctionBodyOrId<FunctionBody, AppliedFunctionId>>>,
+    ) -> Self {
+        Self {
+            id: AppliedFunctionId::new(),
+            name: name.into(),
+            body: FunctionBody::Parallel(ParallelFunctionBody::new(items)),
+        }
+    }
+
     pub(crate) fn create_standalone_runtime(
         &self,
         doc: DocStateView,
@@ -94,7 +105,7 @@ impl FunctionBody {
         match &self {
             FunctionBody::Simple(fun) => fun.create_runtime(),
             FunctionBody::Sequence(fun) => fun.create_runtime(doc),
-            FunctionBody::Parallel(fun) => fun.create_runtime(),
+            FunctionBody::Parallel(fun) => fun.create_runtime(doc),
         }
     }
 
@@ -106,7 +117,7 @@ impl FunctionBody {
         match &self {
             FunctionBody::Simple(fun) => fun.create_runtime_standalone(self_id),
             FunctionBody::Sequence(fun) => fun.create_runtime_standalone(self_id, doc),
-            FunctionBody::Parallel(fun) => fun.create_runtime_standalone(self_id),
+            FunctionBody::Parallel(fun) => fun.create_runtime_standalone(self_id, doc),
         }
     }
 }
@@ -215,7 +226,7 @@ pub enum FunctionCommand {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-enum FunctionBodyOrId<T, U> {
+pub enum FunctionBodyOrId<T, U> {
     Body(T),
     Id(U),
 }
