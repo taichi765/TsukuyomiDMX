@@ -10,7 +10,7 @@ ola = { path = "../../libola-rs" }
 assert_matches = "1.5.0"
 bimap = { workspace = true }
 dirs = { workspace = true }
-derive-getters = { workspace = true }
+derive-getters = { workspace = true, features = ["auto_copy_getters"] }
 derive_more = { workspace = true, features = ["debug", "deref"] }
 paste = { workspace = true }
 rayon = "1.11.0"

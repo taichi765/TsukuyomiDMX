@@ -9,6 +9,7 @@ mod simple;
 //pub use static_scene::SceneValue;
 //pub use static_scene::StaticSceneData;
 
+use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 
 use crate::doc::DocStateView;
@@ -41,15 +42,16 @@ pub(crate) trait StandAloneFunctionRuntime: FunctionRuntime {
 /// bind_to()でFixtureに関連付けたあとのfunction.
 ///
 /// Goboなどmodel-specificなチャンネルを制御する。
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Getters)]
 pub struct Function {
+    #[getter(copy)]
     id: AppliedFunctionId,
     name: String,
     body: FunctionBody,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum FunctionBody {
+pub enum FunctionBody {
     Simple(SimpleFunctionBody),
     Sequence(SequenceFunctionBody),
     Parallel(ParallelFunctionBody),
@@ -78,11 +80,7 @@ impl Function {
         }
     }
 
-    pub fn id(&self) -> AppliedFunctionId {
-        self.id
-    }
-
-    pub fn create_standalone_runtime(
+    pub(crate) fn create_standalone_runtime(
         &self,
         doc: DocStateView,
     ) -> Box<dyn StandAloneFunctionRuntime> {
@@ -100,7 +98,7 @@ impl FunctionBody {
         }
     }
 
-    pub fn create_standalone_runtime(
+    fn create_standalone_runtime(
         &self,
         self_id: AppliedFunctionId,
         doc: DocStateView,
