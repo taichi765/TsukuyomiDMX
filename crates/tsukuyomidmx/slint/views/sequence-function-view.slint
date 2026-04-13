@@ -1,0 +1,31 @@
+import { MiddleText } from "../parts/texts.slint";
+
+struct SequenceStepData {
+    kind: string,
+}
+
+global Adopter {
+    in property <string> id:"asdfghjknbvcdfghj";
+    in property <string> name:"Scene 1";
+    in property <[SequenceStepData]> steps:[{ kind: "body", kind:"body", kind:"id" }];
+}
+
+export { Adopter as SequenceFunctionViewAdopter }
+
+export component SequenceFunctionView inherits Rectangle {
+    VerticalLayout {
+        MiddleText {
+            text: Adopter.id;
+        }
+
+        MiddleText {
+            text: Adopter.name;
+        }
+
+        for step in Adopter.steps: Rectangle {
+            MiddleText {
+                text: step.kind;
+            }
+        }
+    }
+}

@@ -31,6 +31,14 @@ macro_rules! declare_id_newtype {
             }
         }
 
+        impl TryFrom<&str> for $name {
+            type Error = uuid::Error;
+
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                Ok(Self(uuid::Uuid::try_parse(value.as_ref())?))
+            }
+        }
+
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.as_hyphenated())

@@ -1,16 +1,9 @@
 
-
+import { FunctionType } from "../types.slint";
 import { LargeText, PlaneText } from "../parts/texts.slint";
 import { Icons } from "../styling.slint";
 
-export enum FunctionType{
-    Simple,
-    Sequence,
-    Parallel,
-    SimplePrototype,
-    SequencePrototype,
-    ParallelPrototype
-}
+
 
 export struct FunctionData {
     id: string,
@@ -18,10 +11,14 @@ export struct FunctionData {
     name: string,
 }
 
-component FunctionListViewItem {
+component FunctionListViewItem inherits Rectangle {
     in property <string> id;
     in property <string> name;
     in property <FunctionType> type;
+    in property <bool> selected;
+    callback remove();
+    callback clicked();
+
     pure function get-image(type: FunctionType) -> image {
         // TODO: それぞれのアイコンを作る
         if type == FunctionType.Simple {
@@ -46,13 +43,54 @@ component FunctionListViewItem {
         // unreachable
         return Icons.dimmer;
     }
-    HorizontalLayout {
-        Image {
-            source: get-image(type);
+
+    states [
+        selected when root.selected: {
+            root.background: gray;
+        }
+    ]
+
+    VerticalLayout {
+
+        spacer1 := Rectangle {
+            height: 2px;
         }
 
-        PlaneText {
-            text: name;
+        HorizontalLayout {
+            alignment: LayoutAlignment.start;
+
+            margin-left := Rectangle {
+                width: 4px;
+            }
+
+            Image {
+                source: get-image(type);
+            }
+
+            margin := Rectangle {
+                width: 4px;
+            }
+
+            PlaneText {
+                text: name;
+            }
+        }
+
+        spacer2 := Rectangle {
+            height: 2px;
+        }
+    }
+
+    TouchArea {
+        clicked => root.clicked();
+    }
+
+    ContextMenuArea {
+        Menu {
+            MenuItem {
+                title: @tr("Remove");
+                activated => root.remove();
+            }
         }
     }
 }
@@ -71,20 +109,72 @@ global Adopter {
             name: "Scene 2",
         }
     ];
+    in property <int> selected-index;
+
+    callback new-simple-function();
+    callback new-simple-function-prototype();
+    callback new-sequence-funtion();
+    callback new-sequence-function-prototype();
+    callback new-parallel-function();
+    callback new-parallel-function-prototype();
+
+    callback remove-function(id: string, type: FunctionType);
+    callback set-selected-function(id: string, type: FunctionType);
 }
 
 export { Adopter as FunctionListViewAdopter }
 
-export component FunctionListView {
+export component FunctionListView inherits Rectangle {
     VerticalLayout {
+        alignment: LayoutAlignment.start;
+
         LargeText {
             text: @tr("Functions");
         }
 
-        for fun in Adopter.model: FunctionListViewItem {
+        for fun[i] in Adopter.model: FunctionListViewItem {
             id: fun.id;
             name: fun.name;
             type: fun.type;
+            selected: i == Adopter.selected-index;
+
+            remove => Adopter.remove-function(fun.id, fun.type);
+            clicked => Adopter.set-selected-function(fun.id, fun.type);
+        }
+
+        ContextMenuArea {
+            height: 100%;
+            Menu {
+                MenuItem {
+                    title: @tr("New Simple Function");
+                    activated => Adopter.new-simple-function();
+                }
+
+                MenuItem {
+                    title: @tr("New Simple Function Prototype");
+                    activated => Adopter.new-simple-function-prototype();
+                }
+
+                MenuItem {
+                    title: @tr("New Sequence Function");
+                    activated => Adopter.new-sequence-funtion();
+                }
+
+                MenuItem {
+                    title: @tr("New Sequence Function Prototype");
+                    activated => Adopter.new-sequence-function-prototype();
+                }
+
+                MenuItem {
+                    title: @tr("New Parallel Function");
+                    activated => Adopter.new-parallel-function();
+                }
+
+                MenuItem {
+                    title: @tr("New Parallel Function Prototype");
+                    activated => Adopter.new-parallel-function-prototype();
+                }
+            }
         }
     }
 }

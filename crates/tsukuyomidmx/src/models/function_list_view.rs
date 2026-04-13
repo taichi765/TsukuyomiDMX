@@ -7,7 +7,7 @@ use tsukuyomidmx_core::{
     prelude::AppliedFunctionId,
 };
 
-use crate::ui;
+use crate::{app::AnyFunctionId, ui};
 
 pub struct FunctionListViewModel {
     doc: DocStateView,
@@ -24,11 +24,13 @@ impl Model for FunctionListViewModel {
     }
 
     fn row_data(&self, row: usize) -> Option<Self::Data> {
-        todo!()
+        let guard = self.row_order.borrow();
+        let id = guard.get(row)?;
+        self.data.borrow().get(id).cloned()
     }
 
     fn model_tracker(&self) -> &dyn slint::ModelTracker {
-        todo!()
+        &self.notify
     }
 
     fn as_any(&self) -> &dyn core::any::Any {
@@ -90,6 +92,10 @@ impl FunctionListViewModel {
         });
 
         me
+    }
+
+    pub fn get_index(&self, id: AnyFunctionId) -> Option<usize> {
+        self.row_order.borrow().iter().position(|v| *v == id)
     }
 }
 

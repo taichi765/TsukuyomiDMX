@@ -1,0 +1,73 @@
+import { FunctionType } from "../types.slint";
+import { BorderHorz, Icons, Theme } from "../styling.slint";
+import { SimpleFunctionView } from "simple-function-view.slint";
+import { SequenceFunctionView } from "sequence-function-view.slint";
+import { ParallelFunctionView } from "parallel-function-view.slint";
+import { MiddleText } from "../parts/texts.slint";
+import { GlobalState } from "../global-state.slint";
+import { ScrollView } from "std-widgets.slint";
+
+component TabItem inherits Rectangle {
+    in property <string> name;
+    in property <bool> selected;
+    callback clicked();
+    HorizontalLayout {
+        MiddleText {
+            text: name;
+        }
+
+        Rectangle {
+            background: selected ? gray : black;
+            Image {
+                source: Icons.close;
+            }
+
+            TouchArea {
+                clicked => root.clicked();
+            }
+        }
+    }
+}
+
+struct FunctionEditorPanelData {
+    id: string,
+    name: string,
+}
+
+global Adopter {
+    in property <[FunctionEditorPanelData]> model:[
+        {
+            id: "",
+            name: "Scene 1",
+        },
+        {
+            id: "",
+            name: "Scene 2",
+        },
+    ];
+    in property <FunctionType> type;
+    callback close(id: string);
+}
+
+export { Adopter as FunctionEditorPanelAdopter }
+
+export component FunctionEditorPanel inherits Rectangle {
+    VerticalLayout {
+        alignment: LayoutAlignment.start;
+        ScrollView {
+            HorizontalLayout {
+                for data in Adopter.model: TabItem {
+                    name: data.name;
+                    selected: GlobalState.current-function == data.id;
+                    clicked => Adopter.close(data.id);
+                }
+            }
+        }
+
+        BorderHorz { }
+
+        if Adopter.type == FunctionType.Simple:SimpleFunctionView { }
+        if Adopter.type == FunctionType.Sequence:SequenceFunctionView { }
+        if Adopter.type == FunctionType.Parallel:ParallelFunctionView { }
+    }
+}

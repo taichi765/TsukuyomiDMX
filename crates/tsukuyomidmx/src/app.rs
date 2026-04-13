@@ -10,12 +10,13 @@ use std::{
     cell::OnceCell,
     collections::HashMap,
     error::Error,
+    fmt::Display,
     fs::File,
     io::Write,
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
-        Arc, Mutex, RwLock,
+        Arc, Mutex, RwLock, Weak,
         mpsc::{self, Sender},
     },
     thread,
@@ -24,14 +25,14 @@ use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
     engine::{Engine, EngineCommand, EngineMessage},
-    functions::{Function, FunctionPrototype},
+    functions::{Function, FunctionPrototype, FunctionPrototypeId},
     plugins::Plugin,
-    prelude::{Fixture, FixtureDefId, FixtureId, UniverseId},
+    prelude::{AppliedFunctionId, Fixture, FixtureDefId, FixtureId, UniverseId},
 };
 
 use crate::{
     models::{FixtureDefModel, FixtureModel, UniverseModel},
-    tea::{fixture_list_view, preview_2d, universe_view},
+    tea::{fixture_list_view, function_list_view, preview_2d, universe_view},
     ui,
 };
 
@@ -39,7 +40,7 @@ use crate::{
 pub struct App {
     pub doc: Arc<Mutex<Doc>>,
     pub ui: ui::AppWindow,
-    pub state: AppState,
+    state: Arc<RwLock<AppState>>,
     pub dispatcher: Dispatcher,
     pub shared_model_inner: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
@@ -62,12 +63,15 @@ impl App {
         ));
 
         let ui = ui::AppWindow::new().unwrap();
-        let dispatcher = Self::create_dispatcher();
+        let state = Arc::new(RwLock::new(AppState {
+            selected_function: None,
+        }));
+        let dispatcher = create_dispatcher(Arc::clone(&state));
         debug!("App instance created");
         Self {
             doc,
             ui,
-            state: AppState {},
+            state,
             dispatcher,
             shared_model_inner: SharedInnerModel {
                 def_model: OnceCell::new(),
@@ -144,12 +148,15 @@ impl App {
 
         let ui = ui::AppWindow::new().unwrap();
         ui.set_project_path(dir.to_str().unwrap().to_shared_string());
+        let state = Arc::new(RwLock::new(AppState {
+            selected_function: None,
+        }));
 
         Ok(Self {
             doc: Arc::clone(&doc),
             ui,
-            state: AppState {},
-            dispatcher: Self::create_dispatcher(),
+            state: Arc::clone(&state),
+            dispatcher: create_dispatcher(state),
             shared_model_inner: SharedInnerModel {
                 fixture_model: OnceCell::new(),
                 def_model: OnceCell::new(),
@@ -181,6 +188,7 @@ impl App {
 
         fixture_list_view::setup(&self);
         universe_view::setup(&self);
+        function_list_view::setup(&self);
         self.setup_engine();
         self.setup_window();
         preview_2d::setup(&self);
@@ -332,10 +340,6 @@ impl App {
         self.error_rx.set(error_rx).unwrap();
     }
 
-    fn create_dispatcher() -> Dispatcher {
-        Dispatcher(Rc::new(move |change| match change {}))
-    }
-
     fn register_global_actions(self: &Arc<Self>) {
         let adopter = self.ui.global::<ui::MenuBarActions>();
         adopter.on_save({
@@ -381,7 +385,9 @@ impl App {
     }
 }
 
-pub struct AppState {}
+pub struct AppState {
+    selected_function: Option<AnyFunctionId>,
+}
 
 /// これらのModelにMapModel等を使ってuiに渡す、共通化部分
 pub struct SharedInnerModel {
@@ -391,7 +397,9 @@ pub struct SharedInnerModel {
 }
 
 /// [`AppState`]を変更するコマンド
-pub enum AppStateChange {}
+pub enum AppStateChange {
+    SetSelectedFunction(AnyFunctionId),
+}
 
 pub struct Dispatcher(Rc<dyn Fn(AppStateChange)>);
 
@@ -511,6 +519,30 @@ impl<'a> Serialize for FixturesSeq<'a> {
 
         seq.end()
     }
+}
+
+// TODO: core側で定義したほうがいいかも
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AnyFunctionId {
+    Applied(AppliedFunctionId),
+    Prototype(FunctionPrototypeId),
+}
+
+impl Display for AnyFunctionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Applied(id) => write!(f, "{}", id),
+            Self::Prototype(id) => write!(f, "{}", id),
+        }
+    }
+}
+
+fn create_dispatcher(state: Arc<RwLock<AppState>>) -> Dispatcher {
+    Dispatcher(Rc::new(move |change| match change {
+        AppStateChange::SetSelectedFunction(id) => {
+            state.write().unwrap().selected_function = Some(id)
+        }
+    }))
 }
 
 #[cfg(test)]

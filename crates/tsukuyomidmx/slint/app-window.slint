@@ -17,7 +17,7 @@ import { TitleBar } from "titlebar.slint";
 import { MiddleText } from "parts/texts.slint";
 import { LeftPanel } from "panel-left.slint";
 import { Preview3D } from "views/preview-3d.slint";
-import { GlobalMessage } from "global-state.slint";
+import { GlobalState } from "global-state.slint";
 import { RightPanel } from "panel-right.slint";
 
 export { Preview2DAdopter } from "./views/preview-2d.slint";
@@ -25,6 +25,9 @@ export { FadersStore } from "./views/faders-view.slint";
 export { FixtureListAdopter } from "./containers/fixture-def-panel.slint";
 export { UniverseViewAdopter } from "./views/universe-view.slint";
 export { FunctionListViewAdopter } from "./views/function-list-view.slint";
+export { SequenceFunctionViewAdopter } from "./views/sequence-function-view.slint";
+export { FunctionEditorPanelAdopter } from "./views/function-editor-panel.slint";
+export { GlobalState } from "./global-state.slint";
 
 export global MenuBarActions {
     callback save();
@@ -46,7 +49,7 @@ export component AppWindow inherits Window {
 
     property <bool> show-save-dialog;
     // TODO: in propertyにすべき
-    in-out property <string> error-message <=> GlobalMessage.error-message;
+    in-out property <string> error-message <=> GlobalState.error-message;
     in property <image> texture;
     in property <string> project-path;
     out property <TopLevelTabs> current-tab: index-to-tabs-enum(main-pane.current-index);

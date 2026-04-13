@@ -6,7 +6,7 @@ import { BorderHorz, BorderVert } from "../styling.slint";
 import { FixtureSingleView } from "../views/fixture-single-view.slint";
 import { MiddleText } from "../parts/texts.slint";
 import { StandardButton } from "std-widgets.slint";
-import { GlobalMessage } from "../global-state.slint";
+import { GlobalState } from "../global-state.slint";
 
 
 global Adopter {
@@ -74,8 +74,8 @@ export component FixtureDefPanel inherits VerticalLayout {
         }
 
         patch(universe, address, fixture-id, mode, pos) => {
-            GlobalMessage.error-message = Adopter.patch(universe, address, fixture-id, mode,pos);
-            if GlobalMessage.error-message == "" {
+            GlobalState.error-message = Adopter.patch(universe, address, fixture-id, mode,pos);
+            if GlobalState.error-message == "" {
                 next-address-cache = Adopter.get-next-address(self.selected-universe);
             }
         }
