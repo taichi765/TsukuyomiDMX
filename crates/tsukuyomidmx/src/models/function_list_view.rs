@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 use slint::{Model, ModelNotify, ToSharedString};
 use tsukuyomidmx_core::{
     doc::{Doc, DocEffect, DocStateView},
-    functions::{Function, FunctionBody, FunctionPrototypeId},
-    prelude::AppliedFunctionId,
+    effects::{Effect, EffectBody, EffectSpecId},
+    prelude::EffectId,
 };
 
 use crate::{app::AnyFunctionId, ui};
@@ -112,10 +112,10 @@ impl FunctionListViewModel {
     }
 }
 
-fn get_function_type(fun: &Function) -> ui::FunctionType {
+fn get_function_type(fun: &Effect) -> ui::FunctionType {
     match fun.body() {
-        FunctionBody::Simple(_) => ui::FunctionType::Simple,
-        FunctionBody::Sequence(_) => ui::FunctionType::Sequence,
-        FunctionBody::Parallel(_) => ui::FunctionType::Parallel,
+        EffectBody::Simple(_) => ui::FunctionType::Simple,
+        EffectBody::Sequence(_) => ui::FunctionType::Sequence,
+        EffectBody::Parallel(_) => ui::FunctionType::Parallel,
     }
 }

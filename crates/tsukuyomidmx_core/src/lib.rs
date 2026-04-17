@@ -54,21 +54,21 @@ macro_rules! declare_id_newtype {
 }
 
 pub mod doc;
+pub mod effects;
 pub mod engine;
 pub mod fixture;
 pub mod fixture_def;
-pub mod functions;
 pub mod plugins;
 pub mod universe;
 
 pub mod prelude {
     pub use super::{
         doc::{Doc, OutputPluginId},
+        effects::EffectId,
         fixture::{Fixture, FixtureId, MergeMode},
         fixture_def::{
             Capability, CapabilityKind, ChannelDef, FixtureDef, FixtureDefId, FixtureMode,
         },
-        functions::AppliedFunctionId,
         universe::{DmxAddress, UniverseId},
     };
 }

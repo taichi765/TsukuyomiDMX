@@ -5,8 +5,8 @@ use std::{
 
 use crate::{
     doc::{AddressIndexConstructError, FixtureDefNotFoundError, def_registry::FixtureDefRegistry},
+    effects::{Effect, EffectId, EffectSpec, EffectSpecId},
     fixture::{Fixture, FixtureId},
-    functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
     prelude::{DmxAddress, UniverseId},
 };
 
@@ -21,8 +21,8 @@ pub struct AddressIndex(HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>);
 pub(super) struct DocState {
     fixtures: RwLock<HashMap<FixtureId, Fixture>>,
     fixture_defs: RwLock<Box<dyn FixtureDefRegistry>>,
-    functions: RwLock<HashMap<AppliedFunctionId, Function>>,
-    function_prototypes: RwLock<HashMap<FunctionPrototypeId, FunctionPrototype>>,
+    functions: RwLock<HashMap<EffectId, Effect>>,
+    function_prototypes: RwLock<HashMap<EffectSpecId, EffectSpec>>,
     universes: RwLock<HashSet<UniverseId>>,
 
     address_index: RwLock<AddressIndex>,
@@ -65,8 +65,8 @@ impl DocState {
     pub fn from_existing_data(
         def_registry: Box<dyn FixtureDefRegistry>,
         fixtures: HashMap<FixtureId, Fixture>,
-        functions: HashMap<AppliedFunctionId, Function>,
-        function_prototypes: HashMap<FunctionPrototypeId, FunctionPrototype>,
+        functions: HashMap<EffectId, Effect>,
+        function_prototypes: HashMap<EffectSpecId, EffectSpec>,
         universes: HashSet<UniverseId>,
     ) -> Result<Self, AddressIndexConstructError> {
         let index = AddressIndex::from_fixtures(&fixtures, def_registry.as_ref())?;
@@ -85,8 +85,8 @@ impl DocState {
     }
 
     define_rwlock_helper!(fixtures, HashMap<FixtureId, Fixture>);
-    define_rwlock_helper!(functions, HashMap<AppliedFunctionId, Function>);
-    define_rwlock_helper!(function_prototypes, HashMap<FunctionPrototypeId, FunctionPrototype>);
+    define_rwlock_helper!(functions, HashMap<EffectId, Effect>);
+    define_rwlock_helper!(function_prototypes, HashMap<EffectSpecId, EffectSpec>);
     define_rwlock_helper!(address_index, AddressIndex);
     define_rwlock_helper!(universes, HashSet<UniverseId>);
 

@@ -7,9 +7,9 @@ use super::DocStateView;
 use super::errors::*;
 use crate::doc::commands::*;
 use crate::doc::state::AddressIndex;
+use crate::effects::{EffectId, Effect};
 use crate::fixture::FixtureChange;
 use crate::fixture_def::AddressIter;
-use crate::functions::{AppliedFunctionId, Function};
 use crate::prelude::*;
 
 pub(super) fn add_fixture(
@@ -109,7 +109,7 @@ pub(super) fn remove_fixture(
 
 pub(super) fn add_function(
     state: DocStateView,
-    fun: Function,
+    fun: Effect,
 ) -> Result<AddFunctionCommand, AddFunctionError> {
     if state.with_functions(|it| it.contains_key(&fun.id())) {
         return Err(AddFunctionError::IdAlreadyUsed(fun.id()));
@@ -118,13 +118,13 @@ pub(super) fn add_function(
     Ok(AddFunctionCommand::new(fun))
 }
 
-pub(super) fn update_function(_state: DocStateView, _new: Function) -> Result<(), ()> {
+pub(super) fn update_function(_state: DocStateView, _new: Effect) -> Result<(), ()> {
     todo!()
 }
 
 pub(super) fn remove_function(
     state: DocStateView,
-    id: AppliedFunctionId,
+    id: EffectId,
 ) -> Result<RemoveFunctionCommand, RemoveFunctionError> {
     if !state.with_functions(|it| it.contains_key(&id)) {
         return Err(RemoveFunctionError::FunctionNotFound(id));

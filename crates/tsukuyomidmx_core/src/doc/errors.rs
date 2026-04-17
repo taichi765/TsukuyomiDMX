@@ -4,7 +4,7 @@ use crate::{
     doc::def_registry,
     fixture::FixtureId,
     fixture_def::FixtureDefId,
-    prelude::AppliedFunctionId,
+    prelude::EffectId,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -107,13 +107,13 @@ pub enum FixtureRemoveError {
 pub enum AddFunctionError {
     // TODO: idを使っているfunctionの場所とか出したい
     #[error("function id {0:?} is already used")]
-    IdAlreadyUsed(AppliedFunctionId),
+    IdAlreadyUsed(EffectId),
 }
 
 #[derive(Debug, Error)]
 pub enum RemoveFunctionError {
     #[error("cannot find function {0:?}")]
-    FunctionNotFound(AppliedFunctionId),
+    FunctionNotFound(EffectId),
 }
 
 #[derive(Debug, Error)]

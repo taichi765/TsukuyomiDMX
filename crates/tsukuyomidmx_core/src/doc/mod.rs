@@ -15,9 +15,9 @@ use std::{
 
 use crate::{
     doc::state::{AddressIndex, DocState},
+    effects::{Effect, EffectId, EffectSpec, EffectSpecId},
     fixture::{Fixture, FixtureChange, FixtureId},
     fixture_def::FixtureDefId,
-    functions::{AppliedFunctionId, Function, FunctionPrototype, FunctionPrototypeId},
     prelude::ChannelDef,
     universe::{DmxAddress, UniverseId},
 };
@@ -69,8 +69,8 @@ impl Doc {
 
     pub fn from_existing_data(
         fixtures: HashMap<FixtureId, Fixture>,
-        functions: HashMap<AppliedFunctionId, Function>,
-        function_prototypes: HashMap<FunctionPrototypeId, FunctionPrototype>,
+        functions: HashMap<EffectId, Effect>,
+        function_prototypes: HashMap<EffectSpecId, EffectSpec>,
         universes: HashSet<UniverseId>,
     ) -> Result<Self, AddressIndexConstructError> {
         let def_resource_path = {
@@ -158,35 +158,35 @@ impl Doc {
     }
 
     #[instrument]
-    pub fn add_function(&mut self, fun: Function) -> Result<(), AddFunctionError> {
+    pub fn add_function(&mut self, fun: Effect) -> Result<(), AddFunctionError> {
         let cmd = decider::add_function(self.state_view(), fun)?;
         self.apply_command(cmd);
         Ok(())
     }
 
     #[instrument]
-    pub fn update_function(&mut self, _new: Function) -> Result<(), ()> {
+    pub fn update_function(&mut self, _new: Effect) -> Result<(), ()> {
         todo!()
     }
 
     #[instrument]
-    pub fn remove_function(&mut self, id: AppliedFunctionId) -> Result<(), RemoveFunctionError> {
+    pub fn remove_function(&mut self, id: EffectId) -> Result<(), RemoveFunctionError> {
         let cmd = decider::remove_function(self.state_view(), id)?;
         self.apply_command(cmd);
         Ok(())
     }
 
     #[instrument]
-    pub fn add_function_prototype(&mut self, _value: FunctionPrototype) -> Result<(), ()> {
+    pub fn add_function_prototype(&mut self, _value: EffectSpec) -> Result<(), ()> {
         todo!()
     }
 
     #[instrument]
-    pub fn update_function_prototype(&mut self, _new: FunctionPrototype) -> Result<(), ()> {
+    pub fn update_function_prototype(&mut self, _new: EffectSpec) -> Result<(), ()> {
         todo!()
     }
 
-    pub fn remove_function_prototype(&mut self, _id: FunctionPrototypeId) -> Result<(), ()> {
+    pub fn remove_function_prototype(&mut self, _id: EffectSpecId) -> Result<(), ()> {
         todo!()
     }
 
@@ -244,8 +244,8 @@ macro_rules! define_readonly_wrapper {
 impl DocStateView {
     define_readonly_wrapper!(with_fixtures, HashMap<FixtureId, Fixture>);
     define_readonly_wrapper!(with_fixture_defs, dyn FixtureDefRegistry);
-    define_readonly_wrapper!(with_functions, HashMap<AppliedFunctionId, Function>);
-    define_readonly_wrapper!(with_function_prototypes, HashMap<FunctionPrototypeId, FunctionPrototype>);
+    define_readonly_wrapper!(with_functions, HashMap<EffectId, Effect>);
+    define_readonly_wrapper!(with_function_prototypes, HashMap<EffectSpecId, EffectSpec>);
     define_readonly_wrapper!(with_address_index, AddressIndex);
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R
@@ -366,13 +366,13 @@ pub enum DocEffect {
     FixtureDefUpdated(FixtureDefId),
     FixtureDefRemoved(FixtureDefId),
 
-    FunctionAdded(AppliedFunctionId),
-    FunctionUpdated(AppliedFunctionId),
-    FunctionRemoved(AppliedFunctionId),
+    FunctionAdded(EffectId),
+    FunctionUpdated(EffectId),
+    FunctionRemoved(EffectId),
 
-    FunctionPrototypeAdded(FunctionPrototypeId),
-    FunctionPrototypeUpdated(FunctionPrototypeId),
-    FunctionPrototypeRemoved(FunctionPrototypeId),
+    FunctionPrototypeAdded(EffectSpecId),
+    FunctionPrototypeUpdated(EffectSpecId),
+    FunctionPrototypeRemoved(EffectSpecId),
 
     AddressIndexChanged((UniverseId, DmxAddress), (FixtureId, usize)),
     DefRegistryLoaded,

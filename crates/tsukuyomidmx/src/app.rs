@@ -24,10 +24,10 @@ use std::{
 use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
+    effects::{Effect, EffectSpec, EffectSpecId},
     engine::{Engine, EngineCommand, EngineMessage},
-    functions::{Function, FunctionPrototype, FunctionPrototypeId},
     plugins::{OlaPlugin, Plugin},
-    prelude::{AppliedFunctionId, Fixture, FixtureDefId, FixtureId, UniverseId},
+    prelude::{EffectId, Fixture, FixtureDefId, FixtureId, UniverseId},
 };
 
 use crate::{
@@ -105,7 +105,7 @@ impl App {
                 let entry = entry?;
                 let file = File::open(entry.path())
                     .with_context(|| format!("failed to open file {:?}", entry.path()))?;
-                let fun: Function = serde_json::from_reader(&file).with_context(|| {
+                let fun: Effect = serde_json::from_reader(&file).with_context(|| {
                     format!("failed to deserialize function from {:?}", entry.path())
                 })?;
                 acc.insert(fun.id(), fun);
@@ -118,13 +118,12 @@ impl App {
                 let entry = entry?;
                 let file = File::open(entry.path())
                     .with_context(|| format!("failed to open file {:?}", entry.path()))?;
-                let proto: FunctionPrototype =
-                    serde_json::from_reader(&file).with_context(|| {
-                        format!(
-                            "failed to deserialize function prototype from {:?}",
-                            entry.path()
-                        )
-                    })?;
+                let proto: EffectSpec = serde_json::from_reader(&file).with_context(|| {
+                    format!(
+                        "failed to deserialize function prototype from {:?}",
+                        entry.path()
+                    )
+                })?;
                 acc.insert(proto.id(), proto);
                 anyhow::Ok(acc)
             })?;
@@ -223,7 +222,7 @@ impl App {
             .get()
             .unwrap()
             .send(EngineCommand::StartFunction(
-                AppliedFunctionId::try_from("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
+                EffectId::try_from("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
             ))
             .unwrap();
 
@@ -553,8 +552,8 @@ impl<'a> Serialize for FixturesSeq<'a> {
 // TODO: core側で定義したほうがいいかも
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AnyFunctionId {
-    Applied(AppliedFunctionId),
-    Prototype(FunctionPrototypeId),
+    Applied(EffectId),
+    Prototype(EffectSpecId),
 }
 
 impl Display for AnyFunctionId {

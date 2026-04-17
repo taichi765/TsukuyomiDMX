@@ -1,42 +1,42 @@
 use super::*;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SimpleFunctionPrototypeBody {
+pub struct SimpleEffectSpecBody {
     dimmer: Option<u8>,
     color: Option<[u8; 3]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "SimpleFunctionDto", into = "SimpleFunctionDto")]
-pub struct SimpleFunctionBody {
+#[serde(from = "SimpleEffectDto", into = "SimpleEffectDto")]
+pub struct SimpleEffectBody {
     /// (id, offset) -> value
     values: HashMap<(FixtureId, usize), u8>,
 }
 
 /// スタンドアロン
-pub struct StandAloneSimpleFunctionRuntime {
-    fun_id: AppliedFunctionId,
-    inner: SimpleFunctionRuntime,
+pub struct StandAloneSimpleEffectRuntime {
+    fun_id: EffectId,
+    inner: SimpleEffectRuntime,
 }
 
-pub struct SimpleFunctionRuntime;
+pub struct SimpleEffectRuntime;
 
-/// DTO for [`SimpleFunction`].
+/// DTO for [`SimpleEffect`].
 ///
-/// DTO is requied because the key type of `HashMap` in [`SimpleFunction`] is not string.
+/// DTO is requied because the key type of `HashMap` in [`SimpleEffect`] is not string.
 #[derive(Serialize, Deserialize)]
-struct SimpleFunctionDto {
-    values: Vec<SimpleFunctionValueDto>,
+struct SimpleEffectDto {
+    values: Vec<SimpleEffectValueDto>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct SimpleFunctionValueDto {
+struct SimpleEffectValueDto {
     fxt_id: FixtureId,
     offset: usize,
     value: u8,
 }
 
-impl SimpleFunctionBody {
+impl SimpleEffectBody {
     pub(super) fn new(values: impl Into<HashMap<(FixtureId, usize), u8>>) -> Self {
         Self {
             values: values.into(),
@@ -45,26 +45,26 @@ impl SimpleFunctionBody {
 
     pub(super) fn create_runtime_standalone(
         &self,
-        self_id: AppliedFunctionId,
-    ) -> Box<dyn StandAloneFunctionRuntime> {
-        Box::new(StandAloneSimpleFunctionRuntime {
+        self_id: EffectId,
+    ) -> Box<dyn StandAloneEffectRuntime> {
+        Box::new(StandAloneSimpleEffectRuntime {
             fun_id: self_id,
-            inner: SimpleFunctionRuntime,
+            inner: SimpleEffectRuntime,
         })
     }
 
-    pub(super) fn create_runtime(&self) -> Box<dyn FunctionRuntime> {
-        Box::new(SimpleFunctionRuntime)
+    pub(super) fn create_runtime(&self) -> Box<dyn EffectRuntime> {
+        Box::new(SimpleEffectRuntime)
     }
 }
 
-impl SimpleFunctionPrototypeBody {
+impl SimpleEffectSpecBody {
     pub(super) fn bind_to_inner(
         &self,
         mut args: impl Iterator<Item = Vec<FixtureId>>,
         doc: DocStateView,
         diag: &mut Diagnostics,
-    ) -> Option<SimpleFunctionBody> {
+    ) -> Option<SimpleEffectBody> {
         let mut values = HashMap::new();
         let mut has_error = false;
 
@@ -111,7 +111,7 @@ impl SimpleFunctionPrototypeBody {
             return None;
         }
 
-        Some(SimpleFunctionBody { values })
+        Some(SimpleEffectBody { values })
     }
 
     pub(super) fn new(dimmer: Option<u8>, color: Option<[u8; 3]>) -> Self {
@@ -119,20 +119,20 @@ impl SimpleFunctionPrototypeBody {
     }
 }
 
-impl FunctionRuntime for SimpleFunctionRuntime {
+impl EffectRuntime for SimpleEffectRuntime {
     fn run(
         &mut self,
-        body: &FunctionBody,
+        body: &EffectBody,
         _elapsed: Duration,
         _doc: DocStateView,
-    ) -> Vec<FunctionCommand> {
-        let FunctionBody::Simple(fun) = body else {
+    ) -> Vec<EffectCommand> {
+        let EffectBody::Simple(fun) = body else {
             unreachable!()
         };
         fun.values
             .iter()
             .fold(Vec::new(), |mut acc, ((fxt_id, offset), val)| {
-                acc.push(FunctionCommand::WriteUniverse {
+                acc.push(EffectCommand::WriteUniverse {
                     fixture_id: *fxt_id,
                     channel: *offset,
                     value: *val,
@@ -142,8 +142,8 @@ impl FunctionRuntime for SimpleFunctionRuntime {
     }
 }
 
-impl StandAloneFunctionRuntime for StandAloneSimpleFunctionRuntime {
-    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<FunctionCommand> {
+impl StandAloneEffectRuntime for StandAloneSimpleEffectRuntime {
+    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
         doc.with_functions(|it| {
             let this = &it.get(&self.fun_id).unwrap().body;
             self.inner.run(this, elapsed, doc.clone())
@@ -151,24 +151,24 @@ impl StandAloneFunctionRuntime for StandAloneSimpleFunctionRuntime {
     }
 }
 
-impl FunctionRuntime for StandAloneSimpleFunctionRuntime {
+impl EffectRuntime for StandAloneSimpleEffectRuntime {
     fn run(
         &mut self,
-        body: &FunctionBody,
+        body: &EffectBody,
         elapsed: Duration,
         doc: DocStateView,
-    ) -> Vec<FunctionCommand> {
+    ) -> Vec<EffectCommand> {
         self.inner.run(body, elapsed, doc)
     }
 }
 
-impl From<SimpleFunctionBody> for SimpleFunctionDto {
-    fn from(value: SimpleFunctionBody) -> Self {
+impl From<SimpleEffectBody> for SimpleEffectDto {
+    fn from(value: SimpleEffectBody) -> Self {
         Self {
             values: value
                 .values
                 .into_iter()
-                .map(|((fxt_id, offset), value)| SimpleFunctionValueDto {
+                .map(|((fxt_id, offset), value)| SimpleEffectValueDto {
                     fxt_id: fxt_id,
                     offset: offset,
                     value: value,
@@ -178,8 +178,8 @@ impl From<SimpleFunctionBody> for SimpleFunctionDto {
     }
 }
 
-impl From<SimpleFunctionDto> for SimpleFunctionBody {
-    fn from(value: SimpleFunctionDto) -> Self {
+impl From<SimpleEffectDto> for SimpleEffectBody {
+    fn from(value: SimpleEffectDto) -> Self {
         Self {
             values: value
                 .values
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn simple_function_is_serialized_and_deserialized_correctly() {
         let fxt_id = FixtureId::new();
-        let fun = Function::new_simple(
+        let fun = Effect::new_simple(
             "Scene 1",
             vec![((fxt_id, 0usize), 255u8), ((fxt_id, 1), 200)]
                 .into_iter()
@@ -206,7 +206,7 @@ mod tests {
 
         let json = serde_json::to_string(&fun).unwrap();
 
-        let deserialized: Function = serde_json::from_str(&json).unwrap();
+        let deserialized: Effect = serde_json::from_str(&json).unwrap();
 
         assert_eq!(fun, deserialized);
     }

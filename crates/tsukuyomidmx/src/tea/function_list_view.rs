@@ -12,8 +12,8 @@ use crate::{
 };
 use slint::{ComponentHandle, Global, ToSharedString};
 use tsukuyomidmx_core::{
-    functions::{Function, FunctionPrototypeId},
-    prelude::AppliedFunctionId,
+    effects::{Effect, EffectSpecId},
+    prelude::EffectId,
 };
 
 #[allow(unused)]
@@ -30,7 +30,7 @@ pub fn setup(app: &App) {
                 doc_clone
                     .lock()
                     .unwrap()
-                    .add_function(Function::new_simple("Simple Function", HashMap::new()))
+                    .add_function(Effect::new_simple("Simple Function", HashMap::new()))
                     .expect("todo");
             });
         }
@@ -44,7 +44,7 @@ pub fn setup(app: &App) {
                 doc_clone
                     .lock()
                     .unwrap()
-                    .add_function(Function::new_sequence("Sequence Function", Vec::new()))
+                    .add_function(Effect::new_sequence("Sequence Function", Vec::new()))
                     .expect("todo");
             });
         }
@@ -100,10 +100,10 @@ pub fn setup(app: &App) {
         move |id, r#type| {
             wrap_callback("FunctionListViewAdopter::on_remove_function", || {
                 if is_prototype(&r#type) {
-                    let id = AppliedFunctionId::try_from(id.as_str()).expect("todo");
+                    let id = EffectId::try_from(id.as_str()).expect("todo");
                     doc_clone.lock().unwrap().remove_function(id).expect("todo");
                 } else {
-                    let id = FunctionPrototypeId::try_from(id.as_str()).expect("todo");
+                    let id = EffectSpecId::try_from(id.as_str()).expect("todo");
                     doc_clone
                         .lock()
                         .unwrap()
@@ -122,9 +122,9 @@ pub fn setup(app: &App) {
         move |id, r#type| {
             wrap_callback("FunctionListViewAdopter::on_set_selected_function", || {
                 let id = if is_prototype(&r#type) {
-                    AnyFunctionId::Prototype(FunctionPrototypeId::try_from(id.as_str()).unwrap())
+                    AnyFunctionId::Prototype(EffectSpecId::try_from(id.as_str()).unwrap())
                 } else {
-                    AnyFunctionId::Applied(AppliedFunctionId::try_from(id.as_str()).unwrap())
+                    AnyFunctionId::Applied(EffectId::try_from(id.as_str()).unwrap())
                 };
 
                 let idx = model_clone.get_index(id).unwrap();

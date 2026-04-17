@@ -1,39 +1,37 @@
-use crate::functions::FunctionRuntime;
+use crate::effects::EffectRuntime;
 
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParallelFunctionPrototypeBody {}
+pub struct ParallelEffectSpecBody {}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParallelFunctionBody {
-    items: Vec<FunctionBodyOrId<FunctionBody, AppliedFunctionId>>,
+pub struct ParallelEffectBody {
+    items: Vec<EffectBodyOrReference<EffectBody, EffectId>>,
 }
 
-pub struct StandAloneParallelFunctionRuntime {
-    fun_id: AppliedFunctionId,
-    inner: ParallelFunctionRuntime,
+pub struct StandAloneParallelEffectRuntime {
+    fun_id: EffectId,
+    inner: ParallelEffectRuntime,
 }
 
-pub struct ParallelFunctionRuntime {
-    runtimes: Vec<Box<dyn FunctionRuntime>>,
+pub struct ParallelEffectRuntime {
+    runtimes: Vec<Box<dyn EffectRuntime>>,
 }
 
-impl ParallelFunctionPrototypeBody {
+impl ParallelEffectSpecBody {
     pub(super) fn bind_to_inner(
         &self,
         _args: impl Iterator<Item = Vec<FixtureId>>,
         _doc: DocStateView,
         _diag: &mut Diagnostics,
-    ) -> Option<ParallelFunctionBody> {
+    ) -> Option<ParallelEffectBody> {
         todo!()
     }
 }
 
-impl ParallelFunctionBody {
-    pub(super) fn new(
-        items: impl Into<Vec<FunctionBodyOrId<FunctionBody, AppliedFunctionId>>>,
-    ) -> Self {
+impl ParallelEffectBody {
+    pub(super) fn new(items: impl Into<Vec<EffectBodyOrReference<EffectBody, EffectId>>>) -> Self {
         Self {
             items: items.into(),
         }
@@ -41,12 +39,12 @@ impl ParallelFunctionBody {
 
     pub(super) fn create_runtime_standalone(
         &self,
-        self_id: AppliedFunctionId,
+        self_id: EffectId,
         doc: DocStateView,
-    ) -> Box<dyn StandAloneFunctionRuntime> {
-        Box::new(StandAloneParallelFunctionRuntime {
+    ) -> Box<dyn StandAloneEffectRuntime> {
+        Box::new(StandAloneParallelEffectRuntime {
             fun_id: self_id,
-            inner: ParallelFunctionRuntime {
+            inner: ParallelEffectRuntime {
                 runtimes: self
                     .items
                     .iter()
@@ -56,8 +54,8 @@ impl ParallelFunctionBody {
         })
     }
 
-    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn FunctionRuntime> {
-        Box::new(ParallelFunctionRuntime {
+    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        Box::new(ParallelEffectRuntime {
             runtimes: self
                 .items
                 .iter()
@@ -67,14 +65,14 @@ impl ParallelFunctionBody {
     }
 }
 
-impl FunctionRuntime for ParallelFunctionRuntime {
+impl EffectRuntime for ParallelEffectRuntime {
     fn run(
         &mut self,
-        this: &FunctionBody,
+        this: &EffectBody,
         elapsed: Duration,
         doc: DocStateView,
-    ) -> Vec<FunctionCommand> {
-        let FunctionBody::Parallel(this) = this else {
+    ) -> Vec<EffectCommand> {
+        let EffectBody::Parallel(this) = this else {
             unreachable!()
         };
         self.runtimes
@@ -82,8 +80,8 @@ impl FunctionRuntime for ParallelFunctionRuntime {
             .zip(&this.items)
             .fold(Vec::new(), |mut acc, (rt, data)| {
                 let mut commands = match data {
-                    FunctionBodyOrId::Body(fun) => rt.run(&fun, elapsed, doc.clone()),
-                    FunctionBodyOrId::Id(id) => doc.with_functions(|it| {
+                    EffectBodyOrReference::Body(fun) => rt.run(&fun, elapsed, doc.clone()),
+                    EffectBodyOrReference::Reference(id) => doc.with_functions(|it| {
                         let body = &it.get(&id).unwrap().body;
                         rt.run(&body, elapsed, doc.clone())
                     }),
@@ -94,8 +92,8 @@ impl FunctionRuntime for ParallelFunctionRuntime {
     }
 }
 
-impl StandAloneFunctionRuntime for StandAloneParallelFunctionRuntime {
-    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<FunctionCommand> {
+impl StandAloneEffectRuntime for StandAloneParallelEffectRuntime {
+    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
         doc.with_functions(|it| {
             let body = &it.get(&self.fun_id).unwrap().body;
 
@@ -104,13 +102,13 @@ impl StandAloneFunctionRuntime for StandAloneParallelFunctionRuntime {
     }
 }
 
-impl FunctionRuntime for StandAloneParallelFunctionRuntime {
+impl EffectRuntime for StandAloneParallelEffectRuntime {
     fn run(
         &mut self,
-        body: &FunctionBody,
+        body: &EffectBody,
         elapsed: Duration,
         doc: DocStateView,
-    ) -> Vec<FunctionCommand> {
+    ) -> Vec<EffectCommand> {
         self.inner.run(body, elapsed, doc)
     }
 }

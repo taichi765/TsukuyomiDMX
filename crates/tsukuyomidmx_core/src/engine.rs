@@ -3,8 +3,8 @@ use thiserror::Error;
 use tracing::{debug, info, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
+use crate::effects::{EffectCommand, EffectId, StandAloneEffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::functions::{AppliedFunctionId, FunctionCommand, StandAloneFunctionRuntime};
 use crate::plugins::{DmxFrame, Plugin};
 use crate::universe::UniverseId;
 use std::collections::{HashMap, HashSet};
@@ -23,7 +23,7 @@ pub struct Engine {
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
-    active_runtime: Option<Box<dyn StandAloneFunctionRuntime>>,
+    active_runtime: Option<Box<dyn StandAloneEffectRuntime>>,
     /// Pluginインスタンス
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     /// どのPluginがどのUniverseに出力するか
@@ -177,14 +177,14 @@ impl Engine {
 
         for command in commands {
             match command {
-                FunctionCommand::StartFunction(function_id) => self.start_function(function_id),
-                FunctionCommand::StopFuntion => self.stop_function(),
-                FunctionCommand::WriteUniverse {
+                EffectCommand::StartEffect(function_id) => self.start_function(function_id),
+                EffectCommand::StopEffect => self.stop_function(),
+                EffectCommand::WriteUniverse {
                     fixture_id,
                     channel,
                     value,
                 } => self.write_universe(fixture_id, channel, value),
-                FunctionCommand::StartFade {
+                EffectCommand::StartFade {
                     from_id,
                     to_id,
                     chaser_id,
@@ -219,7 +219,7 @@ impl Engine {
     }
 
     /// 既にactiveなfunctionがあった場合上書きされる
-    fn start_function(&mut self, function_id: AppliedFunctionId) {
+    fn start_function(&mut self, function_id: EffectId) {
         let res = self.doc.with_functions(|it| {
             it.get(&function_id)
                 .map(|fun| fun.create_standalone_runtime(self.doc.clone()))
@@ -292,9 +292,9 @@ impl Engine {
 
     fn start_fade(
         &mut self,
-        _from_id: AppliedFunctionId,
-        _to_id: AppliedFunctionId,
-        _chaser_id: AppliedFunctionId,
+        _from_id: EffectId,
+        _to_id: EffectId,
+        _chaser_id: EffectId,
         _duration: Duration,
     ) {
         //必要な値だけを取り出す
@@ -337,7 +337,7 @@ impl Engine {
 #[derive(Debug)]
 pub enum EngineCommand {
     // Commands
-    StartFunction(AppliedFunctionId),
+    StartFunction(EffectId),
     /// 現在実行中のfunctionをstopする
     StopFunction,
     SetLiveValue {
@@ -382,7 +382,7 @@ pub enum EngineError {
     ResolveAddress(#[from] ResolveError),
     #[error("")]
     RunningFunction {
-        function_id: AppliedFunctionId,
+        function_id: EffectId,
         source: Box<dyn Error + Send>,
     },
     #[error("")]
@@ -392,7 +392,7 @@ pub enum EngineError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     #[error("function {function_id} not found in Doc")]
-    FunctionNotFound { function_id: AppliedFunctionId },
+    FunctionNotFound { function_id: EffectId },
     #[error("no plugin {id:?} found")]
     OutputPluginNotFound { id: OutputPluginId },
 }

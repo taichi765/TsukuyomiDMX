@@ -176,13 +176,13 @@ mod fixtures {
 mod functions {
     use crate::{
         doc::{DocCommand, DocEffect},
-        functions::Function,
-        prelude::AppliedFunctionId,
+        effects::Effect,
+        prelude::EffectId,
     };
 
     #[derive(Debug)]
     pub struct AddFunctionCommand {
-        fun: Function,
+        fun: Effect,
     }
 
     impl DocCommand for AddFunctionCommand {
@@ -204,7 +204,7 @@ mod functions {
     }
 
     impl AddFunctionCommand {
-        pub fn new(fun: Function) -> Self {
+        pub fn new(fun: Effect) -> Self {
             Self { fun }
         }
     }
@@ -212,7 +212,7 @@ mod functions {
     pub struct UpdateFunctionCommand {}
 
     #[derive(Debug)]
-    pub struct RemoveFunctionCommand(AppliedFunctionId);
+    pub struct RemoveFunctionCommand(EffectId);
 
     impl DocCommand for RemoveFunctionCommand {
         fn apply(
@@ -233,7 +233,7 @@ mod functions {
     }
 
     impl RemoveFunctionCommand {
-        pub fn new(id: AppliedFunctionId) -> Self {
+        pub fn new(id: EffectId) -> Self {
             Self(id)
         }
     }
