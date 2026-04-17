@@ -1,6 +1,6 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
-use tracing::{info, trace, warn};
+use tracing::{debug, info, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
 use crate::fixture::{FixtureId, MergeMode};
@@ -82,7 +82,7 @@ impl Engine {
 
     fn handle_engine_commands(&mut self) {
         while let Ok(cmd) = self.command_rx.try_recv() {
-            trace!(?cmd, "received command");
+            debug!(?cmd, "received command");
             match cmd {
                 EngineCommand::StartFunction(id) => self.start_function(id),
                 EngineCommand::StopFunction => self.stop_function(),

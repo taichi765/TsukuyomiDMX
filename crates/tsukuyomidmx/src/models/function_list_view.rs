@@ -41,7 +41,20 @@ impl Model for FunctionListViewModel {
 impl FunctionListViewModel {
     pub fn new(doc: &mut Doc) -> Rc<Self> {
         let row_order = Vec::new();
-        let data = HashMap::new();
+        let data = doc.state_view().with_functions(|it| {
+            it.iter().fold(HashMap::new(), |mut acc, v| {
+                acc.insert(
+                    AnyFunctionId::Applied(v.0.to_owned()),
+                    ui::FunctionData {
+                        id: v.0.to_shared_string(),
+                        name: v.1.name().to_shared_string(),
+                        r#type: ui::FunctionType::Simple,
+                    },
+                );
+                acc
+            })
+        });
+        dbg!(&data);
 
         let me = Rc::new(Self {
             doc: doc.state_view(),

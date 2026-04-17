@@ -9,6 +9,8 @@ use crate::{
 };
 
 pub mod artnet;
+mod ola;
+pub use ola::OlaPlugin;
 
 pub trait Plugin: Send + Sync + Debug {
     fn id(&self) -> OutputPluginId;
@@ -58,7 +60,7 @@ impl DmxFrame {
     }
 
     /// If you are dealing with [`DmxAddress`], it's recommended to use [`DmxFrame::iter()`] instead.
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn as_slice(&self) -> &[u8; 512] {
         &self.data
     }
 }

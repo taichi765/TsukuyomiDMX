@@ -26,7 +26,7 @@ use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
     engine::{Engine, EngineCommand, EngineMessage},
     functions::{Function, FunctionPrototype, FunctionPrototypeId},
-    plugins::Plugin,
+    plugins::{OlaPlugin, Plugin},
     prelude::{AppliedFunctionId, Fixture, FixtureDefId, FixtureId, UniverseId},
 };
 
@@ -192,11 +192,40 @@ impl App {
         self.setup_engine();
         self.setup_window();
         preview_2d::setup(&self);
+        // TODO: この部分はuniverses.jsonから読み込んでやる
+        let plugin = Box::new(OlaPlugin::new().unwrap());
+        let p_id = plugin.id();
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::AddPlugin(plugin))
+            .unwrap();
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::AddPluginDestination {
+                plugin: p_id,
+                dest_universe: UniverseId::new(0),
+            })
+            .unwrap();
         self.register_global_actions();
         self.register_key_bindings();
 
         // TODO: ファイルから読み込む
         (0..2).for_each(|_| self.doc.lock().unwrap().add_universe());
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::UniverseAdded(UniverseId::new(0)))
+            .unwrap();
+
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::StartFunction(
+                AppliedFunctionId::try_from("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
+            ))
+            .unwrap();
 
         self.ui.run()?;
 
