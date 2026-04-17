@@ -20,6 +20,7 @@ pub enum MergeMode {
 pub struct Fixture {
     id: FixtureId,
     name: String,
+    tags: Vec<FixtureTag>,
     universe_id: UniverseId,
     address: DmxAddress,
     fixture_def_id: FixtureDefId,
@@ -43,6 +44,7 @@ impl Fixture {
         Self {
             id: FixtureId::new(),
             name: name.into(),
+            tags: Vec::new(),
             universe_id,
             address,
             fixture_def_id,
@@ -58,6 +60,10 @@ impl Fixture {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn tags(&self) -> &Vec<FixtureTag> {
+        &self.tags
     }
 
     pub fn universe_id(&self) -> UniverseId {
@@ -108,6 +114,14 @@ impl TryFrom<FixtureDto> for Fixture {
         Ok(Self {
             id: value.id,
             name: value.name,
+            tags: value
+                .tags
+                .iter()
+                .map(|str| {
+                    FixtureTag::new(str)
+                        .ok_or_else(|| format!("tag contains invalid character: {}", str))
+                })
+                .collect::<Result<_, _>>()?,
             universe_id: value.universe_id,
             address: value.address,
             fixture_def_id: FixtureDefId::try_from(value.fixture_def_id.as_str())?,
@@ -115,6 +129,28 @@ impl TryFrom<FixtureDto> for Fixture {
             x: value.x,
             y: value.y,
         })
+    }
+}
+
+/// Fixtureにつけるタグ。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixtureTag(String);
+
+impl FixtureTag {
+    /// Returns `None` if `val` contains invalid character.
+    ///
+    /// Allowed characters are alphabetic characters, numeric characters and '-' and '_'.
+    /// See [`char::is_alphabetic()`] and [`char::is_numeric()`] for more information.
+    pub fn new(val: impl Into<String>) -> Option<Self> {
+        let val = val.into();
+        if val
+            .chars()
+            .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
+        {
+            None
+        } else {
+            Some(Self(val))
+        }
     }
 }
 
@@ -148,6 +184,7 @@ impl FixtureChange {
 pub struct FixtureDto {
     id: FixtureId,
     name: String,
+    tags: Vec<String>,
     universe_id: UniverseId,
     address: DmxAddress,
     fixture_def_id: String,
@@ -161,6 +198,7 @@ impl From<Fixture> for FixtureDto {
         Self {
             id: value.id,
             name: value.name,
+            tags: value.tags.iter().map(|tag| tag.0.to_owned()).collect(),
             universe_id: value.universe_id,
             address: value.address,
             fixture_def_id: value.fixture_def_id.to_string(),

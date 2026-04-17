@@ -11,12 +11,13 @@ mod simple;
 
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::doc::DocStateView;
 use crate::effects::parallel::{ParallelEffectBody, ParallelEffectSpecBody};
 use crate::effects::sequence::{SequenceEffectBody, SequenceEffectSpecBody, SequenceStep};
 use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody};
-use crate::fixture::FixtureId;
+use crate::fixture::{FixtureId, FixtureTag};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -53,6 +54,66 @@ pub enum EffectBody {
     Simple(SimpleEffectBody),
     Sequence(SequenceEffectBody),
     Parallel(ParallelEffectBody),
+}
+
+/// Propsとして取れる型
+#[derive(Debug, Clone)]
+pub enum Type {
+    Duration,
+    Color,
+    FixtureQuery,
+}
+
+/// Propsとして渡せる値
+#[derive(Debug, Clone)]
+pub enum Value {
+    Duration(Duration),
+    Color([u8; 3]),
+    FixtureQuery(FixtureQuery),
+}
+
+/// Queries Fixtures with css-like selector.
+#[derive(Debug, Clone)]
+pub struct FixtureQuery {
+    string: String,
+    data: Vec<Selector>,
+}
+
+/// [`FixtureQuery`]で指定できるselector.
+#[derive(Debug, Clone)]
+pub enum Selector {
+    Id(FixtureId),
+    Tags(Vec<FixtureTag>),
+}
+
+impl FixtureQuery {
+    /// queryにmatchするFixtureを全て返す
+    pub(crate) fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
+        self.data.iter().fold(Vec::new(), |mut acc, v| {
+            match v {
+                Selector::Id(id) => {
+                    doc.with_fixtures(|it| {
+                        if it.contains_key(id) {
+                            acc.push(id.to_owned());
+                        } else {
+                            warn!(?id, "fixture does not exist");
+                        };
+                    });
+                }
+                Selector::Tags(tags) => doc.with_fixtures(|it| {
+                    let mut fxts = it
+                        .iter()
+                        .filter(|(_, fxt)| tags.iter().any(|tag| fxt.tags().contains(tag)))
+                        .map(|(fxt_id, _)| fxt_id)
+                        .cloned()
+                        .collect();
+                    acc.append(&mut fxts);
+                }),
+            }
+
+            acc
+        })
+    }
 }
 
 impl Effect {
