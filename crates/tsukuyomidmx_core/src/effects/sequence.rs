@@ -3,7 +3,17 @@ use super::*;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SequenceEffectSpecBody {
     props: HashMap<String, Type>,
-    steps: Vec<SequenceTemplateStep>,
+    steps: Vec<SequenceSpecStep>,
+}
+
+type SequenceSpecStep = SequenceTemplateStepBase<EffectSpecBody, EffectSpecId>;
+
+impl SequenceEffectSpecBody {
+    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Vec<ResolvedSequenceStep> {
+        resolve_steps(&self.steps, given_props, |body, props| {
+            body.resolve_props(props)
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -12,7 +22,6 @@ pub enum SequenceEffectTemplateBody {
         spec_id: EffectSpecId,
         spec_props: HashMap<String, Expression>,
         props: HashMap<String, Type>,
-        fixtures: FixtureQuery,
     },
     // TODO: FromTemplate(),
     New {
@@ -43,75 +52,47 @@ impl SequenceEffectTemplateBody {
             spec_id,
             spec_props,
             props: HashMap::new(),
-            fixtures: FixtureQuery::default(),
         })
     }
 
-    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Vec<ResolvedSequenceStep> {
+    fn resolve_props(
+        &self,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Vec<ResolvedSequenceStep> {
         match self {
-            SequenceEffectTemplateBody::FromSpec {
+            Self::FromSpec {
                 spec_id,
                 spec_props,
                 props,
-                fixtures,
             } => {
-                todo!()
+                debug_assert_eq!(props.len(), given_props.len(), "all props must be apllied");
+
+                let resolved_spec_props: HashMap<_, _> = spec_props
+                    .iter()
+                    .map(|(p_name, p_val)| match p_val {
+                        Expression::Prop(p) => {
+                            (p_name.to_owned(), given_props.get(p).cloned().unwrap())
+                        }
+                        Expression::Value(val) => (p_name.to_owned(), val.clone()),
+                    })
+                    .collect();
+
+                doc.with_effect_specs(|it| {
+                    let EffectSpecBody::Sequence(spec) = &it.get(spec_id).unwrap().body else {
+                        unreachable!()
+                    };
+                    spec.resolve_props(resolved_spec_props)
+                })
             }
-            SequenceEffectTemplateBody::New {
+            Self::New {
                 props,
                 steps,
                 fixtures,
             } => {
-                debug_assert_eq!(props.len(), given_props.len());
+                debug_assert_eq!(props.len(), given_props.len(), "all props must be applied");
 
-                steps
-                    .iter()
-                    .scan(
-                        // TODO: SimpleEffectRuntime::empty()みたいなやつ作る。作るときにfixturesを渡す。
-                        Vec::new(),
-                        |prev_last_frame, cur_step| {
-                            let hold = match &cur_step.hold {
-                                Expression::Value(val) => val.unwrap_duration(),
-                                Expression::Prop(p_name) => {
-                                    given_props.get(p_name).unwrap().unwrap_duration()
-                                }
-                            };
-
-                            let fade_in = match &cur_step.fade_in {
-                                Expression::Value(val) => val.unwrap_duration(),
-                                Expression::Prop(p_name) => {
-                                    given_props.get(p_name).unwrap().unwrap_duration()
-                                }
-                            };
-                            let fade_in = if fade_in == Duration::ZERO {
-                                None
-                            } else {
-                                Some(fade_in)
-                            };
-
-                            // TODO: そのまま渡すんじゃなくてbodyで定義されてるやつだけ渡す
-                            let runtime = cur_step.body.resolve_props(given_props.clone());
-
-                            let fadein_runtime = fade_in
-                                .map(|fade_in| {
-                                    FadeInRuntime::new(
-                                        prev_last_frame,
-                                        &runtime.first_frame_hint(),
-                                        fade_in,
-                                    )
-                                })
-                                .map(|rt| -> Box<dyn EffectRuntime> { Box::new(rt) });
-
-                            *prev_last_frame = runtime.last_frame_hint();
-                            Some(ResolvedSequenceStep {
-                                hold,
-                                fade_in,
-                                runtime,
-                                fadein_runtime,
-                            })
-                        },
-                    )
-                    .collect()
+                resolve_steps(steps, given_props, |body, props| body.resolve_props(props))
             }
         }
     }
@@ -119,12 +100,6 @@ impl SequenceEffectTemplateBody {
 
 pub enum FromSpecError {
     SpecNotFound(EffectSpecId),
-}
-
-pub struct SequenceEffect {
-    id: EffectId,
-    name: String,
-    body: SequenceEffectBody,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,7 +117,7 @@ impl SequenceEffectBody {
                     unreachable!()
                 };
 
-                let steps = tmpl.resolve_props(tmpl_props.clone());
+                let steps = tmpl.resolve_props(tmpl_props.clone(), doc.clone());
                 SequenceEffectRuntime::new(steps)
             }),
             Self::New(steps) => {
@@ -175,12 +150,14 @@ impl SequenceEffectBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SequenceTemplateStep {
+pub struct SequenceTemplateStepBase<Body, Id> {
     /// `fade_in`を除いた時間
     hold: Expression,
     fade_in: Expression,
-    body: EffectBodyOrReference<EffectTemplateBody, EffectTemplateId>,
+    body: EffectBodyOrReference<Body, Id>,
 }
+
+type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateBody, EffectTemplateId>;
 
 /// Used in [`SequenceEffectBody`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,6 +182,57 @@ impl ResolvedSequenceStep {
     fn duration(&self) -> Duration {
         self.hold + self.fade_in.unwrap_or(Duration::ZERO)
     }
+}
+
+/// `body_resolver`を使って再帰的にpropsを適用していく
+fn resolve_steps<Body, Id>(
+    steps: &[SequenceTemplateStepBase<Body, Id>],
+    given_props: HashMap<String, Value>,
+    body_resolver: impl Fn(
+        &EffectBodyOrReference<Body, Id>,
+        HashMap<String, Value>,
+    ) -> Box<dyn EffectRuntime>,
+) -> Vec<ResolvedSequenceStep> {
+    steps
+        .iter()
+        .scan(
+            // TODO: SimpleEffectRuntime::empty()みたいなやつ作る。作るときにfixturesを渡す。
+            Vec::new(),
+            |prev_last_frame, cur_step| {
+                let hold = match &cur_step.hold {
+                    Expression::Value(val) => val.unwrap_duration(),
+                    Expression::Prop(p_name) => given_props.get(p_name).unwrap().unwrap_duration(),
+                };
+
+                let fade_in = match &cur_step.fade_in {
+                    Expression::Value(val) => val.unwrap_duration(),
+                    Expression::Prop(p_name) => given_props.get(p_name).unwrap().unwrap_duration(),
+                };
+                let fade_in = if fade_in == Duration::ZERO {
+                    None
+                } else {
+                    Some(fade_in)
+                };
+
+                // TODO: そのまま渡すんじゃなくてbodyで定義されてるやつだけ渡す
+                let runtime = body_resolver(&cur_step.body, given_props.clone());
+
+                let fadein_runtime = fade_in
+                    .map(|fade_in| {
+                        FadeInRuntime::new(prev_last_frame, &runtime.first_frame_hint(), fade_in)
+                    })
+                    .map(|rt| -> Box<dyn EffectRuntime> { Box::new(rt) });
+
+                *prev_last_frame = runtime.last_frame_hint();
+                Some(ResolvedSequenceStep {
+                    hold,
+                    fade_in,
+                    runtime,
+                    fadein_runtime,
+                })
+            },
+        )
+        .collect()
 }
 
 pub struct SequenceEffectRuntime {

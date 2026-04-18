@@ -203,6 +203,12 @@ impl EffectBodyOrReference<EffectBody, EffectId> {
     }
 }
 
+impl EffectBodyOrReference<EffectSpecBody, EffectSpecId> {
+    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Box<dyn EffectRuntime> {
+        todo!()
+    }
+}
+
 impl EffectBodyOrReference<EffectTemplateBody, EffectTemplateId> {
     fn resolve_props(&self, given_props: HashMap<String, Value>) -> Box<dyn EffectRuntime> {
         todo!()
