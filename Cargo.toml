@@ -21,6 +21,7 @@ bimap = "0.6.3"
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive_more = "2.1.1"
 dirs = "6.0.0"
+itertools = "0.14.0"
 paste = "1.0.15"
 tracing = "0.1"
 thiserror = "2.0.17"

@@ -13,6 +13,7 @@ bimap = { workspace = true }
 dirs = { workspace = true }
 derive-getters = { workspace = true, features = ["auto_copy_getters"] }
 derive_more = { workspace = true, features = ["debug", "deref"] }
+itertools = { workspace = true }
 paste = { workspace = true }
 rayon = "1.11.0"
 serde = { workspace = true }

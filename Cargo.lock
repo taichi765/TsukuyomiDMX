@@ -5655,6 +5655,7 @@ dependencies = [
  "derive_more",
  "dirs",
  "ftdi",
+ "itertools 0.14.0",
  "ofl_schemas",
  "ola",
  "paste",
