@@ -2,19 +2,22 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelEffectSpecBody {
-    items: Vec<EffectBodyOrReference<EffectSpecBody, EffectSpecId>>,
+    items: Vec<SpecBodyOrReference>,
 }
 
 impl ParallelEffectSpecBody {
-    fn resolve_props(
+    pub(super) fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,
         doc: DocStateView,
-    ) -> Vec<Box<dyn EffectRuntime>> {
-        self.items
-            .iter()
-            .map(|item| item.resolve_props(given_props.clone()))
-            .collect()
+    ) -> Box<dyn EffectRuntime> {
+        Box::new(ParallelEffectRuntime {
+            runtimes: self
+                .items
+                .iter()
+                .map(|item| item.resolve_props(given_props.clone(), doc.clone()))
+                .collect(),
+        })
     }
 }
 
@@ -33,11 +36,11 @@ pub enum ParallelEffectTemplateBody {
 }
 
 impl ParallelEffectTemplateBody {
-    fn resolve_props(
+    pub(super) fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,
         doc: DocStateView,
-    ) -> Vec<Box<dyn EffectRuntime>> {
+    ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromSpec {
                 spec_id,
@@ -63,10 +66,12 @@ impl ParallelEffectTemplateBody {
             Self::New { props, items } => {
                 debug_assert_eq!(props.len(), given_props.len(), "all props must be applied");
 
-                items
-                    .iter()
-                    .map(|item| item.resolve_props(given_props.clone()))
-                    .collect()
+                Box::new(ParallelEffectRuntime {
+                    runtimes: items
+                        .iter()
+                        .map(|item| item.resolve_props(given_props.clone(), doc.clone()))
+                        .collect(),
+                })
             }
         }
     }
@@ -93,12 +98,9 @@ impl ParallelEffectBody {
             Self::FromTemplate {
                 tmpl_id,
                 tmpl_props,
-            } => {
-                let runtimes = doc.with_template(*tmpl_id, |body: &ParallelEffectTemplateBody| {
-                    body.resolve_props(tmpl_props.clone(), doc.clone())
-                });
-                Box::new(ParallelEffectRuntime { runtimes })
-            }
+            } => doc.with_template(*tmpl_id, |body: &ParallelEffectTemplateBody| {
+                body.resolve_props(tmpl_props.clone(), doc.clone())
+            }),
             Self::New { items } => {
                 let runtimes = items
                     .iter()

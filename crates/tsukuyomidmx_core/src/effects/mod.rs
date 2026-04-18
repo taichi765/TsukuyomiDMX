@@ -127,7 +127,7 @@ impl EffectBody {
     fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
         match &self {
             // TODO: Boxを返すかそのまま返すか統一する
-            EffectBody::Simple(fun) => fun.create_runtime(doc.clone(), doc),
+            EffectBody::Simple(fun) => fun.create_runtime(doc),
             EffectBody::Sequence(fun) => fun.create_runtime(doc),
             EffectBody::Parallel(fun) => fun.create_runtime(doc),
         }
@@ -157,6 +157,21 @@ impl EffectSpec {
     }
 }
 
+impl EffectSpecBody {
+    fn resolve_props(
+        &self,
+        fixtures: &FixtureQuery,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
+        match self {
+            Self::Simple(body) => body.resolve_props(fixtures, given_props, doc),
+            Self::Sequence(body) => body.resolve_props(given_props, doc),
+            Self::Parallel(body) => body.resolve_props(given_props, doc),
+        }
+    }
+}
+
 /// Propsに代入することで[`Effect`]を得られる。
 pub struct EffectTemplate {
     id: EffectTemplateId,
@@ -174,7 +189,19 @@ pub enum EffectTemplateBody {
     Parallel(ParallelEffectTemplateBody),
 }
 
-impl EffectTemplate {}
+impl EffectTemplateBody {
+    fn resolve_props(
+        &self,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
+        match self {
+            EffectTemplateBody::Simple(body) => body.resolve_props(given_props, doc),
+            EffectTemplateBody::Sequence(body) => body.resolve_props(given_props, doc),
+            EffectTemplateBody::Parallel(body) => body.resolve_props(given_props, doc),
+        }
+    }
+}
 
 pub struct Diagnostics {
     inner: Vec<DiagnosticItem>,
@@ -209,15 +236,42 @@ impl EffectBodyOrReference<EffectBody, EffectId> {
     }
 }
 
-impl EffectBodyOrReference<EffectSpecBody, EffectSpecId> {
-    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Box<dyn EffectRuntime> {
-        todo!()
+type SpecBodyOrReference =
+    EffectBodyOrReference<(EffectSpecBody, FixtureQuery), (EffectSpecId, FixtureQuery)>;
+
+impl SpecBodyOrReference {
+    fn resolve_props(
+        &self,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
+        match self {
+            Self::Body((body, fixtures)) => body.resolve_props(fixtures, given_props, doc),
+            Self::Reference((id, fixtures)) => doc.with_effect_specs(|it| {
+                it.get(id)
+                    .unwrap()
+                    .body
+                    .resolve_props(fixtures, given_props, doc.clone())
+            }),
+        }
     }
 }
 
 impl EffectBodyOrReference<EffectTemplateBody, EffectTemplateId> {
-    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Box<dyn EffectRuntime> {
-        todo!()
+    fn resolve_props(
+        &self,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
+        match self {
+            Self::Body(body) => body.resolve_props(given_props, doc),
+            Self::Reference(id) => doc.with_effect_templates(|it| {
+                it.get(id)
+                    .unwrap()
+                    .body
+                    .resolve_props(given_props, doc.clone())
+            }),
+        }
     }
 }
 

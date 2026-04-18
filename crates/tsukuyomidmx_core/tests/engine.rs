@@ -29,12 +29,8 @@ fn engine_can_start_function() {
     let fxt_id = fxt.id();
     doc.add_fixture(fxt).unwrap();
 
-    let fun = Effect::new_simple(
-        "Scene 1",
-        vec![((fxt_id, 0), 255), ((fxt_id, 1), 200)]
-            .into_iter()
-            .collect::<HashMap<_, _>>(),
-    );
+    let fun = Effect::new_simple("Scene 1");
+    // TODO: Add steps here
     let fun_id = fun.id();
     doc.add_function(fun).unwrap();
 

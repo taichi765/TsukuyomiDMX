@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use super::*;
 
 impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody> for DocStateView {
@@ -42,12 +44,17 @@ pub struct SequenceEffectSpecBody {
     steps: Vec<SequenceSpecStep>,
 }
 
-type SequenceSpecStep = SequenceTemplateStepBase<EffectSpecBody, EffectSpecId>;
+type SequenceSpecStep =
+    SequenceTemplateStepBase<(EffectSpecBody, FixtureQuery), (EffectSpecId, FixtureQuery)>;
 
 impl SequenceEffectSpecBody {
-    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Vec<ResolvedSequenceStep> {
+    pub(super) fn resolve_props(
+        &self,
+        given_props: HashMap<String, Value>,
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
         resolve_steps(&self.steps, given_props, |body, props| {
-            body.resolve_props(props)
+            body.resolve_props(props, doc.clone())
         })
     }
 }
@@ -91,11 +98,11 @@ impl SequenceEffectTemplateBody {
         })
     }
 
-    fn resolve_props(
+    pub(super) fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,
-        rg: impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody>,
-    ) -> Vec<ResolvedSequenceStep> {
+        doc: DocStateView,
+    ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromSpec {
                 spec_id,
@@ -114,7 +121,9 @@ impl SequenceEffectTemplateBody {
                     })
                     .collect();
 
-                rg.with_spec(*spec_id, |spec| spec.resolve_props(resolved_spec_props))
+                doc.with_spec(*spec_id, |spec: &SequenceEffectSpecBody| {
+                    spec.resolve_props(resolved_spec_props, doc.clone())
+                })
             }
             Self::New {
                 props,
@@ -123,7 +132,9 @@ impl SequenceEffectTemplateBody {
             } => {
                 debug_assert_eq!(props.len(), given_props.len(), "all props must be applied");
 
-                resolve_steps(steps, given_props, |body, props| body.resolve_props(props))
+                resolve_steps(steps, given_props, |body, props| {
+                    body.resolve_props(props, doc.clone())
+                })
             }
         }
     }
@@ -148,8 +159,7 @@ impl SequenceEffectBody {
                     unreachable!()
                 };
 
-                let steps = tmpl.resolve_props(tmpl_props.clone(), doc.clone());
-                Box::new(SequenceEffectRuntime::new(steps))
+                tmpl.resolve_props(tmpl_props.clone(), doc.clone())
             }),
             Self::New(steps) => {
                 // TODO: SequenceEffectTemplateBody::resolve_props()と重複しているコードがある
@@ -160,17 +170,17 @@ impl SequenceEffectBody {
                         let rt = cur_step.body.create_runtime(doc.clone());
                         let cur_first_frame = rt.first_frame_hint();
                         *prev_last_frame = rt.last_frame_hint();
-                        Some(ResolvedSequenceStep {
-                            fade_in: cur_step.fade_in,
-                            hold: cur_step.hold,
-                            runtime: rt,
-                            fadein_runtime: cur_step
+                        Some(StepRuntime::new(
+                            cur_step.hold,
+                            rt,
+                            cur_step.fade_in,
+                            cur_step
                                 .fade_in
                                 .map(|fade_in| {
                                     FadeInRuntime::new(prev_last_frame, &cur_first_frame, fade_in)
                                 })
                                 .map(|rt| -> Box<dyn EffectRuntime> { Box::new(rt) }),
-                        })
+                        ))
                     })
                     .collect();
 
@@ -207,8 +217,8 @@ fn resolve_steps<Body, Id>(
         &EffectBodyOrReference<Body, Id>,
         HashMap<String, Value>,
     ) -> Box<dyn EffectRuntime>,
-) -> Vec<ResolvedSequenceStep> {
-    steps
+) -> Box<dyn EffectRuntime> {
+    let steps = steps
         .iter()
         .scan(
             // TODO: SimpleEffectRuntime::empty()みたいなやつ作る。作るときにfixturesを渡す。
@@ -239,71 +249,32 @@ fn resolve_steps<Body, Id>(
                     .map(|rt| -> Box<dyn EffectRuntime> { Box::new(rt) });
 
                 *prev_last_frame = runtime.last_frame_hint();
-                Some(ResolvedSequenceStep {
-                    hold,
-                    fade_in,
-                    runtime,
-                    fadein_runtime,
-                })
+                Some(StepRuntime::new(hold, runtime, fade_in, fadein_runtime))
             },
         )
-        .collect()
+        .collect();
+    Box::new(SequenceEffectRuntime::new(steps))
 }
 
 pub struct SequenceEffectRuntime {
     /// fade_inとhold両方のruntime
-    steps: Vec<ResolvedSequenceStep>,
-    time_to_next_action: Duration,
+    steps: Vec<StepRuntime>,
     current_step_num: usize,
-    running_state: SequenceStepState,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SequenceStepState {
-    Hold,
-    FadeIn,
+    /// stepをまたぐときに溢れたDuration
+    dur_buffer: Duration,
 }
 
 impl EffectRuntime for SequenceEffectRuntime {
     fn run(&mut self, elapsed: Duration) -> Vec<EffectCommand> {
-        let mut commands = match self.running_state {
-            SequenceStepState::FadeIn => self
-                .get_current_step()
-                .fadein_runtime
-                .as_mut()
-                .unwrap()
-                .run(elapsed),
-            SequenceStepState::Hold => self.get_current_step().runtime.run(elapsed),
-        };
+        let (mut commands, flow) = self.get_current_step().run(elapsed);
 
-        if self.time_to_next_action >= elapsed {
-            // action継続
-            self.time_to_next_action -= elapsed;
-            return commands;
-        }
-
-        if self.steps.len() == self.current_step_num
-            && self.running_state == SequenceStepState::Hold
-        {
-            //全ステップ終わった
-            commands.push(EffectCommand::StopEffect);
-        } else if self.running_state == SequenceStepState::Hold {
-            // Hold -> next step
+        if let ControlFlow::Break(dur) = flow {
             self.current_step_num += 1;
-            let next_step = self.steps.get(self.current_step_num).unwrap();
-            if let Some(fade_in) = next_step.fade_in {
-                // このフレームで余った分を次のactionに追加
-                self.running_state = SequenceStepState::FadeIn;
-                self.time_to_next_action = fade_in - (elapsed - self.time_to_next_action);
+            if self.current_step_num == self.steps.len() {
+                commands.push(EffectCommand::StopEffect);
             } else {
-                self.running_state = SequenceStepState::Hold;
-                self.time_to_next_action = next_step.hold - (elapsed - self.time_to_next_action);
+                self.dur_buffer = dur;
             }
-        } else {
-            // FadeIn -> Hold
-            self.running_state = SequenceStepState::Hold;
-            self.time_to_next_action = self.steps.get(self.current_step_num).unwrap().hold
-                - (elapsed - self.time_to_next_action);
         }
 
         commands
@@ -319,22 +290,15 @@ impl EffectRuntime for SequenceEffectRuntime {
 }
 
 impl SequenceEffectRuntime {
-    pub(super) fn new(steps: Vec<ResolvedSequenceStep>) -> Self {
-        let first_step = steps.get(0).unwrap();
-        let (time_to_next_action, running_state) = if let Some(fade_in) = first_step.fade_in {
-            (fade_in, SequenceStepState::FadeIn)
-        } else {
-            (first_step.hold, SequenceStepState::Hold)
-        };
+    pub(super) fn new(steps: Vec<StepRuntime>) -> Self {
         Self {
             steps,
-            time_to_next_action,
             current_step_num: 0,
-            running_state,
+            dur_buffer: Duration::ZERO,
         }
     }
 
-    fn get_current_step(&mut self) -> &mut ResolvedSequenceStep {
+    fn get_current_step(&mut self) -> &mut StepRuntime {
         self.steps.get_mut(self.current_step_num).unwrap()
     }
 }
@@ -427,6 +391,83 @@ impl EffectRuntime for FadeInRuntime {
 
     fn last_frame_hint(&self) -> Vec<EffectCommand> {
         panic!("last_frame_hint() should not be called on FadeInRuntime");
+    }
+}
+
+struct StepRuntime {
+    hold: Duration,
+    fade_in: Option<Duration>,
+    runtime: Box<dyn EffectRuntime>,
+    fadein_runtime: Option<Box<dyn EffectRuntime>>,
+    time_to_next_action: Duration,
+    running_state: SequenceStepState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SequenceStepState {
+    Hold,
+    FadeIn,
+}
+
+impl StepRuntime {
+    fn new(
+        hold: Duration,
+        runtime: Box<dyn EffectRuntime>,
+        fade_in: Option<Duration>,
+        fadein_runtime: Option<Box<dyn EffectRuntime>>,
+    ) -> Self {
+        let (time_to_next_action, running_state) = if let Some(fade_in) = fade_in {
+            (fade_in, SequenceStepState::FadeIn)
+        } else {
+            (hold, SequenceStepState::Hold)
+        };
+        Self {
+            hold,
+            fade_in,
+            runtime,
+            fadein_runtime,
+            time_to_next_action,
+            running_state,
+        }
+    }
+
+    /// 2つ目の返り値がBreak(dur)の場合、このステップでdur分だけ余って次のstepに進む
+    /// Continueの場合このstepを継続
+    fn run(&mut self, elapsed: Duration) -> (Vec<EffectCommand>, ControlFlow<Duration, ()>) {
+        let commands = match self.running_state {
+            SequenceStepState::FadeIn => self.fadein_runtime.as_mut().unwrap().run(elapsed),
+            SequenceStepState::Hold => self.runtime.run(elapsed),
+        };
+
+        if self.time_to_next_action >= elapsed {
+            // action継続
+            self.time_to_next_action -= elapsed;
+            return (commands, ControlFlow::Continue(()));
+        }
+
+        if self.running_state == SequenceStepState::Hold {
+            (
+                commands,
+                ControlFlow::Break(elapsed - self.time_to_next_action),
+            )
+        } else {
+            // FadeIn -> Hold
+            self.running_state = SequenceStepState::Hold;
+            self.time_to_next_action = self.hold - (elapsed - self.time_to_next_action);
+            (commands, ControlFlow::Continue(()))
+        }
+    }
+
+    fn first_frame_hint(&self) -> Vec<EffectCommand> {
+        if self.fade_in.is_none() {
+            self.runtime.first_frame_hint()
+        } else {
+            panic!("first_frame_hint() should not be called on FadeInRuntime")
+        }
+    }
+
+    fn last_frame_hint(&self) -> Vec<EffectCommand> {
+        self.runtime.last_frame_hint()
     }
 }
 
