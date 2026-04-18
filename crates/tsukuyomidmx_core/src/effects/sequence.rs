@@ -1,5 +1,51 @@
 use super::*;
 
+pub trait EffectRegistry {
+    fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
+    where
+        F: FnOnce(&SequenceEffectSpecBody) -> R;
+
+    fn with_template<F, R>(&self, tmpl_id: EffectTemplateId, f: F) -> R
+    where
+        F: FnOnce(&SequenceEffectTemplateBody) -> R;
+}
+
+impl EffectRegistry for DocStateView {
+    fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
+    where
+        F: FnOnce(&SequenceEffectSpecBody) -> R,
+    {
+        self.with_effect_specs(|it| {
+            let EffectSpecBody::Sequence(body) = &it.get(&spec_id).unwrap().body else {
+                unreachable!()
+            };
+
+            f(body)
+        })
+    }
+
+    fn with_template<F, R>(&self, tmpl_id: EffectTemplateId, f: F) -> R
+    where
+        F: FnOnce(&SequenceEffectTemplateBody) -> R,
+    {
+        self.with_effect_templates(|it| {
+            let EffectTemplateBody::Sequence(body) = &it.get(&tmpl_id).unwrap().body else {
+                unreachable!()
+            };
+
+            f(body)
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SequenceTemplateStepBase<Body, Id> {
+    /// `fade_in`を除いた時間
+    hold: Expression,
+    fade_in: Expression,
+    body: EffectBodyOrReference<Body, Id>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SequenceEffectSpecBody {
     props: HashMap<String, Type>,
@@ -31,16 +77,16 @@ pub enum SequenceEffectTemplateBody {
     },
 }
 
+type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateBody, EffectTemplateId>;
+
 impl SequenceEffectTemplateBody {
-    pub fn from_spec(spec_id: EffectSpecId, doc: DocStateView) -> Result<Self, FromSpecError> {
-        let spec_props = doc.with_effect_specs(|it| {
-            let spec = it
-                .get(&spec_id)
-                .ok_or_else(|| FromSpecError::SpecNotFound(spec_id))?;
-            let EffectSpecBody::Sequence(body) = &spec.body else {
-                unreachable!()
-            };
-            let ret = body
+    pub fn from_spec(
+        spec_id: EffectSpecId,
+        rg: impl EffectRegistry,
+    ) -> Result<Self, FromSpecError> {
+        // FIXME: ここでget(spec_id)をunwrap()しちゃだめな気がしなくもない
+        let spec_props = rg.with_spec(spec_id, |spec| {
+            let ret = spec
                 .props
                 .iter()
                 .map(|(name, typ)| (name.to_owned(), Expression::Value(typ.default_value())))
@@ -58,7 +104,7 @@ impl SequenceEffectTemplateBody {
     fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,
-        doc: DocStateView,
+        rg: impl EffectRegistry,
     ) -> Vec<ResolvedSequenceStep> {
         match self {
             Self::FromSpec {
@@ -78,12 +124,7 @@ impl SequenceEffectTemplateBody {
                     })
                     .collect();
 
-                doc.with_effect_specs(|it| {
-                    let EffectSpecBody::Sequence(spec) = &it.get(spec_id).unwrap().body else {
-                        unreachable!()
-                    };
-                    spec.resolve_props(resolved_spec_props)
-                })
+                rg.with_spec(*spec_id, |spec| spec.resolve_props(resolved_spec_props))
             }
             Self::New {
                 props,
@@ -148,16 +189,6 @@ impl SequenceEffectBody {
         }
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SequenceTemplateStepBase<Body, Id> {
-    /// `fade_in`を除いた時間
-    hold: Expression,
-    fade_in: Expression,
-    body: EffectBodyOrReference<Body, Id>,
-}
-
-type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateBody, EffectTemplateId>;
 
 /// Used in [`SequenceEffectBody`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -455,72 +486,6 @@ mod tests {
         let deserialized: Effect = serde_json::from_str(&json).unwrap();
 
         assert_eq!(fun, deserialized);*/
-    }
-
-    #[test]
-    fn sequence_function_works() {
-        let spec = EffectSpec {
-            id: EffectSpecId::new(),
-            name: "blink".into(),
-            body: EffectSpecBody::Sequence(SequenceEffectSpecBody {
-                props: vec![("duration", Type::Duration), ("color", Type::Color)]
-                    .into_iter()
-                    .map(|(name, typ)| (name.to_string(), typ))
-                    .collect(),
-                steps: vec![
-                    /*SequenceTemplateStep {
-                        hold: Expression::Prop("duration".into()),
-                        fade_in: Expression::Value(Value::Duration(Duration::ZERO)),
-                        body: EffectBodyOrReference::Body(EffectSpecBody::Simple(
-                            SimpleEffectSpecBody {
-                                dimmer: Some(Expression::Value(Value::Dimmer(255))),
-                                color: Some(Expression::Prop("color".into())),
-                            },
-                        )),
-                    },
-                    SequenceTemplateStep {
-                        hold: Expression::Prop("duration".into()),
-                        fade_in: Expression::Value(Value::Duration(Duration::ZERO)),
-                        body: EffectBodyOrReference::Body(EffectTemplateBody::Simple(
-                            SimpleEffectTemplateBody {
-                                dimmer: Some(Expression::Value(Value::Dimmer(0))),
-                                color: Some(Expression::Prop("color".into())),
-                            },
-                        )),
-                    },*/
-                ],
-            }),
-        };
-
-        let tmpl = EffectTemplate {
-            id: EffectTemplateId::new(),
-            name: "red-blink-on-left".into(),
-            body: EffectTemplateBody::Sequence(SequenceEffectTemplateBody::FromSpec {
-                spec_id: spec.id(),
-                spec_props: HashMap::from([(
-                    "color".into(),
-                    Expression::Value(Value::Color([255, 0, 0])),
-                )]),
-                props: HashMap::from([("duration".into(), Type::Duration)]),
-                fixtures: FixtureQuery::from_str(".left").unwrap(),
-            }),
-        };
-
-        //assert_eq!(EffectTemplate::from_spec(spec.id(), ".left"), tmpl);
-
-        let fx = Effect {
-            id: EffectId::new(),
-            name: "red-blink-on-left-500ms".into(),
-            body: EffectBody::Sequence(SequenceEffectBody::FromTemplate(
-                tmpl.id,
-                HashMap::from([(
-                    "duration".into(),
-                    Value::Duration(Duration::from_millis(500)),
-                )]),
-            )),
-        };
-
-        //let rt = fx.body.create_runtime();
     }
 
     #[test]
