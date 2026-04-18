@@ -44,7 +44,7 @@ impl ParallelEffectBody {
 }
 
 impl EffectRuntime for ParallelEffectRuntime {
-    fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
+    fn run(&mut self, elapsed: Duration) -> Vec<EffectCommand> {
         /*let EffectBody::Parallel(this) = todo!() else {
             unreachable!()
         };

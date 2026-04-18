@@ -250,15 +250,15 @@ enum SequenceStepState {
 }
 
 impl EffectRuntime for SequenceEffectRuntime {
-    fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
+    fn run(&mut self, elapsed: Duration) -> Vec<EffectCommand> {
         let mut commands = match self.running_state {
             SequenceStepState::FadeIn => self
                 .get_current_step()
                 .fadein_runtime
                 .as_mut()
                 .unwrap()
-                .run(elapsed, doc),
-            SequenceStepState::Hold => self.get_current_step().runtime.run(elapsed, doc),
+                .run(elapsed),
+            SequenceStepState::Hold => self.get_current_step().runtime.run(elapsed),
         };
 
         if self.time_to_next_action >= elapsed {
@@ -382,7 +382,7 @@ impl FadeInRuntime {
 }
 
 impl EffectRuntime for FadeInRuntime {
-    fn run(&mut self, elapsed: Duration, _doc: DocStateView) -> Vec<EffectCommand> {
+    fn run(&mut self, elapsed: Duration) -> Vec<EffectCommand> {
         self.elapsed = self.elapsed.saturating_add(elapsed);
 
         let ratio = if self.duration.is_zero() || self.elapsed >= self.duration {

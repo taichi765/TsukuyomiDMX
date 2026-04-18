@@ -91,7 +91,7 @@ impl SimpleEffectTemplateBody {
 }
 
 impl EffectRuntime for SimpleEffectRuntime {
-    fn run(&mut self, _elapsed: Duration, _doc: DocStateView) -> Vec<EffectCommand> {
+    fn run(&mut self, _elapsed: Duration) -> Vec<EffectCommand> {
         /*let EffectBody::Simple(fun) = todo!() else {
             unreachable!()
         };

@@ -50,9 +50,9 @@ pub enum EffectCommand {
     },*/
 }
 
+/// self-contained runtime.
 pub(crate) trait EffectRuntime: Send {
-    /// bodyのバリアントが自身と異なった場合はpanicして良い。
-    fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand>;
+    fn run(&mut self, elapsed: Duration) -> Vec<EffectCommand>;
 
     fn first_frame_hint(&self) -> Vec<EffectCommand>;
 

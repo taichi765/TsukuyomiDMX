@@ -167,11 +167,7 @@ impl Engine {
     }
 
     fn run_active_function(&mut self) {
-        let Some(commands) = self
-            .active_runtime
-            .as_mut()
-            .map(|rt| rt.run(TICK_DURATION, self.doc.clone()))
-        else {
+        let Some(commands) = self.active_runtime.as_mut().map(|rt| rt.run(TICK_DURATION)) else {
             return;
         };
 
