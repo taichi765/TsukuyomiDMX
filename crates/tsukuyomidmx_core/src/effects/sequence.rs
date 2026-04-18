@@ -296,21 +296,86 @@ impl SequenceEffectRuntime {
     }
 }
 
-struct FadeInRuntime {}
+struct FadeInRuntime {
+    from_values: HashMap<(FixtureId, usize), u8>,
+    to_values: HashMap<(FixtureId, usize), u8>,
+    ordered_keys: Vec<(FixtureId, usize)>,
+    duration: Duration,
+    elapsed: Duration,
+}
 
 impl FadeInRuntime {
     fn new(
         from_step_last_frame: &[EffectCommand],
-        to_step: &[EffectCommand],
+        to_step_first_frame: &[EffectCommand],
         duration: Duration,
     ) -> Self {
-        todo!()
+        let mut from_values = HashMap::new();
+        let mut to_values = HashMap::new();
+        let mut ordered_keys = Vec::new();
+
+        for command in from_step_last_frame {
+            if let EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } = command
+            {
+                let key = (*fixture_id, *channel);
+                if !ordered_keys.contains(&key) {
+                    ordered_keys.push(key);
+                }
+                from_values.insert(key, *value);
+            }
+        }
+        for command in to_step_first_frame {
+            if let EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } = command
+            {
+                let key = (*fixture_id, *channel);
+                if !ordered_keys.contains(&key) {
+                    ordered_keys.push(key);
+                }
+                to_values.insert(key, *value);
+            }
+        }
+
+        Self {
+            from_values,
+            to_values,
+            ordered_keys,
+            duration,
+            elapsed: Duration::ZERO,
+        }
     }
 }
 
 impl EffectRuntime for FadeInRuntime {
-    fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
-        todo!()
+    fn run(&mut self, elapsed: Duration, _doc: DocStateView) -> Vec<EffectCommand> {
+        self.elapsed = self.elapsed.saturating_add(elapsed);
+
+        let ratio = if self.duration.is_zero() || self.elapsed >= self.duration {
+            1.0
+        } else {
+            self.elapsed.as_secs_f64() / self.duration.as_secs_f64()
+        };
+
+        self.ordered_keys
+            .iter()
+            .map(|key| {
+                let from = self.from_values.get(key).copied().unwrap_or(0) as f64;
+                let to = self.to_values.get(key).copied().unwrap_or(0) as f64;
+                let value = (from + (to - from) * ratio).round() as u8;
+                EffectCommand::WriteUniverse {
+                    fixture_id: key.0,
+                    channel: key.1,
+                    value,
+                }
+            })
+            .collect()
     }
 
     fn first_frame_hint(&self) -> Vec<EffectCommand> {
@@ -428,5 +493,10 @@ mod tests {
         };
 
         //let rt = fx.body.create_runtime();
+    }
+
+    #[test]
+    fn fadein_works() {
+        todo!()
     }
 }
