@@ -3,7 +3,7 @@ use thiserror::Error;
 use tracing::{debug, info, warn};
 
 use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
-use crate::effects::{EffectCommand, EffectId, StandAloneEffectRuntime};
+use crate::effects::{EffectCommand, EffectId, EffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
 use crate::plugins::{DmxFrame, Plugin};
 use crate::universe::UniverseId;
@@ -23,7 +23,7 @@ pub struct Engine {
     command_rx: Receiver<EngineCommand>,
     message_tx: Sender<EngineMessage>,
 
-    active_runtime: Option<Box<dyn StandAloneEffectRuntime>>,
+    active_runtime: Option<Box<dyn EffectRuntime>>,
     /// Pluginインスタンス
     output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
     /// どのPluginがどのUniverseに出力するか
@@ -170,7 +170,7 @@ impl Engine {
         let Some(commands) = self
             .active_runtime
             .as_mut()
-            .map(|rt| rt.run_standalone(TICK_DURATION, self.doc.clone()))
+            .map(|rt| rt.run(TICK_DURATION, self.doc.clone()))
         else {
             return;
         };
@@ -222,7 +222,7 @@ impl Engine {
     fn start_function(&mut self, function_id: EffectId) {
         let res = self.doc.with_functions(|it| {
             it.get(&function_id)
-                .map(|fun| fun.create_standalone_runtime(self.doc.clone()))
+                .map(|fun| fun.create_runtime(self.doc.clone()))
                 .ok_or(EngineError::FunctionNotFound { function_id })
         });
 

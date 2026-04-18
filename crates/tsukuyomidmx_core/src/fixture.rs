@@ -133,7 +133,7 @@ impl TryFrom<FixtureDto> for Fixture {
 }
 
 /// Fixtureにつけるタグ。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixtureTag(String);
 
 impl FixtureTag {

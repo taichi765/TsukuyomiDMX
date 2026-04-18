@@ -11,31 +11,50 @@ mod simple;
 
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::warn;
 
 use crate::doc::DocStateView;
 use crate::effects::parallel::{ParallelEffectBody, ParallelEffectSpecBody};
-use crate::effects::sequence::{SequenceEffectBody, SequenceEffectSpecBody, SequenceStep};
+use crate::effects::sequence::{
+    SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody, SequenceTemplateStep,
+};
 use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody};
 use crate::fixture::{FixtureId, FixtureTag};
 use std::collections::HashMap;
 use std::time::Duration;
 
 declare_id_newtype!(EffectSpecId);
+declare_id_newtype!(EffectTemplateId);
 declare_id_newtype!(EffectId);
+
+/// [`FunctionRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
+#[derive(Debug)]
+pub enum EffectCommand {
+    /// if the function is already started, `Engine` do nothing.
+    StartEffect(EffectId),
+    /// 実行中のFunctionをstopする
+    StopEffect,
+    WriteUniverse {
+        fixture_id: FixtureId,
+        channel: usize,
+        value: u8,
+    },
+    StartFade {
+        from_id: EffectId,
+        to_id: EffectId,
+        chaser_id: EffectId,
+        duration: Duration,
+    },
+}
 
 pub(crate) trait EffectRuntime: Send {
     /// bodyのバリアントが自身と異なった場合はpanicして良い。
-    fn run(
-        &mut self,
-        body: &EffectBody,
-        elapsed: Duration,
-        doc: DocStateView,
-    ) -> Vec<EffectCommand>;
-}
+    fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand>;
 
-pub(crate) trait StandAloneEffectRuntime: EffectRuntime {
-    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand>;
+    fn first_frame_hint(&self) -> Vec<EffectCommand>;
+
+    fn last_frame_hint(&self) -> Vec<EffectCommand>;
 }
 
 /// bind_to()でFixtureに関連付けたあとのfunction.
@@ -49,44 +68,271 @@ pub struct Effect {
     body: EffectBody,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EffectBody {
     Simple(SimpleEffectBody),
     Sequence(SequenceEffectBody),
     Parallel(ParallelEffectBody),
 }
 
+impl Effect {
+    pub fn new_simple(
+        name: impl Into<String>,
+        values: impl Into<HashMap<(FixtureId, usize), u8>>,
+    ) -> Effect {
+        Effect {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Simple(SimpleEffectBody::new(values)),
+        }
+    }
+
+    pub fn new_sequence(
+        name: impl Into<String>,
+        steps: impl Into<Vec<SequenceTemplateStep<EffectBody, EffectId>>>,
+    ) -> Self {
+        Self {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Sequence(SequenceEffectBody::from_existing_data(steps)),
+        }
+    }
+
+    pub fn new_parallel(
+        name: impl Into<String>,
+        items: impl Into<Vec<EffectBodyOrReference<EffectBody, EffectId>>>,
+    ) -> Self {
+        Self {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Parallel(ParallelEffectBody::new(items)),
+        }
+    }
+}
+
+impl EffectBody {
+    /// infallible
+    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        match &self {
+            EffectBody::Simple(fun) => fun.create_runtime(),
+            EffectBody::Sequence(fun) => fun.create_runtime(doc),
+            EffectBody::Parallel(fun) => fun.create_runtime(doc),
+        }
+    }
+}
+
+/// bind_to()でFixtureに関連付けられる前のfunction.
+///
+/// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EffectSpec {
+    id: EffectSpecId,
+    name: String,
+    body: EffectSpecBody,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum EffectSpecBody {
+    Simple(SimpleEffectSpecBody),
+    Sequence(SequenceEffectSpecBody),
+    Parallel(ParallelEffectSpecBody),
+}
+
+impl EffectSpec {
+    pub fn id(&self) -> EffectSpecId {
+        self.id
+    }
+}
+
+/// Propsに代入することで[`Effect`]を得られる。
+pub struct EffectTemplate {
+    id: EffectTemplateId,
+    name: String,
+    body: EffectTemplateBody,
+}
+
+/// [`EffectTemplate`]のbody。
+///
+/// `Sequence`のstep等として埋め込める。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EffectTemplateBody {
+    Simple(),
+    Sequence(SequenceEffectTemplateBody),
+    Parallel(),
+}
+
+impl EffectTemplate {}
+
+pub struct Diagnostics {
+    inner: Vec<DiagnosticItem>,
+}
+
+struct DiagnosticItem {
+    message: String,
+}
+
+impl Diagnostics {
+    pub fn push_err(&mut self, message: impl Into<String>) {
+        self.inner.push(DiagnosticItem {
+            message: message.into(),
+        });
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EffectBodyOrReference<T, U> {
+    Body(T),
+    Reference(U),
+}
+
+impl EffectBodyOrReference<EffectBody, EffectId> {
+    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        match self {
+            Self::Body(body) => body.create_runtime(doc),
+            Self::Reference(id) => {
+                doc.with_effects(|it| it.get(id).unwrap().body.create_runtime(doc.clone()))
+            }
+        }
+    }
+}
+
+impl EffectBodyOrReference<EffectTemplateBody, EffectTemplateId> {
+    fn resolve_props(&self, given_props: HashMap<String, Value>) -> Box<dyn EffectRuntime> {
+        todo!()
+    }
+}
+
+///
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Expression {
+    Value(Value),
+    Prop(String),
+}
+
 /// Propsとして取れる型
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Type {
     Duration,
+    Dimmer,
     Color,
     FixtureQuery,
 }
 
+impl Type {
+    /// この型のdefaultのvalueを返す
+    pub fn default_value(&self) -> Value {
+        match self {
+            Self::Duration => Value::Duration(Duration::default()),
+            Self::Dimmer => Value::Dimmer(0),
+            Self::Color => Value::Color([0, 0, 0]),
+            Self::FixtureQuery => Value::FixtureQuery(FixtureQuery::default()),
+        }
+    }
+}
+
 /// Propsとして渡せる値
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Value {
     Duration(Duration),
+    Dimmer(u8),
     Color([u8; 3]),
     FixtureQuery(FixtureQuery),
 }
 
+impl Value {
+    /// [`Value`]の型が与えられた[`Type`]と合致しているか確認
+    pub fn matches_type(&self, typ: Type) -> bool {
+        match self {
+            Self::Duration(_) => matches!(typ, Type::Duration),
+            Self::Dimmer(_) => matches!(typ, Type::Dimmer),
+            Self::Color(_) => matches!(typ, Type::Color),
+            Self::FixtureQuery(_) => matches!(typ, Type::FixtureQuery),
+        }
+    }
+
+    /// 型を返す
+    pub fn typ(&self) -> Type {
+        match self {
+            Self::Duration(_) => Type::Duration,
+            Self::Dimmer(_) => Type::Dimmer,
+            Self::Color(_) => Type::Color,
+            Self::FixtureQuery(_) => Type::FixtureQuery,
+        }
+    }
+
+    pub fn unwrap_duration(&self) -> Duration {
+        let Self::Duration(val) = self else {
+            self.panic_on("unwrap_duration");
+        };
+        *val
+    }
+
+    pub fn unwrap_dimmer(&self) -> u8 {
+        let Self::Dimmer(val) = self else {
+            self.panic_on("unwrap_dimmer");
+        };
+
+        *val
+    }
+
+    pub fn unwrap_color(&self) -> [u8; 3] {
+        let Self::Color(val) = self else {
+            self.panic_on("unwrap_color");
+        };
+
+        *val
+    }
+
+    pub fn unwrap_query(&self) -> FixtureQuery {
+        let Self::FixtureQuery(val) = self else {
+            self.panic_on("unwrap_query");
+        };
+
+        val.to_owned()
+    }
+
+    fn panic_on(&self, method_name: &str) -> ! {
+        match self {
+            Self::Duration(_) => panic!("Value::{}() is called on Value::Duration", method_name),
+            Self::Dimmer(_) => panic!("Value::{}() is called on Value::Dimmer", method_name),
+            Self::Color(_) => panic!("Value::{}() is called on Value::Color", method_name),
+            Self::FixtureQuery(_) => {
+                panic!("Value::{}() is called on Value::FixtureQuery", method_name)
+            }
+        }
+    }
+}
+
 /// Queries Fixtures with css-like selector.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixtureQuery {
     string: String,
     data: Vec<Selector>,
 }
 
 /// [`FixtureQuery`]で指定できるselector.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Selector {
     Id(FixtureId),
     Tags(Vec<FixtureTag>),
 }
 
 impl FixtureQuery {
+    pub fn from_str(val: impl Into<String>) -> Option<Self> {
+        let val = val.into();
+        let selector = if val.chars().next()? == '#' {
+            Selector::Id(Self::parse_id(val.chars())?)
+        } else if val.chars().next().unwrap() == '.' {
+            Selector::Tags(Self::parse_tags(&val)?)
+        } else {
+            return None;
+        };
+        Some(Self {
+            string: val,
+            data: vec![selector], // TODO: カンマで複数指定
+        })
+    }
+
     /// queryにmatchするFixtureを全て返す
     pub(crate) fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
         self.data.iter().fold(Vec::new(), |mut acc, v| {
@@ -114,189 +360,42 @@ impl FixtureQuery {
             acc
         })
     }
-}
 
-impl Effect {
-    pub fn new_simple(
-        name: impl Into<String>,
-        values: impl Into<HashMap<(FixtureId, usize), u8>>,
-    ) -> Effect {
-        Effect {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Simple(SimpleEffectBody::new(values)),
+    fn parse_id(mut val: impl Iterator<Item = char>) -> Result<FixtureId, uuid::Error> {
+        if val.next().unwrap() != '#' {
+            unreachable!()
+        } else {
+            let id = val.collect();
+            FixtureId::try_from(id)
         }
     }
 
-    pub fn new_sequence(
-        name: impl Into<String>,
-        steps: impl Into<Vec<SequenceStep<EffectBody, EffectId>>>,
-    ) -> Self {
+    fn parse_tags(val: &str) -> Option<Vec<FixtureTag>> {
+        if val.chars().next()? != '.' {
+            return None; // TODO: Result::Errのほうがいいかも
+        }
+        let tags = val.split(".");
+        tags.map(|tag| FixtureTag::new(tag)).collect()
+    }
+}
+
+impl Default for FixtureQuery {
+    fn default() -> Self {
         Self {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Sequence(SequenceEffectBody::new(steps)),
-        }
-    }
-
-    pub fn new_parallel(
-        name: impl Into<String>,
-        items: impl Into<Vec<EffectBodyOrReference<EffectBody, EffectId>>>,
-    ) -> Self {
-        Self {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Parallel(ParallelEffectBody::new(items)),
-        }
-    }
-
-    pub(crate) fn create_standalone_runtime(
-        &self,
-        doc: DocStateView,
-    ) -> Box<dyn StandAloneEffectRuntime> {
-        self.body.create_standalone_runtime(self.id, doc)
-    }
-}
-
-impl EffectBody {
-    /// infallible
-    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        match &self {
-            EffectBody::Simple(fun) => fun.create_runtime(),
-            EffectBody::Sequence(fun) => fun.create_runtime(doc),
-            EffectBody::Parallel(fun) => fun.create_runtime(doc),
-        }
-    }
-
-    fn create_standalone_runtime(
-        &self,
-        self_id: EffectId,
-        doc: DocStateView,
-    ) -> Box<dyn StandAloneEffectRuntime> {
-        match &self {
-            EffectBody::Simple(fun) => fun.create_runtime_standalone(self_id),
-            EffectBody::Sequence(fun) => fun.create_runtime_standalone(self_id, doc),
-            EffectBody::Parallel(fun) => fun.create_runtime_standalone(self_id, doc),
+            string: ".some-tag".to_string(),
+            data: vec![Selector::Tags(vec![FixtureTag::new("some-tag").unwrap()])],
         }
     }
 }
 
-/// bind_to()でFixtureに関連付けられる前のfunction.
-///
-/// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EffectSpec {
-    id: EffectSpecId,
-    name: String,
-    body: EffectSpecBody,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum EffectSpecBody {
-    Simple(SimpleEffectSpecBody),
-    Sequence(SequenceEffectSpecBody),
-    Parallel(ParallelEffectSpecBody),
-}
-
-impl EffectSpec {
-    pub fn id(&self) -> EffectSpecId {
-        self.id
-    }
-
-    pub fn bind_to(
-        &self,
-        name: impl Into<String>,
-        args: impl Iterator<Item = Vec<FixtureId>> + Clone,
-        doc: DocStateView,
-        diag: &mut Diagnostics,
-    ) -> Option<Effect> {
-        match &self.body {
-            EffectSpecBody::Simple(p) => {
-                if let Some(fun) = p.bind_to_inner(args, doc, diag) {
-                    Some(Effect {
-                        id: EffectId::new(),
-                        name: name.into(),
-                        body: EffectBody::Simple(fun),
-                    })
-                } else {
-                    None
-                }
-            }
-            EffectSpecBody::Sequence(p) => {
-                if let Some(fun) = p.bind_to_inner(args, doc, diag) {
-                    Some(Effect {
-                        id: EffectId::new(),
-                        name: name.into(),
-                        body: EffectBody::Sequence(fun),
-                    })
-                } else {
-                    None
-                }
-            }
-            EffectSpecBody::Parallel(p) => {
-                if let Some(fun) = p.bind_to_inner(args, doc, diag) {
-                    Some(Effect {
-                        id: EffectId::new(),
-                        name: name.into(),
-                        body: EffectBody::Parallel(fun),
-                    })
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
-pub struct Diagnostics {
-    inner: Vec<DiagnosticItem>,
-}
-
-struct DiagnosticItem {
-    message: String,
-}
-
-impl Diagnostics {
-    pub fn push_err(&mut self, message: impl Into<String>) {
-        self.inner.push(DiagnosticItem {
-            message: message.into(),
-        });
-    }
-}
-
-/// [`FunctionRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
-#[derive(Debug)]
-pub enum EffectCommand {
-    /// if the function is already started, `Engine` do nothing.
-    StartEffect(EffectId),
-    /// 実行中のFunctionをstopする
-    StopEffect,
-    WriteUniverse {
-        fixture_id: FixtureId,
-        channel: usize,
-        value: u8,
+#[derive(Debug, Error)]
+pub enum ApplyPropsError {
+    #[error("todo")]
+    NoSuchProp(String),
+    #[error("todo")]
+    TypeMismatched {
+        name: String,
+        expected: Type,
+        got: Type,
     },
-    StartFade {
-        from_id: EffectId,
-        to_id: EffectId,
-        chaser_id: EffectId,
-        duration: Duration,
-    },
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EffectBodyOrReference<T, U> {
-    Body(T),
-    Reference(U),
-}
-
-impl EffectBodyOrReference<EffectBody, EffectId> {
-    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        match self {
-            Self::Body(body) => body.create_runtime(doc),
-            Self::Reference(id) => {
-                doc.with_functions(|it| it.get(id).unwrap().body.create_runtime(doc.clone()))
-            }
-        }
-    }
 }

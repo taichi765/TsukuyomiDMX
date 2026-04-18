@@ -2,21 +2,32 @@ use super::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SimpleEffectSpecBody {
-    dimmer: Option<u8>,
-    color: Option<[u8; 3]>,
+    pub dimmer: Option<Expression>,
+    pub color: Option<Expression>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SimpleEffectTemplateBody {
+    FromSpec {
+        spec_id: EffectSpecId,
+        spec_props: HashMap<String, Expression>,
+        props: HashMap<String, Type>,
+        fixtures: FixtureQuery,
+    },
+    // TODO: FromTemplate(),
+    New {
+        values: HashMap<(FixtureId, usize), u8>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "SimpleEffectDto", into = "SimpleEffectDto")]
-pub struct SimpleEffectBody {
-    /// (id, offset) -> value
-    values: HashMap<(FixtureId, usize), u8>,
-}
-
-/// スタンドアロン
-pub struct StandAloneSimpleEffectRuntime {
-    fun_id: EffectId,
-    inner: SimpleEffectRuntime,
+pub enum SimpleEffectBody {
+    // TODO: FromSpec(),
+    FromTemplate(EffectTemplateId, HashMap<String, Expression>),
+    New {
+        fixtures: FixtureQuery,
+        values: HashMap<(FixtureId, usize), u8>,
+    },
 }
 
 pub struct SimpleEffectRuntime;
@@ -36,21 +47,16 @@ struct SimpleEffectValueDto {
     value: u8,
 }
 
+pub enum SimpleTemplateOrEffect {
+    Template(SimpleEffectTemplateBody),
+    Effect(SimpleEffectBody),
+}
+
 impl SimpleEffectBody {
     pub(super) fn new(values: impl Into<HashMap<(FixtureId, usize), u8>>) -> Self {
         Self {
             values: values.into(),
         }
-    }
-
-    pub(super) fn create_runtime_standalone(
-        &self,
-        self_id: EffectId,
-    ) -> Box<dyn StandAloneEffectRuntime> {
-        Box::new(StandAloneSimpleEffectRuntime {
-            fun_id: self_id,
-            inner: SimpleEffectRuntime,
-        })
     }
 
     pub(super) fn create_runtime(&self) -> Box<dyn EffectRuntime> {
@@ -59,74 +65,33 @@ impl SimpleEffectBody {
 }
 
 impl SimpleEffectSpecBody {
-    pub(super) fn bind_to_inner(
-        &self,
-        mut args: impl Iterator<Item = Vec<FixtureId>>,
-        doc: DocStateView,
-        diag: &mut Diagnostics,
-    ) -> Option<SimpleEffectBody> {
-        let mut values = HashMap::new();
-        let mut has_error = false;
-
-        let Some(fixtures) = args.next() else {
-            diag.push_err("no argument provided");
-            return None;
-        };
-        if args.next().is_some() {
-            diag.push_err("too many arguments provided");
-            return None;
+    pub(super) fn new() -> Self {
+        Self {
+            dimmer: None,
+            color: None,
         }
-
-        for fxt_id in fixtures {
-            doc.with_fixtures_and_defs(|fxts, defs| {
-                let fxt = fxts.get(&fxt_id).unwrap();
-                let def = defs.get(fxt.fixture_def()).unwrap();
-
-                if let Some(dimmer) = self.dimmer {
-                    if let Some(offset) = def.find_dimmer_channel_in_mode(fxt.fixture_mode()) {
-                        values.insert((fxt_id, offset), dimmer);
-                    } else {
-                        diag.push_err(format!("fixture {fxt_id:?} doesn't have dimmer channel"));
-                        has_error = true;
-                    };
-                }
-
-                if let Some(color) = self.color {
-                    if let Some(rgb_offset) = def.find_rgb_channel_in_mode(fxt.fixture_mode()) {
-                        rgb_offset
-                            .into_iter()
-                            .zip(color)
-                            .for_each(|(offset, color)| {
-                                values.insert((fxt_id, offset), color);
-                            });
-                    } else {
-                        diag.push_err("this fixture doesn't have rgb channel");
-                        has_error = true;
-                    }
-                }
-            });
-        }
-
-        if has_error {
-            return None;
-        }
-
-        Some(SimpleEffectBody { values })
-    }
-
-    pub(super) fn new(dimmer: Option<u8>, color: Option<[u8; 3]>) -> Self {
-        Self { dimmer, color }
     }
 }
 
+impl SimpleEffectTemplateBody {
+    /*#[must_use]
+    pub(super) fn apply_prop(&self, name: String, value: Value) -> SimpleTemplateOrEffect {
+        if self.props.len() == 1 {
+            SimpleTemplateOrEffect::Effect(SimpleEffectBody { values: () })
+        } else {
+            SimpleTemplateOrEffect::Template(SimpleEffectTemplateBody {
+                spec: self.spec,
+                template: todo!(),
+                props: (),
+                values: (),
+            })
+        }
+    }*/
+}
+
 impl EffectRuntime for SimpleEffectRuntime {
-    fn run(
-        &mut self,
-        body: &EffectBody,
-        _elapsed: Duration,
-        _doc: DocStateView,
-    ) -> Vec<EffectCommand> {
-        let EffectBody::Simple(fun) = body else {
+    fn run(&mut self, _elapsed: Duration, _doc: DocStateView) -> Vec<EffectCommand> {
+        let EffectBody::Simple(fun) = todo!() else {
             unreachable!()
         };
         fun.values
@@ -139,26 +104,6 @@ impl EffectRuntime for SimpleEffectRuntime {
                 });
                 acc
             })
-    }
-}
-
-impl StandAloneEffectRuntime for StandAloneSimpleEffectRuntime {
-    fn run_standalone(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
-        doc.with_functions(|it| {
-            let this = &it.get(&self.fun_id).unwrap().body;
-            self.inner.run(this, elapsed, doc.clone())
-        })
-    }
-}
-
-impl EffectRuntime for StandAloneSimpleEffectRuntime {
-    fn run(
-        &mut self,
-        body: &EffectBody,
-        elapsed: Duration,
-        doc: DocStateView,
-    ) -> Vec<EffectCommand> {
-        self.inner.run(body, elapsed, doc)
     }
 }
 
