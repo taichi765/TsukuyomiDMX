@@ -163,48 +163,80 @@ impl Doc {
     }
 
     #[instrument]
-    pub fn add_effect_spec(&mut self, _value: EffectSpec) -> Result<(), ()> {
-        todo!()
-    }
-
-    #[instrument]
-    pub fn update_effect_spec(&mut self, _change: EffectSpecChange) -> Result<(), ()> {
-        todo!()
-    }
-
-    pub fn remove_effect_spec(&mut self, _id: EffectSpecId) -> Result<(), ()> {
-        todo!()
-    }
-
-    #[instrument]
-    pub fn add_effect_template(&mut self, _value: EffectTemplate) -> Result<(), ()> {
-        todo!()
-    }
-
-    #[instrument]
-    pub fn update_effect_template(&mut self, _change: EffectTemplateChange) -> Result<(), ()> {
-        todo!()
-    }
-
-    pub fn remove_effect_template(&mut self, _id: EffectTemplateId) -> Result<(), ()> {
-        todo!()
-    }
-
-    #[instrument]
-    pub fn add_effect(&mut self, fx: Effect) -> Result<(), AddFunctionError> {
-        let cmd = decider::add_function(self.state_view(), fx)?;
+    pub fn add_effect_spec(&mut self, value: EffectSpec) -> Result<(), AddEffectSpecError> {
+        let cmd = decider::add_effect_spec(self.state_view(), value)?;
         self.apply_command(cmd);
         Ok(())
     }
 
     #[instrument]
-    pub fn update_effect(&mut self, change: EffectChange) -> Result<(), ()> {
-        todo!()
+    pub fn update_effect_spec(
+        &mut self,
+        id: EffectSpecId,
+        change: EffectSpecChange,
+    ) -> Result<(), UpdateEffectSpecError> {
+        let cmd = decider::update_effect_spec(self.state_view(), id, change)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    pub fn remove_effect_spec(&mut self, id: EffectSpecId) -> Result<(), RemoveEffectSpecError> {
+        let cmd = decider::remove_effect_spec(self.state_view(), id)?;
+        self.apply_command(cmd);
+        Ok(())
     }
 
     #[instrument]
-    pub fn remove_function(&mut self, id: EffectId) -> Result<(), RemoveFunctionError> {
-        let cmd = decider::remove_function(self.state_view(), id)?;
+    pub fn add_effect_template(
+        &mut self,
+        value: EffectTemplate,
+    ) -> Result<(), AddEffectTemplateError> {
+        let cmd = decider::add_effect_template(self.state_view(), value)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    #[instrument]
+    pub fn update_effect_template(
+        &mut self,
+        id: EffectTemplateId,
+        change: EffectTemplateChange,
+    ) -> Result<(), UpdateEffectTemplateError> {
+        let cmd = decider::update_effect_template(self.state_view(), id, change)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    pub fn remove_effect_template(
+        &mut self,
+        id: EffectTemplateId,
+    ) -> Result<(), RemoveEffectTemplateError> {
+        let cmd = decider::remove_effect_template(self.state_view(), id)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    #[instrument]
+    pub fn add_effect(&mut self, fx: Effect) -> Result<(), AddEffectError> {
+        let cmd = decider::add_effect(self.state_view(), fx)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    #[instrument]
+    pub fn update_effect(
+        &mut self,
+        id: EffectId,
+        change: EffectChange,
+    ) -> Result<(), UpdateEffectError> {
+        let cmd = decider::update_effect(self.state_view(), id, change)?;
+        self.apply_command(cmd);
+        Ok(())
+    }
+
+    #[instrument]
+    pub fn remove_effect(&mut self, id: EffectId) -> Result<(), RemoveEffectError> {
+        let cmd = decider::remove_effect(self.state_view(), id)?;
         self.apply_command(cmd);
         Ok(())
     }
@@ -386,13 +418,17 @@ pub enum DocEffect {
     FixtureDefUpdated(FixtureDefId),
     FixtureDefRemoved(FixtureDefId),
 
-    FunctionAdded(EffectId),
-    FunctionUpdated(EffectId),
-    FunctionRemoved(EffectId),
+    EffectSpecAdded(EffectSpecId),
+    EffectSpecUpdated(EffectSpecId),
+    EffectSpecRemoved(EffectSpecId),
 
-    FunctionPrototypeAdded(EffectSpecId),
-    FunctionPrototypeUpdated(EffectSpecId),
-    FunctionPrototypeRemoved(EffectSpecId),
+    EffectTemplateAdded(EffectTemplateId),
+    EffectTemplateUpdated(EffectTemplateId),
+    EffectTemplateRemoved(EffectTemplateId),
+
+    EffectAdded(EffectId),
+    EffectUpdated(EffectId),
+    EffectRemoved(EffectId),
 
     AddressIndexChanged((UniverseId, DmxAddress), (FixtureId, usize)),
     DefRegistryLoaded,

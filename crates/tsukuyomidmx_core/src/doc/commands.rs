@@ -1,7 +1,9 @@
 use std::{any::Any, fmt::Debug};
 
+pub use effect_specs::*;
+pub use effect_templates::*;
+pub use effects::*;
 pub use fixtures::*;
-pub use functions::*;
 pub use universes::*;
 
 use crate::doc::{DocEffect, state::DocState};
@@ -173,30 +175,30 @@ mod fixtures {
     }
 }
 
-mod functions {
-    use crate::{
-        doc::{DocCommand, DocEffect},
-        effects::Effect,
-        prelude::EffectId,
-    };
+mod effect_specs {
+    use crate::doc::state::DocState;
+    use crate::doc::{DocCommand, DocEffect};
+    use crate::effects::{EffectSpec, EffectSpecChange, EffectSpecId};
 
-    #[derive(Debug)]
-    pub struct AddFunctionCommand {
-        fun: Effect,
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct AddEffectSpecCommand {
+        spec: EffectSpec,
     }
 
-    impl DocCommand for AddFunctionCommand {
-        fn apply(
-            self: Box<Self>,
-            state: &crate::doc::DocState,
-        ) -> (Box<dyn DocCommand>, DocEffect) {
-            /*let id = self.fun.id();
-            state.with_functions_mut(|it| it.insert(id, self.fun));
+    impl AddEffectSpecCommand {
+        pub fn new(spec: EffectSpec) -> Self {
+            Self { spec }
+        }
+    }
+
+    impl DocCommand for AddEffectSpecCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let id = self.spec.id();
+            state.with_effect_specs_mut(|it| it.insert(id, self.spec));
             (
-                Box::new(RemoveFunctionCommand::new(id)),
-                DocEffect::FunctionAdded(id),
-            )*/
-            todo!()
+                Box::new(RemoveEffectSpecCommand::new(id)),
+                DocEffect::EffectSpecAdded(id),
+            )
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -204,29 +206,85 @@ mod functions {
         }
     }
 
-    impl AddFunctionCommand {
-        pub fn new(fun: Effect) -> Self {
-            Self { fun }
+    // TODO: あまり綺麗じゃない、EffectSpecChangeとIdだけ持ってればいい
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct UpdateEffectSpecCommand {
+        old: EffectSpec,
+        new: EffectSpec,
+        change: EffectSpecChange,
+    }
+
+    impl UpdateEffectSpecCommand {
+        pub fn new(old: EffectSpec, new: EffectSpec, change: EffectSpecChange) -> Self {
+            Self { old, new, change }
         }
     }
 
-    pub struct UpdateFunctionCommand {}
+    impl DocCommand for UpdateEffectSpecCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let Self { old, new, change } = *self;
+            let id = new.id();
+            let rev = UpdateEffectSpecCommand::new(new.clone(), old.clone(), change.clone());
+            state.with_effect_specs_mut(|it| {
+                *it.get_mut(&id).unwrap() = new;
+            });
+            (Box::new(rev), DocEffect::EffectSpecUpdated(id))
+        }
 
-    #[derive(Debug)]
-    pub struct RemoveFunctionCommand(EffectId);
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
 
-    impl DocCommand for RemoveFunctionCommand {
-        fn apply(
-            self: Box<Self>,
-            state: &crate::doc::DocState,
-        ) -> (Box<dyn DocCommand>, DocEffect) {
-            /*let removed = state.with_functions_mut(|it| it.remove(&self.0)).unwrap();
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RemoveEffectSpecCommand(EffectSpecId);
+
+    impl RemoveEffectSpecCommand {
+        pub fn new(id: EffectSpecId) -> Self {
+            Self(id)
+        }
+    }
+
+    impl DocCommand for RemoveEffectSpecCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let removed = state.with_effect_specs_mut(|it| it.remove(&self.0).unwrap());
             let id = removed.id();
             (
-                Box::new(AddFunctionCommand::new(removed)),
-                DocEffect::FunctionRemoved(id),
-            )*/
-            todo!()
+                Box::new(AddEffectSpecCommand::new(removed)),
+                DocEffect::EffectSpecRemoved(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+}
+
+mod effect_templates {
+    use crate::doc::state::DocState;
+    use crate::doc::{DocCommand, DocEffect};
+    use crate::effects::{EffectTemplate, EffectTemplateChange, EffectTemplateId};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct AddEffectTemplateCommand {
+        tmpl: EffectTemplate,
+    }
+
+    impl AddEffectTemplateCommand {
+        pub fn new(tmpl: EffectTemplate) -> Self {
+            Self { tmpl }
+        }
+    }
+
+    impl DocCommand for AddEffectTemplateCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let id = self.tmpl.id();
+            state.with_effect_templates_mut(|it| it.insert(id, self.tmpl));
+            (
+                Box::new(RemoveEffectTemplateCommand::new(id)),
+                DocEffect::EffectTemplateAdded(id),
+            )
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -234,9 +292,141 @@ mod functions {
         }
     }
 
-    impl RemoveFunctionCommand {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct UpdateEffectTemplateCommand {
+        old: EffectTemplate,
+        new: EffectTemplate,
+        change: EffectTemplateChange,
+    }
+
+    impl UpdateEffectTemplateCommand {
+        pub fn new(old: EffectTemplate, new: EffectTemplate, change: EffectTemplateChange) -> Self {
+            Self { old, new, change }
+        }
+    }
+
+    impl DocCommand for UpdateEffectTemplateCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let Self { old, new, change } = *self;
+            let id = new.id();
+            let rev = UpdateEffectTemplateCommand::new(new.clone(), old.clone(), change.clone());
+            state.with_effect_templates_mut(|it| {
+                *it.get_mut(&id).unwrap() = new;
+            });
+            (Box::new(rev), DocEffect::EffectTemplateUpdated(id))
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RemoveEffectTemplateCommand(EffectTemplateId);
+
+    impl RemoveEffectTemplateCommand {
+        pub fn new(id: EffectTemplateId) -> Self {
+            Self(id)
+        }
+    }
+
+    impl DocCommand for RemoveEffectTemplateCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let removed = state.with_effect_templates_mut(|it| it.remove(&self.0).unwrap());
+            let id = removed.id();
+            (
+                Box::new(AddEffectTemplateCommand::new(removed)),
+                DocEffect::EffectTemplateRemoved(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+}
+
+mod effects {
+    use crate::doc::state::DocState;
+    use crate::doc::{DocCommand, DocEffect};
+    use crate::effects::{Effect, EffectChange, EffectId};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct AddEffectCommand {
+        effect: Effect,
+    }
+
+    impl AddEffectCommand {
+        pub fn new(effect: Effect) -> Self {
+            Self { effect }
+        }
+    }
+
+    impl DocCommand for AddEffectCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let id = self.effect.id();
+            state.with_effects_mut(|it| it.insert(id, self.effect));
+            (
+                Box::new(RemoveEffectCommand::new(id)),
+                DocEffect::EffectAdded(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct UpdateEffectCommand {
+        old: Effect,
+        new: Effect,
+        change: EffectChange,
+    }
+
+    impl UpdateEffectCommand {
+        pub fn new(old: Effect, new: Effect, change: EffectChange) -> Self {
+            Self { old, new, change }
+        }
+    }
+
+    impl DocCommand for UpdateEffectCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let Self { old, new, change } = *self;
+            let id = new.id();
+            let rev = UpdateEffectCommand::new(new.clone(), old.clone(), change.clone());
+            state.with_effects_mut(|it| {
+                *it.get_mut(&id).unwrap() = new;
+            });
+            (Box::new(rev), DocEffect::EffectUpdated(id))
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct RemoveEffectCommand(EffectId);
+
+    impl RemoveEffectCommand {
         pub fn new(id: EffectId) -> Self {
             Self(id)
+        }
+    }
+
+    impl DocCommand for RemoveEffectCommand {
+        fn apply(self: Box<Self>, state: &DocState) -> (Box<dyn DocCommand>, DocEffect) {
+            let removed = state.with_effects_mut(|it| it.remove(&self.0).unwrap());
+            let id = removed.id();
+            (
+                Box::new(AddEffectCommand::new(removed)),
+                DocEffect::EffectRemoved(id),
+            )
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 }

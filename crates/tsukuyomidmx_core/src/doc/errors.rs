@@ -2,9 +2,9 @@ use thiserror::Error;
 
 use crate::{
     doc::def_registry,
+    effects::{EffectId, EffectSpecId, EffectTemplateId},
     fixture::FixtureId,
     fixture_def::FixtureDefId,
-    prelude::EffectId,
     universe::{DmxAddress, UniverseId},
 };
 
@@ -104,16 +104,58 @@ pub enum FixtureRemoveError {
 }
 
 #[derive(Debug, Error)]
-pub enum AddFunctionError {
+pub enum AddEffectSpecError {
+    #[error("effect spec id {0:?} is already used")]
+    IdAlreadyUsed(EffectSpecId),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateEffectSpecError {
+    #[error("cannot find effect spec {0:?}")]
+    NotFound(EffectSpecId),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveEffectSpecError {
+    #[error("cannot find effect spec {0:?}")]
+    NotFound(EffectSpecId),
+}
+
+#[derive(Debug, Error)]
+pub enum AddEffectTemplateError {
+    #[error("effect template id {0:?} is already used")]
+    IdAlreadyUsed(EffectTemplateId),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateEffectTemplateError {
+    #[error("cannot find effect template {0:?}")]
+    NotFound(EffectTemplateId),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveEffectTemplateError {
+    #[error("cannot find effect template {0:?}")]
+    NotFound(EffectTemplateId),
+}
+
+#[derive(Debug, Error)]
+pub enum AddEffectError {
     // TODO: idを使っているfunctionの場所とか出したい
-    #[error("function id {0:?} is already used")]
+    #[error("effect id {0:?} is already used")]
     IdAlreadyUsed(EffectId),
 }
 
 #[derive(Debug, Error)]
-pub enum RemoveFunctionError {
-    #[error("cannot find function {0:?}")]
-    FunctionNotFound(EffectId),
+pub enum UpdateEffectError {
+    #[error("cannot find effect {0:?}")]
+    NotFound(EffectId),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveEffectError {
+    #[error("cannot find effect {0:?}")]
+    NotFound(EffectId),
 }
 
 #[derive(Debug, Error)]

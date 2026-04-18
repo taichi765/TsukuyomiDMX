@@ -74,7 +74,7 @@ pub(crate) trait EffectRuntime: Send {
 /// bind_to()でFixtureに関連付けられる前のfunction.
 ///
 /// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectSpec {
     id: EffectSpecId,
     name: String,
@@ -88,7 +88,7 @@ pub enum EffectSpecBody {
     Parallel(ParallelEffectSpecBody),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectSpecChange {
     Rename(String),
     Simple(SimpleEffectSpecBody),
@@ -97,6 +97,14 @@ pub enum EffectSpecChange {
 }
 
 impl EffectSpec {
+    pub fn new_simple(name: impl Into<String>) -> Self {
+        Self {
+            id: EffectSpecId::new(),
+            name: name.into(),
+            body: EffectSpecBody::Simple(SimpleEffectSpecBody::new()),
+        }
+    }
+
     pub fn id(&self) -> EffectSpecId {
         self.id
     }
@@ -131,7 +139,7 @@ impl EffectSpecBody {
 }
 
 /// Propsに代入することで[`Effect`]を得られる。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectTemplate {
     id: EffectTemplateId,
     name: String,
@@ -157,6 +165,18 @@ pub enum EffectTemplateChange {
 }
 
 impl EffectTemplate {
+    pub fn new_simple(name: impl Into<String>) -> Self {
+        Self {
+            id: EffectTemplateId::new(),
+            name: name.into(),
+            body: EffectTemplateBody::Simple(SimpleEffectTemplateBody::new()),
+        }
+    }
+
+    pub fn id(&self) -> EffectTemplateId {
+        self.id
+    }
+
     // TODO: 個別のchangeを用意したほうがいいか？
     pub(crate) fn apply_change(&mut self, change: EffectTemplateChange) {
         match change {
@@ -189,7 +209,7 @@ impl EffectTemplateBody {
 /// bind_to()でFixtureに関連付けたあとのfunction.
 ///
 /// Goboなどmodel-specificなチャンネルを制御する。
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Getters)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Getters)]
 pub struct Effect {
     #[getter(copy)]
     id: EffectId,
@@ -204,7 +224,7 @@ pub enum EffectBody {
     Parallel(ParallelEffectBody),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectChange {
     Rename(String),
     Simple(SimpleEffectBody),

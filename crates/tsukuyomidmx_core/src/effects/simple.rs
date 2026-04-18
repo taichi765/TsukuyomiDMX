@@ -69,6 +69,16 @@ pub enum SimpleEffectTemplateBody {
 }
 
 impl SimpleEffectTemplateBody {
+    pub fn new() -> Self {
+        Self::New {
+            fixtures: FixtureQuery::default(),
+            values: HashMap::new(),
+            dimmer: Expression::Value(Value::Dimmer(0)),
+            color: Expression::Value(Value::Color([0, 0, 0])),
+            props: HashMap::new(),
+        }
+    }
+
     pub(super) fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,

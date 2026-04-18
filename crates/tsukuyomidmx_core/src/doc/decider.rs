@@ -7,7 +7,10 @@ use super::DocStateView;
 use super::errors::*;
 use crate::doc::commands::*;
 use crate::doc::state::AddressIndex;
-use crate::effects::{Effect, EffectId};
+use crate::effects::{
+    Effect, EffectChange, EffectId, EffectSpec, EffectSpecChange, EffectSpecId, EffectTemplate,
+    EffectTemplateChange, EffectTemplateId,
+};
 use crate::fixture::FixtureChange;
 use crate::fixture_def::AddressIter;
 use crate::prelude::*;
@@ -107,32 +110,112 @@ pub(super) fn remove_fixture(
     Ok(RemoveFixtureCommand::new(*id))
 }
 
-pub(super) fn add_function(
+pub(super) fn add_effect_spec(
     state: DocStateView,
-    fun: Effect,
-) -> Result<AddFunctionCommand, AddFunctionError> {
-    /*if state.with_functions(|it| it.contains_key(&fun.id())) {
-        return Err(AddFunctionError::IdAlreadyUsed(fun.id()));
+    effect_spec: EffectSpec,
+) -> Result<AddEffectSpecCommand, AddEffectSpecError> {
+    if state.with_effect_specs(|it| it.contains_key(&effect_spec.id())) {
+        return Err(AddEffectSpecError::IdAlreadyUsed(effect_spec.id()));
     }
 
-    Ok(AddFunctionCommand::new(fun))*/
-    todo!()
+    Ok(AddEffectSpecCommand::new(effect_spec))
 }
 
-pub(super) fn update_function(_state: DocStateView, _new: Effect) -> Result<(), ()> {
-    todo!()
+pub(super) fn update_effect_spec(
+    state: DocStateView,
+    id: EffectSpecId,
+    change: EffectSpecChange,
+) -> Result<UpdateEffectSpecCommand, UpdateEffectSpecError> {
+    let old = state.with_effect_specs(|it| {
+        it.get(&id)
+            .cloned()
+            .ok_or(UpdateEffectSpecError::NotFound(id))
+    })?;
+    let mut new = old.clone();
+    new.apply_change(change.clone());
+    Ok(UpdateEffectSpecCommand::new(old, new, change))
 }
 
-pub(super) fn remove_function(
+pub(super) fn remove_effect_spec(
+    state: DocStateView,
+    id: EffectSpecId,
+) -> Result<RemoveEffectSpecCommand, RemoveEffectSpecError> {
+    if !state.with_effect_specs(|it| it.contains_key(&id)) {
+        return Err(RemoveEffectSpecError::NotFound(id));
+    }
+
+    Ok(RemoveEffectSpecCommand::new(id))
+}
+
+pub(super) fn add_effect_template(
+    state: DocStateView,
+    effect_template: EffectTemplate,
+) -> Result<AddEffectTemplateCommand, AddEffectTemplateError> {
+    if state.with_effect_templates(|it| it.contains_key(&effect_template.id())) {
+        return Err(AddEffectTemplateError::IdAlreadyUsed(effect_template.id()));
+    }
+
+    Ok(AddEffectTemplateCommand::new(effect_template))
+}
+
+pub(super) fn update_effect_template(
+    state: DocStateView,
+    id: EffectTemplateId,
+    change: EffectTemplateChange,
+) -> Result<UpdateEffectTemplateCommand, UpdateEffectTemplateError> {
+    let old = state.with_effect_templates(|it| {
+        it.get(&id)
+            .cloned()
+            .ok_or(UpdateEffectTemplateError::NotFound(id))
+    })?;
+    let mut new = old.clone();
+    new.apply_change(change.clone());
+    Ok(UpdateEffectTemplateCommand::new(old, new, change))
+}
+
+pub(super) fn remove_effect_template(
+    state: DocStateView,
+    id: EffectTemplateId,
+) -> Result<RemoveEffectTemplateCommand, RemoveEffectTemplateError> {
+    if !state.with_effect_templates(|it| it.contains_key(&id)) {
+        return Err(RemoveEffectTemplateError::NotFound(id));
+    }
+
+    Ok(RemoveEffectTemplateCommand::new(id))
+}
+
+pub(super) fn add_effect(
+    state: DocStateView,
+    effect: Effect,
+) -> Result<AddEffectCommand, AddEffectError> {
+    if state.with_effects(|it| it.contains_key(&effect.id())) {
+        return Err(AddEffectError::IdAlreadyUsed(effect.id()));
+    }
+
+    Ok(AddEffectCommand::new(effect))
+}
+
+pub(super) fn update_effect(
     state: DocStateView,
     id: EffectId,
-) -> Result<RemoveFunctionCommand, RemoveFunctionError> {
-    /*if !state.with_functions(|it| it.contains_key(&id)) {
-        return Err(RemoveFunctionError::FunctionNotFound(id));
+    change: EffectChange,
+) -> Result<UpdateEffectCommand, UpdateEffectError> {
+    let old =
+        state.with_effects(|it| it.get(&id).cloned().ok_or(UpdateEffectError::NotFound(id)))?;
+    let mut new = old.clone();
+    new.apply_change(change.clone());
+    Ok(UpdateEffectCommand::new(old, new, change))
+}
+
+pub(super) fn remove_effect(
+    state: DocStateView,
+    id: EffectId,
+) -> Result<RemoveEffectCommand, RemoveEffectError> {
+    if !state.with_effects(|it| it.contains_key(&id)) {
+        return Err(RemoveEffectError::NotFound(id));
     }
 
-    Ok(RemoveFunctionCommand::new(id))*/
-    todo!()
+    Ok(RemoveEffectCommand::new(id))
 }
 
 /// changeを適用したあとのoccupied_addressを計算する
