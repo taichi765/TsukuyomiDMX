@@ -15,7 +15,7 @@ use std::{
 
 use crate::{
     doc::state::{AddressIndex, DocState},
-    effects::{Effect, EffectId, EffectSpec, EffectSpecId},
+    effects::{Effect, EffectId, EffectSpec, EffectSpecId, EffectTemplate, EffectTemplateId},
     fixture::{Fixture, FixtureChange, FixtureId},
     fixture_def::FixtureDefId,
     prelude::ChannelDef,
@@ -69,8 +69,9 @@ impl Doc {
 
     pub fn from_existing_data(
         fixtures: HashMap<FixtureId, Fixture>,
-        functions: HashMap<EffectId, Effect>,
-        function_prototypes: HashMap<EffectSpecId, EffectSpec>,
+        effect_specs: HashMap<EffectSpecId, EffectSpec>,
+        effect_templates: HashMap<EffectTemplateId, EffectTemplate>,
+        effects: HashMap<EffectId, Effect>,
         universes: HashSet<UniverseId>,
     ) -> Result<Self, AddressIndexConstructError> {
         let def_resource_path = {
@@ -85,8 +86,9 @@ impl Doc {
             state: Arc::new(DocState::from_existing_data(
                 def_rg,
                 fixtures,
-                functions,
-                function_prototypes,
+                effect_specs,
+                effect_templates,
+                effects,
                 universes,
             )?),
             subscribers: Vec::new(),
@@ -244,8 +246,9 @@ macro_rules! define_readonly_wrapper {
 impl DocStateView {
     define_readonly_wrapper!(with_fixtures, HashMap<FixtureId, Fixture>);
     define_readonly_wrapper!(with_fixture_defs, dyn FixtureDefRegistry);
-    define_readonly_wrapper!(with_functions, HashMap<EffectId, Effect>);
-    define_readonly_wrapper!(with_function_prototypes, HashMap<EffectSpecId, EffectSpec>);
+    define_readonly_wrapper!(with_effect_specs, HashMap<EffectSpecId, EffectSpec>);
+    define_readonly_wrapper!(with_effect_templates, HashMap<EffectTemplateId, EffectTemplate>);
+    define_readonly_wrapper!(with_effects, HashMap<EffectId, Effect>);
     define_readonly_wrapper!(with_address_index, AddressIndex);
 
     pub fn with_fixtures_and_defs<F, R>(&self, f: F) -> R

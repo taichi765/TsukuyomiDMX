@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     doc::{AddressIndexConstructError, FixtureDefNotFoundError, def_registry::FixtureDefRegistry},
-    effects::{Effect, EffectId, EffectSpec, EffectSpecId},
+    effects::{Effect, EffectId, EffectSpec, EffectSpecId, EffectTemplate, EffectTemplateId},
     fixture::{Fixture, FixtureId},
     prelude::{DmxAddress, UniverseId},
 };
@@ -21,8 +21,9 @@ pub struct AddressIndex(HashMap<(UniverseId, DmxAddress), (FixtureId, usize)>);
 pub(super) struct DocState {
     fixtures: RwLock<HashMap<FixtureId, Fixture>>,
     fixture_defs: RwLock<Box<dyn FixtureDefRegistry>>,
-    functions: RwLock<HashMap<EffectId, Effect>>,
-    function_prototypes: RwLock<HashMap<EffectSpecId, EffectSpec>>,
+    effect_specs: RwLock<HashMap<EffectSpecId, EffectSpec>>,
+    effect_templates: RwLock<HashMap<EffectTemplateId, EffectTemplate>>,
+    effects: RwLock<HashMap<EffectId, Effect>>,
     universes: RwLock<HashSet<UniverseId>>,
 
     address_index: RwLock<AddressIndex>,
@@ -54,8 +55,9 @@ impl DocState {
         Self {
             fixtures: RwLock::new(HashMap::new()),
             fixture_defs: RwLock::new(def_registry),
-            functions: RwLock::new(HashMap::new()),
-            function_prototypes: RwLock::new(HashMap::new()),
+            effect_specs: RwLock::new(HashMap::new()),
+            effect_templates: RwLock::new(HashMap::new()),
+            effects: RwLock::new(HashMap::new()),
             universes: RwLock::new(HashSet::new()),
 
             address_index: RwLock::new(AddressIndex::new()),
@@ -65,16 +67,18 @@ impl DocState {
     pub fn from_existing_data(
         def_registry: Box<dyn FixtureDefRegistry>,
         fixtures: HashMap<FixtureId, Fixture>,
-        functions: HashMap<EffectId, Effect>,
-        function_prototypes: HashMap<EffectSpecId, EffectSpec>,
+        effect_specs: HashMap<EffectSpecId, EffectSpec>,
+        effect_templates: HashMap<EffectTemplateId, EffectTemplate>,
+        effects: HashMap<EffectId, Effect>,
         universes: HashSet<UniverseId>,
     ) -> Result<Self, AddressIndexConstructError> {
         let index = AddressIndex::from_fixtures(&fixtures, def_registry.as_ref())?;
         Ok(Self {
             fixtures: RwLock::new(fixtures),
             fixture_defs: RwLock::new(def_registry),
-            functions: RwLock::new(functions),
-            function_prototypes: RwLock::new(function_prototypes),
+            effect_specs: RwLock::new(effect_specs),
+            effect_templates: RwLock::new(effect_templates),
+            effects: RwLock::new(effects),
             universes: RwLock::new(universes),
             address_index: RwLock::new(index),
         })
@@ -85,8 +89,9 @@ impl DocState {
     }
 
     define_rwlock_helper!(fixtures, HashMap<FixtureId, Fixture>);
-    define_rwlock_helper!(functions, HashMap<EffectId, Effect>);
-    define_rwlock_helper!(function_prototypes, HashMap<EffectSpecId, EffectSpec>);
+    define_rwlock_helper!(effect_specs, HashMap<EffectSpecId, EffectSpec>);
+    define_rwlock_helper!(effect_templates, HashMap<EffectTemplateId, EffectTemplate>);
+    define_rwlock_helper!(effects, HashMap<EffectId, Effect>);
     define_rwlock_helper!(address_index, AddressIndex);
     define_rwlock_helper!(universes, HashSet<UniverseId>);
 
