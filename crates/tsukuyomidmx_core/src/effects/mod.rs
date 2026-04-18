@@ -21,7 +21,7 @@ use crate::effects::parallel::{ParallelEffectBody, ParallelEffectSpecBody};
 use crate::effects::sequence::{
     SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody,
 };
-use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody};
+use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody, SimpleEffectTemplateBody};
 use crate::fixture::{FixtureId, FixtureTag};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -30,8 +30,18 @@ declare_id_newtype!(EffectSpecId);
 declare_id_newtype!(EffectTemplateId);
 declare_id_newtype!(EffectId);
 
+pub trait EffectRegistry<Spec, Template> {
+    fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
+    where
+        F: FnOnce(&Spec) -> R;
+
+    fn with_template<F, R>(&self, tmpl_id: EffectTemplateId, f: F) -> R
+    where
+        F: FnOnce(&Template) -> R;
+}
+
 /// [`FunctionRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectCommand {
     /// if the function is already started, `Engine` do nothing.
     StartEffect(EffectId),
@@ -78,14 +88,11 @@ pub enum EffectBody {
 }
 
 impl Effect {
-    pub fn new_simple(
-        name: impl Into<String>,
-        values: impl Into<HashMap<(FixtureId, usize), u8>>,
-    ) -> Effect {
+    pub fn new_simple(name: impl Into<String>) -> Effect {
         Effect {
             id: EffectId::new(),
             name: name.into(),
-            body: EffectBody::Simple(SimpleEffectBody::new(values)),
+            body: EffectBody::Simple(SimpleEffectBody::new()),
         }
     }
 
@@ -121,8 +128,8 @@ impl EffectBody {
     fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
         match &self {
             // TODO: Boxを返すかそのまま返すか統一する
-            EffectBody::Simple(fun) => fun.create_runtime(),
-            EffectBody::Sequence(fun) => Box::new(fun.create_runtime(doc)),
+            EffectBody::Simple(fun) => fun.create_runtime(doc.clone(), doc),
+            EffectBody::Sequence(fun) => fun.create_runtime(doc),
             EffectBody::Parallel(fun) => fun.create_runtime(doc),
         }
     }
@@ -163,7 +170,7 @@ pub struct EffectTemplate {
 /// `Sequence`のstep等として埋め込める。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EffectTemplateBody {
-    Simple(),
+    Simple(SimpleEffectTemplateBody),
     Sequence(SequenceEffectTemplateBody),
     Parallel(),
 }

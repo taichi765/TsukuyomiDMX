@@ -1,16 +1,6 @@
 use super::*;
 
-pub trait EffectRegistry {
-    fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
-    where
-        F: FnOnce(&SequenceEffectSpecBody) -> R;
-
-    fn with_template<F, R>(&self, tmpl_id: EffectTemplateId, f: F) -> R
-    where
-        F: FnOnce(&SequenceEffectTemplateBody) -> R;
-}
-
-impl EffectRegistry for DocStateView {
+impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody> for DocStateView {
     fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
     where
         F: FnOnce(&SequenceEffectSpecBody) -> R,
@@ -82,7 +72,7 @@ type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateBody, EffectT
 impl SequenceEffectTemplateBody {
     pub fn from_spec(
         spec_id: EffectSpecId,
-        rg: impl EffectRegistry,
+        rg: impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody>,
     ) -> Result<Self, FromSpecError> {
         // FIXME: ここでget(spec_id)をunwrap()しちゃだめな気がしなくもない
         let spec_props = rg.with_spec(spec_id, |spec| {
@@ -104,7 +94,7 @@ impl SequenceEffectTemplateBody {
     fn resolve_props(
         &self,
         given_props: HashMap<String, Value>,
-        rg: impl EffectRegistry,
+        rg: impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody>,
     ) -> Vec<ResolvedSequenceStep> {
         match self {
             Self::FromSpec {
@@ -151,7 +141,7 @@ pub enum SequenceEffectBody {
 }
 
 impl SequenceEffectBody {
-    pub(super) fn create_runtime(&self, doc: DocStateView) -> SequenceEffectRuntime {
+    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromTemplate(tmpl_id, tmpl_props) => doc.with_effect_templates(|it| {
                 let EffectTemplateBody::Sequence(tmpl) = &it.get(tmpl_id).unwrap().body else {
@@ -159,7 +149,7 @@ impl SequenceEffectBody {
                 };
 
                 let steps = tmpl.resolve_props(tmpl_props.clone(), doc.clone());
-                SequenceEffectRuntime::new(steps)
+                Box::new(SequenceEffectRuntime::new(steps))
             }),
             Self::New(steps) => {
                 // TODO: SequenceEffectTemplateBody::resolve_props()と重複しているコードがある
@@ -184,7 +174,7 @@ impl SequenceEffectBody {
                     })
                     .collect();
 
-                SequenceEffectRuntime::new(steps)
+                Box::new(SequenceEffectRuntime::new(steps))
             }
         }
     }
