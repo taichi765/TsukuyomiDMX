@@ -17,7 +17,9 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::doc::DocStateView;
-use crate::effects::parallel::{ParallelEffectBody, ParallelEffectSpecBody};
+use crate::effects::parallel::{
+    ParallelEffectBody, ParallelEffectSpecBody, ParallelEffectTemplateBody,
+};
 use crate::effects::sequence::{
     SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody,
 };
@@ -107,18 +109,15 @@ impl Effect {
         }
     }*/
 
-    pub fn new_parallel(
-        name: impl Into<String>,
-        items: impl Into<Vec<EffectBodyOrReference<EffectBody, EffectId>>>,
-    ) -> Self {
+    pub fn new_parallel(name: impl Into<String>) -> Self {
         Self {
             id: EffectId::new(),
             name: name.into(),
-            body: EffectBody::Parallel(ParallelEffectBody::new(items)),
+            body: EffectBody::Parallel(ParallelEffectBody::new()),
         }
     }
 
-    pub fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+    pub(crate) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
         self.body.create_runtime(doc)
     }
 }
@@ -145,7 +144,7 @@ pub struct EffectSpec {
     body: EffectSpecBody,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EffectSpecBody {
     Simple(SimpleEffectSpecBody),
     Sequence(SequenceEffectSpecBody),
@@ -172,7 +171,7 @@ pub struct EffectTemplate {
 pub enum EffectTemplateBody {
     Simple(SimpleEffectTemplateBody),
     Sequence(SequenceEffectTemplateBody),
-    Parallel(),
+    Parallel(ParallelEffectTemplateBody),
 }
 
 impl EffectTemplate {}

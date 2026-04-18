@@ -36,7 +36,7 @@ pub struct SequenceTemplateStepBase<Body, Id> {
     body: EffectBodyOrReference<Body, Id>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceEffectSpecBody {
     props: HashMap<String, Type>,
     steps: Vec<SequenceSpecStep>,
@@ -199,12 +199,6 @@ pub struct ResolvedSequenceStep {
     fadein_runtime: Option<Box<dyn EffectRuntime>>,
 }
 
-impl ResolvedSequenceStep {
-    fn duration(&self) -> Duration {
-        self.hold + self.fade_in.unwrap_or(Duration::ZERO)
-    }
-}
-
 /// `body_resolver`を使って再帰的にpropsを適用していく
 fn resolve_steps<Body, Id>(
     steps: &[SequenceTemplateStepBase<Body, Id>],
@@ -325,7 +319,7 @@ impl EffectRuntime for SequenceEffectRuntime {
 }
 
 impl SequenceEffectRuntime {
-    fn new(steps: Vec<ResolvedSequenceStep>) -> Self {
+    pub(super) fn new(steps: Vec<ResolvedSequenceStep>) -> Self {
         let first_step = steps.get(0).unwrap();
         let (time_to_next_action, running_state) = if let Some(fade_in) = first_step.fade_in {
             (fade_in, SequenceStepState::FadeIn)
