@@ -30,7 +30,7 @@ pub fn setup(app: &App) {
                 doc_clone
                     .lock()
                     .unwrap()
-                    .add_function(Effect::new_simple("Simple Function", HashMap::new()))
+                    .add_effect(Effect::new_simple("Simple Function", HashMap::new()))
                     .expect("todo");
             });
         }
@@ -44,7 +44,7 @@ pub fn setup(app: &App) {
                 doc_clone
                     .lock()
                     .unwrap()
-                    .add_function(Effect::new_sequence("Sequence Function", Vec::new()))
+                    .add_effect(Effect::new_sequence("Sequence Function", Vec::new()))
                     .expect("todo");
             });
         }
@@ -107,7 +107,7 @@ pub fn setup(app: &App) {
                     doc_clone
                         .lock()
                         .unwrap()
-                        .remove_function_prototype(id)
+                        .remove_effect_spec(id)
                         .expect("todo");
                 }
             })

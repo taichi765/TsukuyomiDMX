@@ -71,69 +71,6 @@ pub(crate) trait EffectRuntime: Send {
     fn last_frame_hint(&self) -> Vec<EffectCommand>;
 }
 
-/// bind_to()でFixtureに関連付けたあとのfunction.
-///
-/// Goboなどmodel-specificなチャンネルを制御する。
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Getters)]
-pub struct Effect {
-    #[getter(copy)]
-    id: EffectId,
-    name: String,
-    body: EffectBody,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EffectBody {
-    Simple(SimpleEffectBody),
-    Sequence(SequenceEffectBody),
-    Parallel(ParallelEffectBody),
-}
-
-impl Effect {
-    pub fn new_simple(name: impl Into<String>) -> Effect {
-        Effect {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Simple(SimpleEffectBody::new()),
-        }
-    }
-
-    /*pub fn new_sequence(
-        name: impl Into<String>,
-        steps: impl Into<Vec<SequenceTemplateStep<EffectBody, EffectId>>>,
-    ) -> Self {
-        Self {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Sequence(SequenceEffectBody::from_existing_data(steps)),
-        }
-    }*/
-
-    pub fn new_parallel(name: impl Into<String>) -> Self {
-        Self {
-            id: EffectId::new(),
-            name: name.into(),
-            body: EffectBody::Parallel(ParallelEffectBody::new()),
-        }
-    }
-
-    pub(crate) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        self.body.create_runtime(doc)
-    }
-}
-
-impl EffectBody {
-    /// infallible
-    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        match &self {
-            // TODO: Boxを返すかそのまま返すか統一する
-            EffectBody::Simple(fun) => fun.create_runtime(doc),
-            EffectBody::Sequence(fun) => fun.create_runtime(doc),
-            EffectBody::Parallel(fun) => fun.create_runtime(doc),
-        }
-    }
-}
-
 /// bind_to()でFixtureに関連付けられる前のfunction.
 ///
 /// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
@@ -151,9 +88,30 @@ pub enum EffectSpecBody {
     Parallel(ParallelEffectSpecBody),
 }
 
+#[derive(Debug, Clone)]
+pub enum EffectSpecChange {
+    Rename(String),
+    Simple(SimpleEffectSpecBody),
+    Sequence(SequenceEffectSpecBody),
+    Parallel(ParallelEffectSpecBody),
+}
+
 impl EffectSpec {
     pub fn id(&self) -> EffectSpecId {
         self.id
+    }
+
+    pub(crate) fn apply_change(&mut self, change: EffectSpecChange) {
+        match change {
+            EffectSpecChange::Rename(name) => {
+                self.name = name;
+            }
+            EffectSpecChange::Simple(body) => {
+                self.body = EffectSpecBody::Simple(body);
+            }
+            EffectSpecChange::Sequence(body) => self.body = EffectSpecBody::Sequence(body),
+            EffectSpecChange::Parallel(body) => self.body = EffectSpecBody::Parallel(body),
+        }
     }
 }
 
@@ -173,6 +131,7 @@ impl EffectSpecBody {
 }
 
 /// Propsに代入することで[`Effect`]を得られる。
+#[derive(Debug, Clone)]
 pub struct EffectTemplate {
     id: EffectTemplateId,
     name: String,
@@ -189,6 +148,30 @@ pub enum EffectTemplateBody {
     Parallel(ParallelEffectTemplateBody),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectTemplateChange {
+    Rename(String),
+    Simple(SimpleEffectTemplateBody),
+    Sequence(SequenceEffectTemplateBody),
+    Parallel(ParallelEffectTemplateBody),
+}
+
+impl EffectTemplate {
+    // TODO: 個別のchangeを用意したほうがいいか？
+    pub(crate) fn apply_change(&mut self, change: EffectTemplateChange) {
+        match change {
+            EffectTemplateChange::Rename(name) => {
+                self.name = name;
+            }
+            EffectTemplateChange::Simple(body) => {
+                self.body = EffectTemplateBody::Simple(body);
+            }
+            EffectTemplateChange::Sequence(body) => self.body = EffectTemplateBody::Sequence(body),
+            EffectTemplateChange::Parallel(body) => self.body = EffectTemplateBody::Parallel(body),
+        }
+    }
+}
+
 impl EffectTemplateBody {
     fn resolve_props(
         &self,
@@ -199,6 +182,88 @@ impl EffectTemplateBody {
             EffectTemplateBody::Simple(body) => body.resolve_props(given_props, doc),
             EffectTemplateBody::Sequence(body) => body.resolve_props(given_props, doc),
             EffectTemplateBody::Parallel(body) => body.resolve_props(given_props, doc),
+        }
+    }
+}
+
+/// bind_to()でFixtureに関連付けたあとのfunction.
+///
+/// Goboなどmodel-specificなチャンネルを制御する。
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Getters)]
+pub struct Effect {
+    #[getter(copy)]
+    id: EffectId,
+    name: String,
+    body: EffectBody,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EffectBody {
+    Simple(SimpleEffectBody),
+    Sequence(SequenceEffectBody),
+    Parallel(ParallelEffectBody),
+}
+
+#[derive(Debug, Clone)]
+pub enum EffectChange {
+    Rename(String),
+    Simple(SimpleEffectBody),
+    Sequence(SequenceEffectBody),
+    Parallel(ParallelEffectBody),
+}
+
+impl Effect {
+    pub fn new_simple(name: impl Into<String>) -> Effect {
+        Effect {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Simple(SimpleEffectBody::new()),
+        }
+    }
+
+    pub fn new_sequence(name: impl Into<String>) -> Self {
+        todo!()
+        /*Self {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Sequence(SequenceEffectBody::),
+        }*/
+    }
+
+    pub fn new_parallel(name: impl Into<String>) -> Self {
+        Self {
+            id: EffectId::new(),
+            name: name.into(),
+            body: EffectBody::Parallel(ParallelEffectBody::new()),
+        }
+    }
+
+    pub(crate) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        self.body.create_runtime(doc)
+    }
+
+    pub(crate) fn apply_change(&mut self, change: EffectChange) {
+        match change {
+            EffectChange::Rename(name) => {
+                self.name = name;
+            }
+            EffectChange::Simple(body) => {
+                self.body = EffectBody::Simple(body);
+            }
+            EffectChange::Sequence(body) => self.body = EffectBody::Sequence(body),
+            EffectChange::Parallel(body) => self.body = EffectBody::Parallel(body),
+        }
+    }
+}
+
+impl EffectBody {
+    /// infallible
+    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        match &self {
+            // TODO: Boxを返すかそのまま返すか統一する
+            EffectBody::Simple(fun) => fun.create_runtime(doc),
+            EffectBody::Sequence(fun) => fun.create_runtime(doc),
+            EffectBody::Parallel(fun) => fun.create_runtime(doc),
         }
     }
 }
@@ -460,16 +525,4 @@ impl Default for FixtureQuery {
             data: vec![Selector::Tags(vec![FixtureTag::new("some-tag").unwrap()])],
         }
     }
-}
-
-#[derive(Debug, Error)]
-pub enum ApplyPropsError {
-    #[error("todo")]
-    NoSuchProp(String),
-    #[error("todo")]
-    TypeMismatched {
-        name: String,
-        expected: Type,
-        got: Type,
-    },
 }

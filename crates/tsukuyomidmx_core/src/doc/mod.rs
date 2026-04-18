@@ -15,7 +15,10 @@ use std::{
 
 use crate::{
     doc::state::{AddressIndex, DocState},
-    effects::{Effect, EffectId, EffectSpec, EffectSpecId, EffectTemplate, EffectTemplateId},
+    effects::{
+        Effect, EffectChange, EffectId, EffectSpec, EffectSpecChange, EffectSpecId, EffectTemplate,
+        EffectTemplateChange, EffectTemplateId,
+    },
     fixture::{Fixture, FixtureChange, FixtureId},
     fixture_def::FixtureDefId,
     prelude::ChannelDef,
@@ -160,14 +163,42 @@ impl Doc {
     }
 
     #[instrument]
-    pub fn add_function(&mut self, fun: Effect) -> Result<(), AddFunctionError> {
-        let cmd = decider::add_function(self.state_view(), fun)?;
+    pub fn add_effect_spec(&mut self, _value: EffectSpec) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument]
+    pub fn update_effect_spec(&mut self, _change: EffectSpecChange) -> Result<(), ()> {
+        todo!()
+    }
+
+    pub fn remove_effect_spec(&mut self, _id: EffectSpecId) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument]
+    pub fn add_effect_template(&mut self, _value: EffectTemplate) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument]
+    pub fn update_effect_template(&mut self, _change: EffectTemplateChange) -> Result<(), ()> {
+        todo!()
+    }
+
+    pub fn remove_effect_template(&mut self, _id: EffectTemplateId) -> Result<(), ()> {
+        todo!()
+    }
+
+    #[instrument]
+    pub fn add_effect(&mut self, fx: Effect) -> Result<(), AddFunctionError> {
+        let cmd = decider::add_function(self.state_view(), fx)?;
         self.apply_command(cmd);
         Ok(())
     }
 
     #[instrument]
-    pub fn update_function(&mut self, _new: Effect) -> Result<(), ()> {
+    pub fn update_effect(&mut self, change: EffectChange) -> Result<(), ()> {
         todo!()
     }
 
@@ -176,20 +207,6 @@ impl Doc {
         let cmd = decider::remove_function(self.state_view(), id)?;
         self.apply_command(cmd);
         Ok(())
-    }
-
-    #[instrument]
-    pub fn add_function_prototype(&mut self, _value: EffectSpec) -> Result<(), ()> {
-        todo!()
-    }
-
-    #[instrument]
-    pub fn update_function_prototype(&mut self, _new: EffectSpec) -> Result<(), ()> {
-        todo!()
-    }
-
-    pub fn remove_function_prototype(&mut self, _id: EffectSpecId) -> Result<(), ()> {
-        todo!()
     }
 
     pub fn add_universe(&mut self) {

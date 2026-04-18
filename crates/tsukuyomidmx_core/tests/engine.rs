@@ -32,7 +32,7 @@ fn engine_can_start_function() {
     let fun = Effect::new_simple("Scene 1");
     // TODO: Add steps here
     let fun_id = fun.id();
-    doc.add_function(fun).unwrap();
+    doc.add_effect(fun).unwrap();
 
     let (command_tx, command_rx) = mpsc::channel();
     let (message_tx, _message_rx) = mpsc::channel();
