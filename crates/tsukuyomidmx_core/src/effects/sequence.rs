@@ -267,11 +267,11 @@ impl EffectRuntime for SequenceEffectRuntime {
     }
 
     fn first_frame_hint(&self) -> Vec<EffectCommand> {
-        todo!()
+        self.steps.get(0).unwrap().runtime.first_frame_hint()
     }
 
     fn last_frame_hint(&self) -> Vec<EffectCommand> {
-        todo!()
+        self.steps.last().unwrap().runtime.first_frame_hint()
     }
 }
 
