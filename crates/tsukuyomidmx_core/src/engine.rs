@@ -184,152 +184,104 @@ impl Engine {
                     channel,
                     value,
                 } => self.write_universe(fixture_id, channel, value),
-                EffectCommand::StartFade {
-                    from_id,
-                    to_id,
-                    chaser_id,
-                    duration,
-                } => self.start_fade(from_id, to_id, chaser_id, duration),
             }
         }
-    }
 
-    fn dispatch_outputs(&mut self) {
-        self.output_map.par_iter().for_each(|(p_id, u_ids)| {
-            let Some(plugin) = self.output_plugins.get(p_id) else {
-                warn!(plugin_id = %p_id, "plugin not found"); // FIXME: message_txでエラーを送るべき？
-                return;
-            };
-            u_ids.iter().for_each(|u_id| {
-                let Some(universe_data) = self.universe_states.get(u_id) else {
-                    warn!(universe_id = ?u_id, "universe state not created");
+        fn dispatch_outputs(&mut self) {
+            self.output_map.par_iter().for_each(|(p_id, u_ids)| {
+                let Some(plugin) = self.output_plugins.get(p_id) else {
+                    warn!(plugin_id = %p_id, "plugin not found"); // FIXME: message_txでエラーを送るべき？
                     return;
                 };
-                if let Err(e) = plugin.send_dmx(*u_id, DmxFrame::from(universe_data.values)) {
+                u_ids.iter().for_each(|u_id| {
+                    let Some(universe_data) = self.universe_states.get(u_id) else {
+                        warn!(universe_id = ?u_id, "universe state not created");
+                        return;
+                    };
+                    if let Err(e) = plugin.send_dmx(*u_id, DmxFrame::from(universe_data.values)) {
+                        self.message_tx
+                            .send(EngineMessage::ErrorOccured(EngineError::SendingDmx {
+                                universe_id: *u_id,
+                                plugin_id: *p_id,
+                                source: Box::new(e),
+                            }))
+                            .unwrap();
+                    }
+                });
+            });
+        }
+
+        /// 既にactiveなfunctionがあった場合上書きされる
+        fn start_function(&mut self, function_id: EffectId) {
+            let res = self.doc.with_functions(|it| {
+                it.get(&function_id)
+                    .map(|fun| fun.create_runtime(self.doc.clone()))
+                    .ok_or(EngineError::FunctionNotFound { function_id })
+            });
+
+            match res {
+                Ok(rt) => self.active_runtime = Some(rt),
+                Err(e) => self
+                    .message_tx
+                    .send(EngineMessage::ErrorOccured(e))
+                    .expect("failed to send message from engine thread"),
+            }
+        }
+
+        /// 現在activeなfuncitonを止める。
+        ///
+        /// activeなfunctionが無かった場合何もしない。
+        fn stop_function(&mut self) {
+            self.active_runtime = None;
+        }
+
+        fn write_universe(&mut self, fxt_id: FixtureId, channel: usize, value: u8) {
+            match self.doc.resolve_address_with_offset(fxt_id, channel) {
+                Ok(resolved_address) => {
+                    let univ = self
+                        .universe_states
+                        .get_mut(&resolved_address.universe)
+                        .expect("todo");
+                    univ.set_value(resolved_address, value);
+                }
+                Err(e) => self
+                    .message_tx
+                    .send(EngineMessage::ErrorOccured(EngineError::ResolveAddress(e)))
+                    .expect("failed to send message from engine thread"),
+            }
+        }
+
+        fn write_universe_with_channel_name(
+            &mut self,
+            fixture_id: FixtureId,
+            channel: &str,
+            value: u8,
+        ) {
+            match self
+                .doc
+                .resolve_address_with_channel_name(fixture_id, channel)
+            {
+                Ok(resolved_address) => {
+                    let universe = self
+                        .universe_states
+                        .get_mut(&resolved_address.universe)
+                        .expect(
+                            format!("universe states not found: {:?}", resolved_address.universe)
+                                .as_str(),
+                        ); // TODO: EngineMessageで通知する
+                    universe.set_value(resolved_address, value);
+                }
+                Err(e) => {
                     self.message_tx
-                        .send(EngineMessage::ErrorOccured(EngineError::SendingDmx {
-                            universe_id: *u_id,
-                            plugin_id: *p_id,
+                        .send(EngineMessage::ErrorOccured(EngineError::ResolvingAddress {
+                            fixture_id,
+                            channel: channel.to_string(),
                             source: Box::new(e),
                         }))
-                        .unwrap();
+                        .expect("failed to send message from engine");
                 }
-            });
-        });
-    }
-
-    /// 既にactiveなfunctionがあった場合上書きされる
-    fn start_function(&mut self, function_id: EffectId) {
-        let res = self.doc.with_functions(|it| {
-            it.get(&function_id)
-                .map(|fun| fun.create_runtime(self.doc.clone()))
-                .ok_or(EngineError::FunctionNotFound { function_id })
-        });
-
-        match res {
-            Ok(rt) => self.active_runtime = Some(rt),
-            Err(e) => self
-                .message_tx
-                .send(EngineMessage::ErrorOccured(e))
-                .expect("failed to send message from engine thread"),
-        }
-    }
-
-    /// 現在activeなfuncitonを止める。
-    ///
-    /// activeなfunctionが無かった場合何もしない。
-    fn stop_function(&mut self) {
-        self.active_runtime = None;
-    }
-
-    fn write_universe(&mut self, fxt_id: FixtureId, channel: usize, value: u8) {
-        match self.doc.resolve_address_with_offset(fxt_id, channel) {
-            Ok(resolved_address) => {
-                let univ = self
-                    .universe_states
-                    .get_mut(&resolved_address.universe)
-                    .expect("todo");
-                univ.set_value(resolved_address, value);
-            }
-            Err(e) => self
-                .message_tx
-                .send(EngineMessage::ErrorOccured(EngineError::ResolveAddress(e)))
-                .expect("failed to send message from engine thread"),
-        }
-    }
-
-    fn write_universe_with_channel_name(
-        &mut self,
-        fixture_id: FixtureId,
-        channel: &str,
-        value: u8,
-    ) {
-        match self
-            .doc
-            .resolve_address_with_channel_name(fixture_id, channel)
-        {
-            Ok(resolved_address) => {
-                let universe = self
-                    .universe_states
-                    .get_mut(&resolved_address.universe)
-                    .expect(
-                        format!("universe states not found: {:?}", resolved_address.universe)
-                            .as_str(),
-                    ); // TODO: EngineMessageで通知する
-                universe.set_value(resolved_address, value);
-            }
-            Err(e) => {
-                self.message_tx
-                    .send(EngineMessage::ErrorOccured(EngineError::ResolvingAddress {
-                        fixture_id,
-                        channel: channel.to_string(),
-                        source: Box::new(e),
-                    }))
-                    .expect("failed to send message from engine");
             }
         }
-    }
-
-    fn start_fade(
-        &mut self,
-        _from_id: EffectId,
-        _to_id: EffectId,
-        _chaser_id: EffectId,
-        _duration: Duration,
-    ) {
-        //必要な値だけを取り出す
-        /*let (from_values, to_values) = {
-            let from_scene = self.get_function(from_id).as_ref();
-            let from_scene = match from_scene.function_type() {
-                FunctionType::Scene => (from_scene as &dyn Any)
-                    .downcast_ref::<StaticSceneData>()
-                    .unwrap(),
-                _ => panic!("unimplemented type"),
-            };
-
-            let to_scene = self.get_function(to_id).as_ref();
-            let to_scene = match to_scene.function_type() {
-                FunctionType::Scene => (to_scene as &dyn Any)
-                    .downcast_ref::<StaticSceneData>()
-                    .unwrap(),
-                _ => panic!("unimplemented type"),
-            };
-            // TODO: 無駄なclone?
-            (from_scene.values().clone(), to_scene.values().clone())
-        };
-        let fader = Fader::new(
-            self.next_internal_function_id(),
-            to_id,
-            chaser_id,
-            from_values,
-            to_values,
-            duration,
-        );
-        todo!();
-        let fader_id = fader.id();
-        self.push_function(Box::new(fader))
-            .expect("functionの追加に失敗しました");
-        self.start_function(fader_id);*/
     }
 }
 

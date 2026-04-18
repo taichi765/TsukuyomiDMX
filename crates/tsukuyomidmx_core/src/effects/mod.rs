@@ -40,12 +40,12 @@ pub enum EffectCommand {
         channel: usize,
         value: u8,
     },
-    StartFade {
+    /*StartFade {
         from_id: EffectId,
         to_id: EffectId,
         chaser_id: EffectId,
         duration: Duration,
-    },
+    },*/
 }
 
 pub(crate) trait EffectRuntime: Send {
