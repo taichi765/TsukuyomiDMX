@@ -7,7 +7,7 @@ use super::DocStateView;
 use super::errors::*;
 use crate::doc::commands::*;
 use crate::doc::state::AddressIndex;
-use crate::effects::{EffectId, Effect};
+use crate::effects::{Effect, EffectId};
 use crate::fixture::FixtureChange;
 use crate::fixture_def::AddressIter;
 use crate::prelude::*;
@@ -111,11 +111,12 @@ pub(super) fn add_function(
     state: DocStateView,
     fun: Effect,
 ) -> Result<AddFunctionCommand, AddFunctionError> {
-    if state.with_functions(|it| it.contains_key(&fun.id())) {
+    /*if state.with_functions(|it| it.contains_key(&fun.id())) {
         return Err(AddFunctionError::IdAlreadyUsed(fun.id()));
     }
 
-    Ok(AddFunctionCommand::new(fun))
+    Ok(AddFunctionCommand::new(fun))*/
+    todo!()
 }
 
 pub(super) fn update_function(_state: DocStateView, _new: Effect) -> Result<(), ()> {
@@ -126,11 +127,12 @@ pub(super) fn remove_function(
     state: DocStateView,
     id: EffectId,
 ) -> Result<RemoveFunctionCommand, RemoveFunctionError> {
-    if !state.with_functions(|it| it.contains_key(&id)) {
+    /*if !state.with_functions(|it| it.contains_key(&id)) {
         return Err(RemoveFunctionError::FunctionNotFound(id));
     }
 
-    Ok(RemoveFunctionCommand::new(id))
+    Ok(RemoveFunctionCommand::new(id))*/
+    todo!()
 }
 
 /// changeを適用したあとのoccupied_addressを計算する

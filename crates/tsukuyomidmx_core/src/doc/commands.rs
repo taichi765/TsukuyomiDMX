@@ -190,12 +190,13 @@ mod functions {
             self: Box<Self>,
             state: &crate::doc::DocState,
         ) -> (Box<dyn DocCommand>, DocEffect) {
-            let id = self.fun.id();
+            /*let id = self.fun.id();
             state.with_functions_mut(|it| it.insert(id, self.fun));
             (
                 Box::new(RemoveFunctionCommand::new(id)),
                 DocEffect::FunctionAdded(id),
-            )
+            )*/
+            todo!()
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -219,12 +220,13 @@ mod functions {
             self: Box<Self>,
             state: &crate::doc::DocState,
         ) -> (Box<dyn DocCommand>, DocEffect) {
-            let removed = state.with_functions_mut(|it| it.remove(&self.0)).unwrap();
+            /*let removed = state.with_functions_mut(|it| it.remove(&self.0)).unwrap();
             let id = removed.id();
             (
                 Box::new(AddFunctionCommand::new(removed)),
                 DocEffect::FunctionRemoved(id),
-            )
+            )*/
+            todo!()
         }
 
         fn as_any(&self) -> &dyn std::any::Any {

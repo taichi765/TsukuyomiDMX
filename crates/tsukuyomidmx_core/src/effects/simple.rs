@@ -54,9 +54,10 @@ pub enum SimpleTemplateOrEffect {
 
 impl SimpleEffectBody {
     pub(super) fn new(values: impl Into<HashMap<(FixtureId, usize), u8>>) -> Self {
-        Self {
+        /*Self {
             values: values.into(),
-        }
+        }*/
+        todo!()
     }
 
     pub(super) fn create_runtime(&self) -> Box<dyn EffectRuntime> {
@@ -91,7 +92,7 @@ impl SimpleEffectTemplateBody {
 
 impl EffectRuntime for SimpleEffectRuntime {
     fn run(&mut self, _elapsed: Duration, _doc: DocStateView) -> Vec<EffectCommand> {
-        let EffectBody::Simple(fun) = todo!() else {
+        /*let EffectBody::Simple(fun) = todo!() else {
             unreachable!()
         };
         fun.values
@@ -103,13 +104,22 @@ impl EffectRuntime for SimpleEffectRuntime {
                     value: *val,
                 });
                 acc
-            })
+            })*/
+        todo!()
+    }
+
+    fn first_frame_hint(&self) -> Vec<EffectCommand> {
+        todo!()
+    }
+
+    fn last_frame_hint(&self) -> Vec<EffectCommand> {
+        todo!()
     }
 }
 
 impl From<SimpleEffectBody> for SimpleEffectDto {
     fn from(value: SimpleEffectBody) -> Self {
-        Self {
+        /*Self {
             values: value
                 .values
                 .into_iter()
@@ -119,19 +129,21 @@ impl From<SimpleEffectBody> for SimpleEffectDto {
                     value: value,
                 })
                 .collect(),
-        }
+        }*/
+        todo!()
     }
 }
 
 impl From<SimpleEffectDto> for SimpleEffectBody {
     fn from(value: SimpleEffectDto) -> Self {
-        Self {
+        /*Self {
             values: value
                 .values
                 .into_iter()
                 .map(|v| ((v.fxt_id, v.offset), v.value))
                 .collect(),
-        }
+        }*/
+        todo!()
     }
 }
 

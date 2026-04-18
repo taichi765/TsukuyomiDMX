@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 mod parallel;
 mod sequence;
 mod simple;
@@ -17,7 +19,7 @@ use tracing::warn;
 use crate::doc::DocStateView;
 use crate::effects::parallel::{ParallelEffectBody, ParallelEffectSpecBody};
 use crate::effects::sequence::{
-    SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody, SequenceTemplateStep,
+    SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody,
 };
 use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody};
 use crate::fixture::{FixtureId, FixtureTag};
@@ -87,7 +89,7 @@ impl Effect {
         }
     }
 
-    pub fn new_sequence(
+    /*pub fn new_sequence(
         name: impl Into<String>,
         steps: impl Into<Vec<SequenceTemplateStep<EffectBody, EffectId>>>,
     ) -> Self {
@@ -96,7 +98,7 @@ impl Effect {
             name: name.into(),
             body: EffectBody::Sequence(SequenceEffectBody::from_existing_data(steps)),
         }
-    }
+    }*/
 
     pub fn new_parallel(
         name: impl Into<String>,
@@ -108,14 +110,19 @@ impl Effect {
             body: EffectBody::Parallel(ParallelEffectBody::new(items)),
         }
     }
+
+    pub fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+        self.body.create_runtime(doc)
+    }
 }
 
 impl EffectBody {
     /// infallible
     fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
         match &self {
+            // TODO: Boxを返すかそのまま返すか統一する
             EffectBody::Simple(fun) => fun.create_runtime(),
-            EffectBody::Sequence(fun) => fun.create_runtime(doc),
+            EffectBody::Sequence(fun) => Box::new(fun.create_runtime(doc)),
             EffectBody::Parallel(fun) => fun.create_runtime(doc),
         }
     }
@@ -321,7 +328,7 @@ impl FixtureQuery {
     pub fn from_str(val: impl Into<String>) -> Option<Self> {
         let val = val.into();
         let selector = if val.chars().next()? == '#' {
-            Selector::Id(Self::parse_id(val.chars())?)
+            Selector::Id(Self::parse_id(val.chars()).expect("todo: Errを返す"))
         } else if val.chars().next().unwrap() == '.' {
             Selector::Tags(Self::parse_tags(&val)?)
         } else {
@@ -365,8 +372,9 @@ impl FixtureQuery {
         if val.next().unwrap() != '#' {
             unreachable!()
         } else {
-            let id = val.collect();
-            FixtureId::try_from(id)
+            let id: String = val.collect();
+            todo!()
+            //FixtureId::try_from(id)
         }
     }
 

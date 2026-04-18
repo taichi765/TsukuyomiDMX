@@ -5,7 +5,7 @@ use super::*;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelEffectSpecBody {}
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelEffectBody {
     items: Vec<EffectBodyOrReference<EffectBody, EffectId>>,
 }
@@ -45,7 +45,7 @@ impl ParallelEffectBody {
 
 impl EffectRuntime for ParallelEffectRuntime {
     fn run(&mut self, elapsed: Duration, doc: DocStateView) -> Vec<EffectCommand> {
-        let EffectBody::Parallel(this) = todo!() else {
+        /*let EffectBody::Parallel(this) = todo!() else {
             unreachable!()
         };
         self.runtimes
@@ -60,6 +60,15 @@ impl EffectRuntime for ParallelEffectRuntime {
                 };
                 acc.append(&mut commands);
                 acc
-            })
+            })*/
+        todo!()
+    }
+
+    fn first_frame_hint(&self) -> Vec<EffectCommand> {
+        todo!()
+    }
+
+    fn last_frame_hint(&self) -> Vec<EffectCommand> {
+        todo!()
     }
 }
