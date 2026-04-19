@@ -23,3 +23,6 @@
 .gemini/
 GEMINI.md
 AGENTS.md
+
+# Packaging
+**/*.Appdir/**

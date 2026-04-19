@@ -524,8 +524,7 @@ impl FixtureQuery {
             unreachable!()
         } else {
             let id: String = val.collect();
-            todo!()
-            //FixtureId::try_from(id)
+            FixtureId::from_str(&id)
         }
     }
 
