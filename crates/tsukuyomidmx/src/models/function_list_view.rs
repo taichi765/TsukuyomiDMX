@@ -41,10 +41,10 @@ impl Model for FunctionListViewModel {
 impl FunctionListViewModel {
     pub fn new(doc: &mut Doc) -> Rc<Self> {
         let row_order = Vec::new();
-        let data = doc.state_view().with_functions(|it| {
+        let data = doc.state_view().with_effects(|it| {
             it.iter().fold(HashMap::new(), |mut acc, v| {
                 acc.insert(
-                    AnyFunctionId::Applied(v.0.to_owned()),
+                    AnyFunctionId::Effect(v.0.to_owned()),
                     ui::FunctionData {
                         id: v.0.to_shared_string(),
                         name: v.1.name().to_shared_string(),
@@ -67,9 +67,9 @@ impl FunctionListViewModel {
             let me_clone = Rc::clone(&me);
 
             Box::new(move |ev| match ev {
-                DocEffect::FunctionAdded(id) => me_clone.doc.with_functions(|it| {
+                DocEffect::EffectAdded(id) => me_clone.doc.with_effects(|it| {
                     let fun = it.get(id).unwrap();
-                    let id = AnyFunctionId::Applied(*id);
+                    let id = AnyFunctionId::Effect(*id);
                     let added_row = me_clone.row_order.borrow().len();
                     me_clone.row_order.borrow_mut().push(id);
                     me_clone.data.borrow_mut().insert(
@@ -77,29 +77,51 @@ impl FunctionListViewModel {
                         ui::FunctionData {
                             id: id.to_shared_string(),
                             name: fun.name().to_shared_string(),
-                            r#type: get_function_type(fun),
+                            r#type: get_effect_type(fun),
                         },
                     );
                     me_clone.notify.row_added(added_row, 1);
                 }),
-                DocEffect::FunctionUpdated(id) => todo!(),
-                DocEffect::FunctionRemoved(id) => {
+                DocEffect::EffectUpdated(id) => {
                     let pos = me_clone
                         .row_order
                         .borrow()
                         .iter()
-                        .position(|el| matches!(el, AnyFunctionId::Applied(v) if v==id))
+                        .position(|el| matches!(el, AnyFunctionId::Effect(v) if v==id))
+                        .unwrap();
+                    me_clone.doc.with_effects(|it| {
+                        let fx = it.get(id).unwrap();
+                        me_clone.data.borrow_mut().insert(
+                            AnyFunctionId::Effect(*id),
+                            ui::FunctionData {
+                                id: id.to_shared_string(),
+                                name: fx.name().to_shared_string(),
+                                r#type: get_effect_type(fx),
+                            },
+                        );
+                    });
+                    me_clone.notify.row_changed(pos);
+                }
+                DocEffect::EffectRemoved(id) => {
+                    let pos = me_clone
+                        .row_order
+                        .borrow()
+                        .iter()
+                        .position(|el| matches!(el, AnyFunctionId::Effect(v) if v==id))
                         .unwrap();
                     me_clone.row_order.borrow_mut().remove(pos);
                     me_clone
                         .data
                         .borrow_mut()
-                        .remove(&AnyFunctionId::Applied(*id));
+                        .remove(&AnyFunctionId::Effect(*id));
                     me_clone.notify.row_removed(pos, 1);
                 }
-                DocEffect::FunctionPrototypeAdded(id) => todo!(),
-                DocEffect::FunctionPrototypeUpdated(id) => todo!(),
-                DocEffect::FunctionPrototypeRemoved(id) => todo!(),
+                DocEffect::EffectSpecAdded(id) => todo!(),
+                DocEffect::EffectSpecUpdated(id) => todo!(),
+                DocEffect::EffectSpecRemoved(id) => todo!(),
+                DocEffect::EffectTemplateAdded(id) => todo!(),
+                DocEffect::EffectTemplateUpdated(id) => todo!(),
+                DocEffect::EffectTemplateRemoved(id) => todo!(),
                 _ => (),
             })
         });
@@ -112,7 +134,7 @@ impl FunctionListViewModel {
     }
 }
 
-fn get_function_type(fun: &Effect) -> ui::FunctionType {
+fn get_effect_type(fun: &Effect) -> ui::FunctionType {
     match fun.body() {
         EffectBody::Simple(_) => ui::FunctionType::Simple,
         EffectBody::Sequence(_) => ui::FunctionType::Sequence,

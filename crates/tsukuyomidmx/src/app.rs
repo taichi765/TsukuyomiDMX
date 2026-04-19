@@ -24,10 +24,13 @@ use std::{
 use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
     doc::{Doc, OutputPluginId},
-    effects::{Effect, EffectSpec, EffectSpecId},
+    effects::{
+        Effect, EffectChange, EffectSpec, EffectSpecId, EffectTemplate, EffectTemplateId,
+        FixtureQuery, SimpleEffectBody,
+    },
     engine::{Engine, EngineCommand, EngineMessage},
     plugins::{OlaPlugin, Plugin},
-    prelude::{EffectId, Fixture, FixtureDefId, FixtureId, UniverseId},
+    prelude::{DmxAddress, EffectId, Fixture, FixtureDefId, FixtureId, UniverseId},
 };
 
 use crate::{
@@ -99,34 +102,48 @@ impl App {
             .with_context(|| format!("failed to deserialize fixtures from {:?}", fxt_file_path))?;
         let fixtures = fixtures.into_iter().map(|fxt| (fxt.id(), fxt)).collect();
 
-        let functions_dir = dir.join("functions");
-        let functions =
-            std::fs::read_dir(functions_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
+        let effects_dir = dir.join("effects");
+        let effects =
+            std::fs::read_dir(effects_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
                 let entry = entry?;
                 let file = File::open(entry.path())
                     .with_context(|| format!("failed to open file {:?}", entry.path()))?;
-                let fun: Effect = serde_json::from_reader(&file).with_context(|| {
+                let effect: Effect = serde_json::from_reader(&file).with_context(|| {
                     format!("failed to deserialize function from {:?}", entry.path())
                 })?;
-                acc.insert(fun.id(), fun);
+                acc.insert(effect.id(), effect);
                 anyhow::Ok(acc)
             })?;
 
-        let prototypes_dir = dir.join("function-prototypes");
-        let function_prototypes =
-            std::fs::read_dir(prototypes_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
-                let entry = entry?;
-                let file = File::open(entry.path())
-                    .with_context(|| format!("failed to open file {:?}", entry.path()))?;
-                let proto: EffectSpec = serde_json::from_reader(&file).with_context(|| {
-                    format!(
-                        "failed to deserialize function prototype from {:?}",
-                        entry.path()
-                    )
-                })?;
-                acc.insert(proto.id(), proto);
-                anyhow::Ok(acc)
+        let specs_dir = dir.join("effect-specs");
+        let specs = std::fs::read_dir(specs_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
+            let entry = entry?;
+            let file = File::open(entry.path())
+                .with_context(|| format!("failed to open file {:?}", entry.path()))?;
+            let spec: EffectSpec = serde_json::from_reader(&file).with_context(|| {
+                format!(
+                    "failed to deserialize function prototype from {:?}",
+                    entry.path()
+                )
             })?;
+            acc.insert(spec.id(), spec);
+            anyhow::Ok(acc)
+        })?;
+
+        let tmpls_dir = dir.join("effect-templates");
+        let tmpls = std::fs::read_dir(tmpls_dir)?.try_fold(HashMap::new(), |mut acc, entry| {
+            let entry = entry?;
+            let file = File::open(entry.path())
+                .with_context(|| format!("failed to open file {:?}", entry.path()))?;
+            let tmpl: EffectTemplate = serde_json::from_reader(&file).with_context(|| {
+                format!(
+                    "failed to deserialize function prototype from {:?}",
+                    entry.path()
+                )
+            })?;
+            acc.insert(tmpl.id(), tmpl);
+            anyhow::Ok(acc)
+        })?;
 
         let universes_path = dir.join("universes.json");
         let universes_file = File::open(&universes_path)
@@ -138,12 +155,10 @@ impl App {
         let universes = univ_dto.data.iter().map(|(u_id, _)| *u_id).collect();
         let universe_cfgs: HashMap<UniverseId, UniverseConfig> = univ_dto.into();
 
-        let doc = Arc::new(Mutex::new(Doc::from_existing_data(
-            fixtures,
-            functions,
-            function_prototypes,
-            universes,
-        )?));
+        let doc = Arc::new(Mutex::new(
+            Doc::from_existing_data(fixtures, specs, tmpls, effects, universes)
+                .with_context(|| format!("failed to create Doc"))?,
+        ));
 
         let ui = ui::AppWindow::new().unwrap();
         ui.set_project_path(dir.to_str().unwrap().to_shared_string());
@@ -222,8 +237,38 @@ impl App {
             .get()
             .unwrap()
             .send(EngineCommand::StartFunction(
-                EffectId::try_from("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
+                EffectId::from_str("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
             ))
+            .unwrap();
+
+        let fxt = Fixture::new(
+            "Parlight",
+            UniverseId::new(0),
+            DmxAddress::MIN,
+            FixtureDefId::new("stage-evolution".into(), "hpar64-9".into()),
+            "7-channel",
+            0.,
+            0.,
+        );
+        let fxt_id = fxt.id();
+        self.doc.lock().unwrap().add_fixture(fxt).unwrap();
+
+        let effect = Effect::new_simple("Scene 1");
+        let effect_id = effect.id();
+        self.doc.lock().unwrap().add_effect(effect).unwrap();
+        let body = SimpleEffectBody::New {
+            fixtures: FixtureQuery::from_str(format!("#{}", fxt_id)).unwrap(),
+            values: HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 255), ((fxt_id, 2), 255)]),
+        };
+        self.doc
+            .lock()
+            .unwrap()
+            .update_effect(effect_id, EffectChange::Simple(body))
+            .unwrap();
+        self.command_tx
+            .get()
+            .unwrap()
+            .send(EngineCommand::StartFunction(effect_id))
             .unwrap();
 
         self.ui.run()?;
@@ -248,7 +293,7 @@ impl App {
     /// [`project_path`][App::project_path]に保存する。
     fn save(&self) -> Result<(), anyhow::Error> {
         self.save_fixtures()?;
-        self.save_functions()?;
+        self.save_effects()?;
         self.seva_universes()?;
 
         Ok(())
@@ -271,35 +316,53 @@ impl App {
         Ok(())
     }
 
-    fn save_functions(&self) -> Result<(), anyhow::Error> {
+    fn save_effects(&self) -> Result<(), anyhow::Error> {
         // TODO: dirtyフラグ
         let doc = self.doc.lock().unwrap().state_view();
 
-        let fun_dir = self.get_project_path().join("functions");
-        doc.with_functions(|it| {
-            for (_, fun) in it.iter() {
-                let path = fun_dir.join(fun.id().to_string());
+        let effect_dir = self.get_project_path().join("effects");
+        doc.with_effects(|it| {
+            for (_, effect) in it.iter() {
+                let path = effect_dir.join(format!("{}__{}.json", effect.id(), effect.name()));
                 let mut file = File::create(&path)
                     .with_context(|| format!("failed to create file {:?}", path))?;
-                serde_json::to_writer(&file, &fun)
-                    .with_context(|| format!("failed to serialize function {:?}", fun.id()))?;
+                serde_json::to_writer_pretty(&file, &effect)
+                    .with_context(|| format!("failed to serialize function {:?}", effect.id()))?;
                 file.flush().unwrap();
             }
             Ok::<_, anyhow::Error>(())
         })?;
 
-        let prototype_dir = self.get_project_path().join("function-prototypes");
-        doc.with_function_prototypes(|it| {
-            for (_, p) in it {
-                let path = prototype_dir.join(p.id().to_string());
+        let spec_dir = self.get_project_path().join("effect-specs");
+        doc.with_effect_specs(|it| {
+            for (_, spec) in it {
+                let path = spec_dir.join(format!("{}__{}.json", spec.id(), spec.name()));
                 let mut file = File::create(&path)
                     .with_context(|| format!("failed to create file {:?}", path))?;
-                serde_json::to_writer_pretty(&file, &p).with_context(|| {
-                    format!("failed to serialize function prototype {:?}", p.id())
+                serde_json::to_writer_pretty(&file, &spec).with_context(|| {
+                    format!("failed to serialize function prototype {:?}", spec.id())
                 })?;
                 file.flush().unwrap();
             }
-            Ok(())
+            anyhow::Ok(())
+        })?;
+
+        let tmpl_dir = self.get_project_path().join("effect-templates");
+        doc.with_effect_templates(|it| {
+            for (_, tmpl) in it {
+                let path = tmpl_dir.join(format!("{}__{}.json", tmpl.name(), tmpl.id()));
+                let mut file = File::create(&path)
+                    .with_context(|| format!("failed to create file {:?}", path))?;
+                serde_json::to_writer_pretty(&file, &tmpl).with_context(|| {
+                    format!(
+                        "failed to serialize effect template {}({:?})",
+                        tmpl.name(),
+                        tmpl.id()
+                    )
+                })?;
+                file.flush().unwrap();
+            }
+            anyhow::Ok(())
         })
     }
 
@@ -552,15 +615,17 @@ impl<'a> Serialize for FixturesSeq<'a> {
 // TODO: core側で定義したほうがいいかも
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AnyFunctionId {
-    Applied(EffectId),
-    Prototype(EffectSpecId),
+    Effect(EffectId),
+    Spec(EffectSpecId),
+    Template(EffectTemplateId),
 }
 
 impl Display for AnyFunctionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Applied(id) => write!(f, "{}", id),
-            Self::Prototype(id) => write!(f, "{}", id),
+            Self::Effect(id) => write!(f, "{}", id),
+            Self::Spec(id) => write!(f, "{}", id),
+            Self::Template(id) => write!(f, "{}", id),
         }
     }
 }

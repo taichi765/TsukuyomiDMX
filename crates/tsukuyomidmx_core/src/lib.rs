@@ -31,10 +31,8 @@ macro_rules! declare_id_newtype {
             }
         }
 
-        impl TryFrom<&str> for $name {
-            type Error = uuid::Error;
-
-            fn try_from(value: &str) -> Result<Self, Self::Error> {
+        impl $name {
+            pub fn from_str(value: &str) -> Result<Self, uuid::Error> {
                 Ok(Self(uuid::Uuid::try_parse(value.as_ref())?))
             }
         }

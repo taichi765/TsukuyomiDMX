@@ -2,8 +2,8 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SimpleEffectSpecBody {
-    dimmer: Option<Expression>,
-    color: Option<Expression>,
+    pub dimmer: Option<Expression>,
+    pub color: Option<Expression>,
 }
 
 impl SimpleEffectSpecBody {

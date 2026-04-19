@@ -199,16 +199,6 @@ pub struct SequenceStep {
     body: EffectBodyOrReference<EffectBody, EffectId>,
 }
 
-/// Used in [`SequenceEffectRuntime`].
-///
-/// This is self-contained.
-pub struct ResolvedSequenceStep {
-    hold: Duration,
-    fade_in: Option<Duration>,
-    runtime: Box<dyn EffectRuntime>,
-    fadein_runtime: Option<Box<dyn EffectRuntime>>,
-}
-
 /// `body_resolver`を使って再帰的にpropsを適用していく
 fn resolve_steps<Body, Id>(
     steps: &[SequenceTemplateStepBase<Body, Id>],
@@ -290,7 +280,7 @@ impl EffectRuntime for SequenceEffectRuntime {
 }
 
 impl SequenceEffectRuntime {
-    pub(super) fn new(steps: Vec<StepRuntime>) -> Self {
+    fn new(steps: Vec<StepRuntime>) -> Self {
         Self {
             steps,
             current_step_num: 0,

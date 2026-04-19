@@ -1,29 +1,17 @@
 #![allow(unused_variables)]
 
 mod parallel;
+pub use parallel::{ParallelEffectBody, ParallelEffectSpecBody, ParallelEffectTemplateBody};
 mod sequence;
+pub use sequence::{SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody};
 mod simple;
-
-//pub use chaser::ChaserData;
-//pub use collection::Collection;
-//#[allow(unused)]
-//pub(crate) use fader::Fader;
-//pub use static_scene::SceneValue;
-//pub use static_scene::StaticSceneData;
+pub use simple::{SimpleEffectBody, SimpleEffectSpecBody, SimpleEffectTemplateBody};
 
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use tracing::warn;
 
 use crate::doc::DocStateView;
-use crate::effects::parallel::{
-    ParallelEffectBody, ParallelEffectSpecBody, ParallelEffectTemplateBody,
-};
-use crate::effects::sequence::{
-    SequenceEffectBody, SequenceEffectSpecBody, SequenceEffectTemplateBody,
-};
-use crate::effects::simple::{SimpleEffectBody, SimpleEffectSpecBody, SimpleEffectTemplateBody};
 use crate::fixture::{FixtureId, FixtureTag};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -74,8 +62,9 @@ pub(crate) trait EffectRuntime: Send {
 /// bind_to()でFixtureに関連付けられる前のfunction.
 ///
 /// Dimmer, Colorなどmodel-agnosticなチャンネルを制御する。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Getters)]
 pub struct EffectSpec {
+    #[getter(copy)]
     id: EffectSpecId,
     name: String,
     body: EffectSpecBody,
@@ -103,10 +92,6 @@ impl EffectSpec {
             name: name.into(),
             body: EffectSpecBody::Simple(SimpleEffectSpecBody::new()),
         }
-    }
-
-    pub fn id(&self) -> EffectSpecId {
-        self.id
     }
 
     pub(crate) fn apply_change(&mut self, change: EffectSpecChange) {
@@ -139,8 +124,9 @@ impl EffectSpecBody {
 }
 
 /// Propsに代入することで[`Effect`]を得られる。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Getters)]
 pub struct EffectTemplate {
+    #[getter(copy)]
     id: EffectTemplateId,
     name: String,
     body: EffectTemplateBody,
@@ -171,10 +157,6 @@ impl EffectTemplate {
             name: name.into(),
             body: EffectTemplateBody::Simple(SimpleEffectTemplateBody::new()),
         }
-    }
-
-    pub fn id(&self) -> EffectTemplateId {
-        self.id
     }
 
     // TODO: 個別のchangeを用意したほうがいいか？
