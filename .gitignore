@@ -25,4 +25,5 @@ GEMINI.md
 AGENTS.md
 
 # Packaging
-**/*.Appdir/
+*.AppDir/
+*.AppImage
