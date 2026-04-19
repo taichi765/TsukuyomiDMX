@@ -1,4 +1,4 @@
-[**日本語版README**](https://github.com/taichi765/tsukuyomi-rs?tab=readme-ov-file#概要)
+[**日本語版README**](https://github.com/taichi765/TsukuyomiDMX/blob/master/README_ja_JP.md)
 ## Overview
 Tsukuyomi is a DMX Lighting Controller written in Rust.  Work in progress.
 ## Motivation
@@ -25,11 +25,3 @@ cargo run
 - [ ] 3D preview
 ## Contributing
 Contributions are welcome! Please open issues for bugs/feature requests and create PRs for code changes.
-
-## 概要
-TsukuyomiはRust製の照明制御ソフトです。開発中です
-## ロードマップ
-- [ ] DMXとArtNetへの出力
-- [ ] フィクスチャの追加
-- [ ] MIDIでの制御
-- [ ] 3Dプレビュー
