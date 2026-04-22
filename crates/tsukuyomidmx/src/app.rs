@@ -35,7 +35,7 @@ use tsukuyomidmx_core::{
 
 use crate::{
     models::{FixtureDefModel, FixtureModel, UniverseModel},
-    tea::{fixture_list_view, function_list_view, preview_2d, universe_view},
+    tea::{effect_tree_view, fixture_list_view, preview_2d, universe_view},
     ui,
 };
 
@@ -202,7 +202,7 @@ impl App {
 
         fixture_list_view::setup(&self);
         universe_view::setup(&self);
-        function_list_view::setup(&self);
+        effect_tree_view::setup(&self);
         self.setup_engine();
         self.setup_window();
         preview_2d::setup(&self);

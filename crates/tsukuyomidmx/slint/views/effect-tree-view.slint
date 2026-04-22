@@ -5,13 +5,13 @@ import { Icons } from "../styling.slint";
 
 
 
-export struct FunctionData {
+export struct EffectTreeViewItemData {
     id: string,
     type: FunctionType,
     name: string,
 }
 
-component FunctionListViewItem inherits Rectangle {
+component EffectTreeViewItem inherits Rectangle {
     in property <string> id;
     in property <string> name;
     in property <FunctionType> type;
@@ -96,7 +96,7 @@ component FunctionListViewItem inherits Rectangle {
 }
 
 global Adopter {
-    in property <[FunctionData]> model:[
+    in property <[EffectTreeViewItemData]> model:[
         // dummy
         {
             id:"",
@@ -122,9 +122,9 @@ global Adopter {
     callback set-selected-function(id: string, type: FunctionType);
 }
 
-export { Adopter as FunctionListViewAdopter }
+export { Adopter as EffectTreeViewAdopter }
 
-export component FunctionListView inherits Rectangle {
+export component EffectTreeView inherits Rectangle {
     VerticalLayout {
         alignment: LayoutAlignment.start;
 
@@ -132,7 +132,7 @@ export component FunctionListView inherits Rectangle {
             text: @tr("Functions");
         }
 
-        for fun[i] in Adopter.model: FunctionListViewItem {
+        for fun[i] in Adopter.model: EffectTreeViewItem {
             id: fun.id;
             name: fun.name;
             type: fun.type;

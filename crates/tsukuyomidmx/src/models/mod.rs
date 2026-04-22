@@ -10,8 +10,8 @@ mod preview_2d;
 pub use preview_2d::Preview2DModel;
 mod universe;
 pub use universe::UniverseModel;
-mod function_list_view;
-pub use function_list_view::FunctionListViewModel;
+mod effect_tree_view;
+pub use effect_tree_view::EffectTreeViewModel;
 
 #[cfg(test)]
 mod test_helpers {

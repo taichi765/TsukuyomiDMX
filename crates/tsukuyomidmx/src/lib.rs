@@ -5,8 +5,8 @@ pub mod colors;
 //pub mod controllers;
 pub mod models;
 pub mod tea {
+    pub mod effect_tree_view;
     pub mod fixture_list_view;
-    pub mod function_list_view;
     pub mod preview_2d;
     pub mod universe_view;
 

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     app::{AnyFunctionId, App, AppStateChange},
-    models::FunctionListViewModel,
+    models::EffectTreeViewModel,
     tea::wrap_callback,
     ui,
 };
@@ -19,7 +19,7 @@ use tsukuyomidmx_core::{
 #[allow(unused)]
 pub fn setup(app: &App) {
     let adopter = app.ui.global::<ui::FunctionListViewAdopter>();
-    let model = FunctionListViewModel::new(&mut app.doc.lock().unwrap());
+    let model = EffectTreeViewModel::new(&mut app.doc.lock().unwrap());
     adopter.set_model(Rc::clone(&model).into());
 
     adopter.on_new_simple_function({

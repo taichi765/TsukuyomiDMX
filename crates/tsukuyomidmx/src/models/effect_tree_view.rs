@@ -9,15 +9,15 @@ use tsukuyomidmx_core::{
 
 use crate::{app::AnyFunctionId, ui};
 
-pub struct FunctionListViewModel {
+pub struct EffectTreeViewModel {
     doc: DocStateView,
     row_order: RefCell<Vec<AnyFunctionId>>,
-    data: RefCell<HashMap<AnyFunctionId, ui::FunctionData>>,
+    data: RefCell<HashMap<AnyFunctionId, ui::EffectTreeViewItemData>>,
     notify: ModelNotify,
 }
 
-impl Model for FunctionListViewModel {
-    type Data = ui::FunctionData;
+impl Model for EffectTreeViewModel {
+    type Data = ui::EffectTreeViewItemData;
 
     fn row_count(&self) -> usize {
         self.data.borrow().len()
@@ -38,14 +38,14 @@ impl Model for FunctionListViewModel {
     }
 }
 
-impl FunctionListViewModel {
+impl EffectTreeViewModel {
     pub fn new(doc: &mut Doc) -> Rc<Self> {
         let row_order = Vec::new();
         let data = doc.state_view().with_effects(|it| {
             it.iter().fold(HashMap::new(), |mut acc, v| {
                 acc.insert(
                     AnyFunctionId::Effect(v.0.to_owned()),
-                    ui::FunctionData {
+                    ui::EffectTreeViewItemData {
                         id: v.0.to_shared_string(),
                         name: v.1.name().to_shared_string(),
                         r#type: ui::FunctionType::Simple,
@@ -74,7 +74,7 @@ impl FunctionListViewModel {
                     me_clone.row_order.borrow_mut().push(id);
                     me_clone.data.borrow_mut().insert(
                         id,
-                        ui::FunctionData {
+                        ui::EffectTreeViewItemData {
                             id: id.to_shared_string(),
                             name: fun.name().to_shared_string(),
                             r#type: get_effect_type(fun),
@@ -93,7 +93,7 @@ impl FunctionListViewModel {
                         let fx = it.get(id).unwrap();
                         me_clone.data.borrow_mut().insert(
                             AnyFunctionId::Effect(*id),
-                            ui::FunctionData {
+                            ui::EffectTreeViewItemData {
                                 id: id.to_shared_string(),
                                 name: fx.name().to_shared_string(),
                                 r#type: get_effect_type(fx),
