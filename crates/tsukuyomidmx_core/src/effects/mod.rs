@@ -286,62 +286,6 @@ impl Diagnostics {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EffectBodyOrReference<T, U> {
-    Body(T),
-    Reference(U),
-}
-
-impl EffectBodyOrReference<EffectBody, EffectId> {
-    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        match self {
-            Self::Body(body) => body.create_runtime(doc),
-            Self::Reference(id) => {
-                doc.with_effects(|it| it.get(id).unwrap().body.create_runtime(doc.clone()))
-            }
-        }
-    }
-}
-
-type SpecBodyOrReference =
-    EffectBodyOrReference<(EffectSpecBody, FixtureQuery), (EffectSpecId, FixtureQuery)>;
-
-impl SpecBodyOrReference {
-    fn resolve_props(
-        &self,
-        given_props: HashMap<String, Value>,
-        doc: DocStateView,
-    ) -> Box<dyn EffectRuntime> {
-        match self {
-            Self::Body((body, fixtures)) => body.resolve_props(fixtures, given_props, doc),
-            Self::Reference((id, fixtures)) => doc.with_effect_specs(|it| {
-                it.get(id)
-                    .unwrap()
-                    .body
-                    .resolve_props(fixtures, given_props, doc.clone())
-            }),
-        }
-    }
-}
-
-impl EffectBodyOrReference<EffectTemplateBody, EffectTemplateId> {
-    fn resolve_props(
-        &self,
-        given_props: HashMap<String, Value>,
-        doc: DocStateView,
-    ) -> Box<dyn EffectRuntime> {
-        match self {
-            Self::Body(body) => body.resolve_props(given_props, doc),
-            Self::Reference(id) => doc.with_effect_templates(|it| {
-                it.get(id)
-                    .unwrap()
-                    .body
-                    .resolve_props(given_props, doc.clone())
-            }),
-        }
-    }
-}
-
 ///
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Expression {
@@ -525,5 +469,60 @@ impl Default for FixtureQuery {
             string: ".some-tag".to_string(),
             data: vec![Selector::Tags(vec![FixtureTag::new("some-tag").unwrap()])],
         }
+    }
+}
+
+trait PropsResolver<Id> {
+    fn resolve_props(
+        &self,
+        id: Id,
+        given_props: HashMap<String, Value>,
+        // fixtures: &FixtureQuery,
+    ) -> Box<dyn EffectRuntime>;
+}
+
+impl PropsResolver<EffectId> for DocStateView {
+    fn resolve_props(
+        &self,
+        id: EffectId,
+        given_props: HashMap<String, Value>,
+        // fixtures: &FixtureQuery,
+    ) -> Box<dyn EffectRuntime> {
+        self.with_effects(|it| {
+            let body = it.get(&id).unwrap();
+        });
+        todo!()
+    }
+}
+
+impl PropsResolver<EffectTemplateId> for DocStateView {
+    fn resolve_props(
+        &self,
+        id: EffectTemplateId,
+        given_props: HashMap<String, Value>,
+        // fixtures: &FixtureQuery,
+    ) -> Box<dyn EffectRuntime> {
+        todo!()
+    }
+}
+
+impl PropsResolver<&(EffectSpecId, FixtureQuery)> for DocStateView {
+    fn resolve_props(
+        &self,
+        (id, fixtures): &(EffectSpecId, FixtureQuery),
+        given_props: HashMap<String, Value>,
+        // fixtures: &FixtureQuery,
+    ) -> Box<dyn EffectRuntime> {
+        todo!()
+    }
+}
+
+trait CreateRuntime {
+    fn create_runtime(&self, id: EffectId) -> Box<dyn EffectRuntime>;
+}
+
+impl CreateRuntime for DocStateView {
+    fn create_runtime(&self, id: EffectId) -> Box<dyn EffectRuntime> {
+        todo!()
     }
 }

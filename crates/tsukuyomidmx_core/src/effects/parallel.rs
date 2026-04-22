@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParallelEffectSpecBody {
-    items: Vec<SpecBodyOrReference>,
+    items: Vec<(EffectSpecId, FixtureQuery)>,
 }
 
 impl ParallelEffectSpecBody {
@@ -15,7 +15,7 @@ impl ParallelEffectSpecBody {
             runtimes: self
                 .items
                 .iter()
-                .map(|item| item.resolve_props(given_props.clone(), doc.clone()))
+                .map(|spec_key| doc.resolve_props(spec_key, given_props.clone()))
                 .collect(),
         })
     }
@@ -24,14 +24,14 @@ impl ParallelEffectSpecBody {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ParallelEffectTemplateBody {
     FromSpec {
-        spec_id: EffectSpecId,
+        spec_key: (EffectSpecId, FixtureQuery),
         spec_props: HashMap<String, Expression>,
         props: HashMap<String, Type>,
     },
     // TODO: FromTemplate{},
     New {
         props: HashMap<String, Type>,
-        items: Vec<EffectBodyOrReference<EffectTemplateBody, EffectTemplateId>>,
+        items: Vec<EffectTemplateId>,
     },
 }
 
@@ -43,7 +43,7 @@ impl ParallelEffectTemplateBody {
     ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromSpec {
-                spec_id,
+                spec_key,
                 spec_props,
                 props,
             } => {
@@ -59,9 +59,7 @@ impl ParallelEffectTemplateBody {
                     })
                     .collect();
 
-                doc.with_spec(*spec_id, |body: &ParallelEffectSpecBody| {
-                    body.resolve_props(resolved_spec_props, doc.clone())
-                })
+                doc.resolve_props(spec_key, resolved_spec_props)
             }
             Self::New { props, items } => {
                 debug_assert_eq!(props.len(), given_props.len(), "all props must be applied");
@@ -69,7 +67,7 @@ impl ParallelEffectTemplateBody {
                 Box::new(ParallelEffectRuntime {
                     runtimes: items
                         .iter()
-                        .map(|item| item.resolve_props(given_props.clone(), doc.clone()))
+                        .map(|tmpl_id| doc.resolve_props(*tmpl_id, given_props.clone()))
                         .collect(),
                 })
             }
@@ -84,7 +82,7 @@ pub enum ParallelEffectBody {
         tmpl_props: HashMap<String, Value>,
     },
     New {
-        items: Vec<EffectBodyOrReference<EffectBody, EffectId>>,
+        items: Vec<EffectId>,
     },
 }
 
@@ -98,13 +96,11 @@ impl ParallelEffectBody {
             Self::FromTemplate {
                 tmpl_id,
                 tmpl_props,
-            } => doc.with_template(*tmpl_id, |body: &ParallelEffectTemplateBody| {
-                body.resolve_props(tmpl_props.clone(), doc.clone())
-            }),
+            } => doc.resolve_props(*tmpl_id, tmpl_props.to_owned()),
             Self::New { items } => {
                 let runtimes = items
                     .iter()
-                    .map(|fun| fun.create_runtime(doc.clone()))
+                    .map(|effect_id| doc.create_runtime(*effect_id))
                     .collect();
                 Box::new(ParallelEffectRuntime { runtimes })
             }
@@ -140,7 +136,7 @@ impl EffectRuntime for ParallelEffectRuntime {
     }
 }
 
-impl EffectRegistry<ParallelEffectSpecBody, ParallelEffectTemplateBody> for DocStateView {
+/*impl EffectRegistry<ParallelEffectSpecBody, ParallelEffectTemplateBody> for DocStateView {
     fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
     where
         F: FnOnce(&ParallelEffectSpecBody) -> R,
@@ -166,7 +162,7 @@ impl EffectRegistry<ParallelEffectSpecBody, ParallelEffectTemplateBody> for DocS
             f(body)
         })
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {}

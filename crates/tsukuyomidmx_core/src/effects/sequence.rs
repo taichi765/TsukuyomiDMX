@@ -2,40 +2,13 @@ use std::ops::ControlFlow;
 
 use super::*;
 
-impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody> for DocStateView {
-    fn with_spec<F, R>(&self, spec_id: EffectSpecId, f: F) -> R
-    where
-        F: FnOnce(&SequenceEffectSpecBody) -> R,
-    {
-        self.with_effect_specs(|it| {
-            let EffectSpecBody::Sequence(body) = &it.get(&spec_id).unwrap().body else {
-                unreachable!()
-            };
-
-            f(body)
-        })
-    }
-
-    fn with_template<F, R>(&self, tmpl_id: EffectTemplateId, f: F) -> R
-    where
-        F: FnOnce(&SequenceEffectTemplateBody) -> R,
-    {
-        self.with_effect_templates(|it| {
-            let EffectTemplateBody::Sequence(body) = &it.get(&tmpl_id).unwrap().body else {
-                unreachable!()
-            };
-
-            f(body)
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SequenceTemplateStepBase<Body, Id> {
+pub struct SequenceTemplateStepBase<T> {
     /// `fade_in`を除いた時間
     hold: Expression,
     fade_in: Expression,
-    body: EffectBodyOrReference<Body, Id>,
+    /// idまたはそれに付随する情報
+    key: T,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,8 +17,7 @@ pub struct SequenceEffectSpecBody {
     steps: Vec<SequenceSpecStep>,
 }
 
-type SequenceSpecStep =
-    SequenceTemplateStepBase<(EffectSpecBody, FixtureQuery), (EffectSpecId, FixtureQuery)>;
+type SequenceSpecStep = SequenceTemplateStepBase<(EffectSpecId, FixtureQuery)>;
 
 impl SequenceEffectSpecBody {
     pub(super) fn resolve_props(
@@ -53,8 +25,8 @@ impl SequenceEffectSpecBody {
         given_props: HashMap<String, Value>,
         doc: DocStateView,
     ) -> Box<dyn EffectRuntime> {
-        resolve_steps(&self.steps, given_props, |body, props| {
-            body.resolve_props(props, doc.clone())
+        resolve_steps(&self.steps, given_props, |key, props| {
+            doc.resolve_props(key, props)
         })
     }
 }
@@ -62,7 +34,7 @@ impl SequenceEffectSpecBody {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SequenceEffectTemplateBody {
     FromSpec {
-        spec_id: EffectSpecId,
+        spec_key: (EffectSpecId, FixtureQuery),
         spec_props: HashMap<String, Expression>,
         props: HashMap<String, Type>,
     },
@@ -74,10 +46,10 @@ pub enum SequenceEffectTemplateBody {
     },
 }
 
-type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateBody, EffectTemplateId>;
+type SequenceTemplateStep = SequenceTemplateStepBase<EffectTemplateId>;
 
 impl SequenceEffectTemplateBody {
-    pub fn from_spec(
+    /*pub fn from_spec(
         spec_id: EffectSpecId,
         rg: impl EffectRegistry<SequenceEffectSpecBody, SequenceEffectTemplateBody>,
     ) -> Result<Self, FromSpecError> {
@@ -92,11 +64,11 @@ impl SequenceEffectTemplateBody {
         })?;
 
         Ok(Self::FromSpec {
-            spec_id,
+            spec_key: spec_id,
             spec_props,
             props: HashMap::new(),
         })
-    }
+    }*/
 
     pub(super) fn resolve_props(
         &self,
@@ -105,7 +77,7 @@ impl SequenceEffectTemplateBody {
     ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromSpec {
-                spec_id,
+                spec_key,
                 spec_props,
                 props,
             } => {
@@ -121,9 +93,7 @@ impl SequenceEffectTemplateBody {
                     })
                     .collect();
 
-                doc.with_spec(*spec_id, |spec: &SequenceEffectSpecBody| {
-                    spec.resolve_props(resolved_spec_props, doc.clone())
-                })
+                doc.resolve_props(spec_key, resolved_spec_props)
             }
             Self::New {
                 props,
@@ -132,8 +102,8 @@ impl SequenceEffectTemplateBody {
             } => {
                 debug_assert_eq!(props.len(), given_props.len(), "all props must be applied");
 
-                resolve_steps(steps, given_props, |body, props| {
-                    body.resolve_props(props, doc.clone())
+                resolve_steps(steps, given_props, |tmpl_id, props| {
+                    doc.resolve_props(*tmpl_id, props)
                 })
             }
         }
@@ -167,7 +137,7 @@ impl SequenceEffectBody {
                 let steps = steps
                     .iter()
                     .scan(Vec::new(), |prev_last_frame, cur_step| {
-                        let rt = cur_step.body.create_runtime(doc.clone());
+                        let rt = doc.create_runtime(cur_step.effect_id);
                         let cur_first_frame = rt.first_frame_hint();
                         *prev_last_frame = rt.last_frame_hint();
                         Some(StepRuntime::new(
@@ -196,17 +166,16 @@ pub struct SequenceStep {
     hold: Duration,
     fade_in: Option<Duration>, // TODO: NoneではなくDuration::ZEROを使う。Optionを使うのはResolvedだけ
     // TODO: Template + propsもできるようにする
-    body: EffectBodyOrReference<EffectBody, EffectId>,
+    effect_id: EffectId,
 }
 
-/// `body_resolver`を使って再帰的にpropsを適用していく
-fn resolve_steps<Body, Id>(
-    steps: &[SequenceTemplateStepBase<Body, Id>],
+/// 再帰的にpropsを適用していく
+///
+/// - `item_resolver`: 各Stepのeffect_idをresolveする
+fn resolve_steps<T: ResolveStepItemKey>(
+    steps: &[SequenceTemplateStepBase<T>],
     given_props: HashMap<String, Value>,
-    body_resolver: impl Fn(
-        &EffectBodyOrReference<Body, Id>,
-        HashMap<String, Value>,
-    ) -> Box<dyn EffectRuntime>,
+    item_resolver: impl Fn(&T, HashMap<String, Value>) -> Box<dyn EffectRuntime>,
 ) -> Box<dyn EffectRuntime> {
     let steps = steps
         .iter()
@@ -230,7 +199,7 @@ fn resolve_steps<Body, Id>(
                 };
 
                 // TODO: そのまま渡すんじゃなくてbodyで定義されてるやつだけ渡す
-                let runtime = body_resolver(&cur_step.body, given_props.clone());
+                let runtime = item_resolver(&cur_step.key, given_props.clone());
 
                 let fadein_runtime = fade_in
                     .map(|fade_in| {
@@ -245,6 +214,13 @@ fn resolve_steps<Body, Id>(
         .collect();
     Box::new(SequenceEffectRuntime::new(steps))
 }
+
+/// [`resolve_props()`]でstepをresolveする際にkeyとして使える型
+trait ResolveStepItemKey {}
+
+impl ResolveStepItemKey for EffectTemplateId {}
+
+impl ResolveStepItemKey for (EffectSpecId, FixtureQuery) {}
 
 pub struct SequenceEffectRuntime {
     /// fade_inとhold両方のruntime
