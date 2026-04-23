@@ -122,6 +122,10 @@ pub enum SequenceEffectBody {
 }
 
 impl SequenceEffectBody {
+    pub(super) fn new() -> Self {
+        Self::New(Vec::new())
+    }
+
     pub(super) fn create_runtime(
         &self,
         doc: impl PropsResolver<EffectTemplateId> + CreateRuntime,
@@ -359,10 +363,13 @@ impl EffectRuntime for FadeInRuntime {
     }
 }
 
+#[derive(derive_more::Debug)]
 struct StepRuntime {
     hold: Duration,
     fade_in: Option<Duration>,
+    #[debug(skip)]
     runtime: Box<dyn EffectRuntime>,
+    #[debug(skip)]
     fadein_runtime: Option<Box<dyn EffectRuntime>>,
     time_to_next_action: Duration,
     running_state: SequenceStepState,
@@ -399,23 +406,28 @@ impl StepRuntime {
     /// 2つ目の返り値がBreak(dur)の場合、このステップでdur分だけ余って次のstepに進む
     /// Continueの場合このstepを継続
     fn run(&mut self, elapsed: Duration) -> (Vec<EffectCommand>, ControlFlow<Duration, ()>) {
+        dbg!(&self);
         let commands = match self.running_state {
             SequenceStepState::FadeIn => self.fadein_runtime.as_mut().unwrap().run(elapsed),
             SequenceStepState::Hold => self.runtime.run(elapsed),
         };
 
-        if self.time_to_next_action >= elapsed {
+        if self.time_to_next_action > elapsed {
+            println!("branch 1");
             // action継続
             self.time_to_next_action -= elapsed;
+            dbg!(self.time_to_next_action);
             return (commands, ControlFlow::Continue(()));
         }
 
         if self.running_state == SequenceStepState::Hold {
+            println!("branch 2");
             (
                 commands,
                 ControlFlow::Break(elapsed - self.time_to_next_action),
             )
         } else {
+            println!("branch 3");
             // FadeIn -> Hold
             self.running_state = SequenceStepState::Hold;
             self.time_to_next_action = self.hold - (elapsed - self.time_to_next_action);
@@ -438,46 +450,205 @@ impl StepRuntime {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::*;
+
+    struct StubCreateRuntime {
+        runtimes: RefCell<HashMap<EffectId, Box<dyn EffectRuntime>>>,
+    }
+
+    impl CreateRuntime for StubCreateRuntime {
+        fn create_runtime(&self, id: EffectId) -> Box<dyn EffectRuntime> {
+            self.runtimes.borrow_mut().remove(&id).unwrap()
+        }
+    }
+
+    impl PropsResolver<EffectTemplateId> for StubCreateRuntime {
+        fn resolve_props(
+            &self,
+            id: EffectTemplateId,
+            given_props: HashMap<String, Value>,
+            // fixtures: &FixtureQuery,
+        ) -> Box<dyn EffectRuntime> {
+            unimplemented!("this is stub for CreateRuntime, not PropsResolver!")
+        }
+    }
+
+    impl StubCreateRuntime {
+        fn new(runtimes: impl Into<HashMap<EffectId, Box<dyn EffectRuntime>>>) -> Self {
+            Self {
+                runtimes: RefCell::new(runtimes.into()),
+            }
+        }
+    }
+
+    fn create_simple_effect_with_some_values(fxt_id: FixtureId) -> Effect {
+        let mut effect = Effect::new_simple("Step 1");
+
+        let EffectBody::Simple(SimpleEffectBody::New { fixtures, values }) = effect.body() else {
+            panic!("should match")
+        };
+
+        let new_values = HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 200)]);
+        let new = SimpleEffectBody::New {
+            fixtures: fixtures.clone(),
+            values: new_values,
+        };
+        effect.apply_change(EffectChange::Simple(new));
+        effect
+    }
+
+    fn create_simple_effect_with_some_values_2(fxt_id: FixtureId) -> Effect {
+        let mut effect = Effect::new_simple("Step 2");
+
+        let EffectBody::Simple(SimpleEffectBody::New { fixtures, values }) = effect.body() else {
+            panic!("should match")
+        };
+
+        let new_values = HashMap::from([((fxt_id, 0), 0), ((fxt_id, 1), 100), ((fxt_id, 2), 255)]);
+        let new = SimpleEffectBody::New {
+            fixtures: fixtures.clone(),
+            values: new_values,
+        };
+        effect.apply_change(EffectChange::Simple(new));
+        effect
+    }
+
+    /// Returns (seq, simple_1, simple_2, fxt_id)
+    fn create_sequence_effect_with_some_step() -> (Effect, Effect, Effect, FixtureId) {
+        let fxt_id = FixtureId::new();
+
+        let simple_1 = create_simple_effect_with_some_values(fxt_id);
+        let simple_2 = create_simple_effect_with_some_values_2(fxt_id);
+
+        let mut seq_fx = Effect::new_sequence("Scene 1");
+
+        let SequenceEffectBody::New(steps) = seq_fx.unwrap_sequnece() else {
+            panic!("should match")
+        };
+
+        let new = vec![
+            SequenceStep {
+                hold: Duration::from_millis(500),
+                fade_in: None,
+                effect_id: simple_1.id(),
+            },
+            SequenceStep {
+                hold: Duration::from_millis(500),
+                fade_in: None,
+                effect_id: simple_2.id(),
+            },
+        ];
+        seq_fx.apply_change(EffectChange::Sequence(SequenceEffectBody::New(new)));
+
+        (seq_fx, simple_1, simple_2, fxt_id)
+    }
 
     #[test]
     fn sequence_function_is_serialized_and_deserialized_correctly() {
-        todo!()
-        /*let fxt_id = FixtureId::new();
-        let simple = Effect::new_simple(
-            "Scene 2",
-            vec![((fxt_id, 3usize), 123u8), ((fxt_id, 4), 100)]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-        );
-        let fun = Effect::new_sequence(
-            "Scene 1",
-            vec![
-                SequenceStep {
-                    duration: Duration::from_millis(500),
-                    fade_in: Duration::ZERO,
-                    body: EffectBodyOrReference::Body(EffectBody::Simple(SimpleEffectBody::new(
-                        vec![((fxt_id, 0usize), 255u8), ((fxt_id, 1), 200)]
-                            .into_iter()
-                            .collect::<HashMap<_, _>>(),
-                    ))),
-                },
-                SequenceStep {
-                    duration: Duration::from_millis(700),
-                    fade_in: Duration::from_millis(100),
-                    body: EffectBodyOrReference::Reference(simple.id()),
-                },
-            ],
-        );
+        let (seq_fx, _, _, _) = create_sequence_effect_with_some_step();
 
-        let json = serde_json::to_string_pretty(&fun).unwrap();
+        let json = serde_json::to_string_pretty(&seq_fx).unwrap();
         println!("{}", json);
 
         let deserialized: Effect = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(fun, deserialized);*/
+        assert_eq!(seq_fx, deserialized);
     }
 
+    #[test]
+    fn sequence_runtime_run_advances_step() {
+        let (seq_fx, simple_1, simple_2, fxt_id) = create_sequence_effect_with_some_step();
+        let stub = StubCreateRuntime::new([
+            (
+                simple_1.id(),
+                simple_1.unwrap_simple().create_runtime(DummyPropsResolver),
+            ),
+            (
+                simple_2.id(),
+                simple_2.unwrap_simple().create_runtime(DummyPropsResolver),
+            ),
+        ]);
+
+        let mut rt = seq_fx.unwrap_sequnece().create_runtime(stub);
+
+        // Tick 1- Step 1
+        let commands = rt.run(Duration::from_millis(100));
+        assert_eq!(commands.len(), 2);
+        // TODO: hard code
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 0 && *value == 255 => true,
+            _ => false,
+        }));
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 1 && *value == 200 => true,
+            _ => false,
+        }));
+
+        // Tick 2 - still Step 1
+        let commands = rt.run(Duration::from_millis(400));
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 0 && *value == 255 => true,
+            _ => false,
+        }));
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 1 && *value == 200 => true,
+            _ => false,
+        }));
+
+        // Tick 3 - Step 2
+        let commands = rt.run(Duration::from_millis(500));
+        assert_eq!(commands.len(), 4);
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 0 && *value == 0 => true,
+            _ => false,
+        }));
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 1 && *value == 100 => true,
+            _ => false,
+        }));
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 2 && *value == 255 => true,
+            _ => false,
+        }));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, EffectCommand::StopEffect))
+        );
+    }
+
+    #[ignore = "do this later"]
     #[test]
     fn fadein_works() {
         todo!()

@@ -316,20 +316,6 @@ mod tests {
 
     use super::*;
 
-    /// Panics when [`PropsResolver::resolve_props()`] is called.
-    struct DummyPropsResolver;
-
-    impl PropsResolver<EffectTemplateId> for DummyPropsResolver {
-        fn resolve_props(
-            &self,
-            id: EffectTemplateId,
-            given_props: HashMap<String, Value>,
-            // fixtures: &FixtureQuery,
-        ) -> Box<dyn EffectRuntime> {
-            unimplemented!("This is dummy!")
-        }
-    }
-
     fn create_simple_effect_with_some_values() -> (Effect, FixtureId) {
         let fxt_id = FixtureId::new();
         let mut effect = Effect::new_simple("Scene 1");
@@ -344,12 +330,13 @@ mod tests {
             values: new_values,
         };
         effect.apply_change(EffectChange::Simple(new));
+
         (effect, fxt_id)
     }
 
     #[test]
     fn simple_effect_is_serialized_and_deserialized_correctly() {
-        let (effect, fxt_id) = create_simple_effect_with_some_values();
+        let (effect, _) = create_simple_effect_with_some_values();
 
         let json = serde_json::to_string_pretty(&effect).unwrap();
 
@@ -401,5 +388,25 @@ mod tests {
         };
 
         assert_eq!(rt.first_frame_hint(), rt.last_frame_hint());
+    }
+
+    #[test]
+    fn simple_spec_is_serialized_and_deserialized_correctly() {
+        todo!()
+    }
+
+    #[test]
+    fn simple_spec_resolves_props_correctly() {
+        todo!()
+    }
+
+    #[test]
+    fn simple_template_is_serialized_and_deserilaized_correctly() {
+        todo!()
+    }
+
+    #[test]
+    fn simple_template_resolves_props_correctly() {
+        todo!()
     }
 }

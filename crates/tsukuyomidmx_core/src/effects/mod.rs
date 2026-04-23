@@ -30,7 +30,7 @@ pub trait EffectRegistry<Spec, Template> {
         F: FnOnce(&Template) -> R;
 }
 
-/// [`FunctionRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
+/// [`EffectRuntime::run()`] returns this and [`Engine`][crate::engine::Engine] evaluates the command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectCommand {
     /// if the function is already started, `Engine` do nothing.
@@ -42,12 +42,6 @@ pub enum EffectCommand {
         channel: usize,
         value: u8,
     },
-    /*StartFade {
-        from_id: EffectId,
-        to_id: EffectId,
-        chaser_id: EffectId,
-        duration: Duration,
-    },*/
 }
 
 /// self-contained runtime.
@@ -202,7 +196,7 @@ pub enum EffectChange {
 
 impl Effect {
     pub fn new_simple(name: impl Into<String>) -> Effect {
-        Effect {
+        Self {
             id: EffectId::new(),
             name: name.into(),
             body: EffectBody::Simple(SimpleEffectBody::new()),
@@ -210,12 +204,11 @@ impl Effect {
     }
 
     pub fn new_sequence(name: impl Into<String>) -> Self {
-        todo!()
-        /*Self {
+        Self {
             id: EffectId::new(),
             name: name.into(),
-            body: EffectBody::Sequence(SequenceEffectBody::),
-        }*/
+            body: EffectBody::Sequence(SequenceEffectBody::new()),
+        }
     }
 
     pub fn new_parallel(name: impl Into<String>) -> Self {
@@ -240,6 +233,30 @@ impl Effect {
             }
             EffectChange::Sequence(body) => self.body = EffectBody::Sequence(body),
             EffectChange::Parallel(body) => self.body = EffectBody::Parallel(body),
+        }
+    }
+
+    fn unwrap_simple(&self) -> &SimpleEffectBody {
+        if let EffectBody::Simple(body) = self.body() {
+            body
+        } else {
+            panic!("EffectBody::unwrap_simple() is called on {:?}", self)
+        }
+    }
+
+    fn unwrap_sequnece(&self) -> &SequenceEffectBody {
+        if let EffectBody::Sequence(body) = self.body() {
+            body
+        } else {
+            panic!("EffectBody::unwrap_sequence() is called on {:?}", self)
+        }
+    }
+
+    fn unwrap_parallel(&self) -> &ParallelEffectBody {
+        if let EffectBody::Parallel(body) = self.body() {
+            body
+        } else {
+            panic!("EffectBody::unwrap_sequence() is called on {:?}", self)
         }
     }
 }
@@ -490,6 +507,20 @@ impl PropsResolver<&(EffectSpecId, FixtureQuery)> for DocStateView {
                 EffectSpecBody::Parallel(body) => body.resolve_props(given_props, self.clone()),
             }
         })
+    }
+}
+
+/// Panics when [`PropsResolver::resolve_props()`] is called.
+struct DummyPropsResolver;
+
+impl PropsResolver<EffectTemplateId> for DummyPropsResolver {
+    fn resolve_props(
+        &self,
+        id: EffectTemplateId,
+        given_props: HashMap<String, Value>,
+        // fixtures: &FixtureQuery,
+    ) -> Box<dyn EffectRuntime> {
+        unimplemented!("This is dummy!")
     }
 }
 
