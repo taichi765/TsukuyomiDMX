@@ -18,6 +18,7 @@ paste = { workspace = true }
 rayon = "1.11.0"
 serde = { workspace = true }
 serde_json = "1.0.149"
+serde_with = "3.18.0"
 
 uuid = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }

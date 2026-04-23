@@ -1,3 +1,5 @@
+use serde_with::{DeserializeAs, serde_as};
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +139,11 @@ impl SimpleEffectTemplateBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    from = "SimpleEffectBodyDto",
+    into = "SimpleEffectBodyDto",
+    deny_unknown_fields
+)]
 pub enum SimpleEffectBody {
     // TODO: FromSpec(),
     FromTemplate {
@@ -203,48 +210,60 @@ impl SimpleEffectRuntime {
     }
 }
 
-/// DTO for [`SimpleEffect`].
+/// DTO for [`SimpleEffectBody`].
 ///
-/// DTO is requied because the key type of `HashMap` in [`SimpleEffect`] is not string.
+/// DTO is requied because the key type of `HashMap` in [`SimpleEffectBody`] is not string.
 #[derive(Serialize, Deserialize)]
-struct SimpleEffectDto {
-    values: Vec<SimpleEffectValueDto>,
+enum SimpleEffectBodyDto {
+    FromTemplate {
+        tmpl_id: EffectTemplateId,
+        tmpl_props: HashMap<String, Value>,
+    },
+    New {
+        fixtures: FixtureQuery,
+        values: Vec<(FixtureId, usize, u8)>,
+    },
 }
 
-#[derive(Serialize, Deserialize)]
-struct SimpleEffectValueDto {
-    fxt_id: FixtureId,
-    offset: usize,
-    value: u8,
-}
-
-impl From<SimpleEffectBody> for SimpleEffectDto {
+impl From<SimpleEffectBody> for SimpleEffectBodyDto {
     fn from(value: SimpleEffectBody) -> Self {
-        /*Self {
-            values: value
-                .values
-                .into_iter()
-                .map(|((fxt_id, offset), value)| SimpleEffectValueDto {
-                    fxt_id: fxt_id,
-                    offset: offset,
-                    value: value,
-                })
-                .collect(),
-        }*/
-        todo!()
+        match value {
+            SimpleEffectBody::FromTemplate {
+                tmpl_id,
+                tmpl_props,
+            } => Self::FromTemplate {
+                tmpl_id,
+                tmpl_props,
+            },
+            SimpleEffectBody::New { fixtures, values } => Self::New {
+                fixtures,
+                values: values
+                    .into_iter()
+                    .map(|((fxt_id, offset), val)| (fxt_id, offset, val))
+                    .collect(),
+            },
+        }
     }
 }
 
-impl From<SimpleEffectDto> for SimpleEffectBody {
-    fn from(value: SimpleEffectDto) -> Self {
-        /*Self {
-            values: value
-                .values
-                .into_iter()
-                .map(|v| ((v.fxt_id, v.offset), v.value))
-                .collect(),
-        }*/
-        todo!()
+impl From<SimpleEffectBodyDto> for SimpleEffectBody {
+    fn from(value: SimpleEffectBodyDto) -> Self {
+        match value {
+            SimpleEffectBodyDto::FromTemplate {
+                tmpl_id,
+                tmpl_props,
+            } => Self::FromTemplate {
+                tmpl_id,
+                tmpl_props,
+            },
+            SimpleEffectBodyDto::New { fixtures, values } => Self::New {
+                fixtures,
+                values: values
+                    .into_iter()
+                    .map(|(fxt_id, offset, val)| ((fxt_id, offset), val))
+                    .collect(),
+            },
+        }
     }
 }
 
@@ -298,16 +317,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn simple_function_is_serialized_and_deserialized_correctly() {
+    fn simple_effect_is_serialized_and_deserialized_correctly() {
         let fxt_id = FixtureId::new();
-        let fun = Effect::new_simple("Scene 1");
+        let mut effect = Effect::new_simple("Scene 1");
+
+        let EffectBody::Simple(SimpleEffectBody::New { fixtures, values }) = effect.body() else {
+            panic!("should match")
+        };
+
+        let new_values = HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 200)]);
+        let new = SimpleEffectBody::New {
+            fixtures: fixtures.clone(),
+            values: new_values,
+        };
+        effect.apply_change(EffectChange::Simple(new));
 
         // TODO: Add values here
 
-        let json = serde_json::to_string(&fun).unwrap();
+        let json = serde_json::to_string_pretty(&effect).unwrap();
 
         let deserialized: Effect = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(fun, deserialized);
+        assert_eq!(effect, deserialized);
     }
 }
