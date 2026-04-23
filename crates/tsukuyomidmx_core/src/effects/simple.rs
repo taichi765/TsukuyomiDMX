@@ -1,5 +1,3 @@
-use serde_with::{DeserializeAs, serde_as};
-
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -315,10 +313,24 @@ impl DocStateViewExt for DocStateView {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
-    #[test]
-    fn simple_effect_is_serialized_and_deserialized_correctly() {
+    /// Panics when [`PropsResolver::resolve_props()`] is called.
+    struct DummyPropsResolver;
+
+    impl PropsResolver<EffectTemplateId> for DummyPropsResolver {
+        fn resolve_props(
+            &self,
+            id: EffectTemplateId,
+            given_props: HashMap<String, Value>,
+            // fixtures: &FixtureQuery,
+        ) -> Box<dyn EffectRuntime> {
+            unimplemented!("This is dummy!")
+        }
+    }
+
+    fn create_simple_effect_with_some_values() -> (Effect, FixtureId) {
         let fxt_id = FixtureId::new();
         let mut effect = Effect::new_simple("Scene 1");
 
@@ -332,13 +344,62 @@ mod tests {
             values: new_values,
         };
         effect.apply_change(EffectChange::Simple(new));
+        (effect, fxt_id)
+    }
 
-        // TODO: Add values here
+    #[test]
+    fn simple_effect_is_serialized_and_deserialized_correctly() {
+        let (effect, fxt_id) = create_simple_effect_with_some_values();
 
         let json = serde_json::to_string_pretty(&effect).unwrap();
 
         let deserialized: Effect = serde_json::from_str(&json).unwrap();
 
         assert_eq!(effect, deserialized);
+    }
+
+    #[test]
+    fn simple_runtime_run_returns_right_command() {
+        let (effect, fxt_id) = create_simple_effect_with_some_values();
+
+        let mut rt = if let EffectBody::Simple(body) = effect.body() {
+            body.create_runtime(DummyPropsResolver)
+        } else {
+            panic!("should match")
+        };
+
+        let commands = rt.run(Duration::from_millis(20));
+
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().any(|cmd| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if *fixture_id == fxt_id && *channel == 0 && *value == 255 => true,
+            _ => false,
+        }));
+
+        assert!(commands.iter().any(|cmd: &EffectCommand| match cmd {
+            EffectCommand::WriteUniverse {
+                fixture_id,
+                channel,
+                value,
+            } if (*fixture_id == fxt_id && *channel == 1 && *value == 200) => true,
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn simple_runtime_returns_same_commands_between_first_and_last_frame() {
+        let (effect, _) = create_simple_effect_with_some_values();
+
+        let rt = if let EffectBody::Simple(body) = effect.body() {
+            body.create_runtime(DummyPropsResolver)
+        } else {
+            panic!("should match")
+        };
+
+        assert_eq!(rt.first_frame_hint(), rt.last_frame_hint());
     }
 }
