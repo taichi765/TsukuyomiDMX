@@ -1,5 +1,5 @@
 
-import { FunctionType } from "../types.slint";
+import { EffectKind } from "../types.slint";
 import { LargeText, PlaneText } from "../parts/texts.slint";
 import { Icons } from "../styling.slint";
 
@@ -7,36 +7,46 @@ import { Icons } from "../styling.slint";
 
 export struct EffectTreeViewItemData {
     id: string,
-    type: FunctionType,
+    kind: EffectKind,
     name: string,
+    indent: int,
 }
 
 component EffectTreeViewItem inherits Rectangle {
     in property <string> id;
     in property <string> name;
-    in property <FunctionType> type;
+    in property <EffectKind> kind;
     in property <bool> selected;
     callback remove();
     callback clicked();
 
-    pure function get-image(type: FunctionType) -> image {
+    pure function get-image(kind: EffectKind) -> image {
         // TODO: それぞれのアイコンを作る
-        if type == FunctionType.Simple {
+        if kind == EffectKind.Simple {
             return Icons.dimmer;
         }
-        if type == FunctionType.Sequence {
+        if kind == EffectKind.Sequence {
             return Icons.dimmer;
         }
-        if type == FunctionType.Parallel {
+        if kind == EffectKind.Parallel {
             return Icons.dimmer;
         }
-        if type == FunctionType.SimplePrototype {
+        if kind == EffectKind.SimpleTemplate {
             return Icons.dimmer;
         }
-        if type == FunctionType.SequencePrototype {
+        if kind == EffectKind.SequenceTemplate {
             return Icons.dimmer;
         }
-        if type == FunctionType.ParallelPrototype {
+        if kind == EffectKind.ParallelTemplate {
+            return Icons.dimmer;
+        }
+        if kind == EffectKind.SimpleSpec {
+            return Icons.dimmer;
+        }
+        if kind == EffectKind.SequenceSpec {
+            return Icons.dimmer;
+        }
+        if kind == EffectKind.ParallelSpec {
             return Icons.dimmer;
         }
 
@@ -64,7 +74,7 @@ component EffectTreeViewItem inherits Rectangle {
             }
 
             Image {
-                source: get-image(type);
+                source: get-image(kind);
             }
 
             margin := Rectangle {
@@ -100,26 +110,28 @@ global Adopter {
         // dummy
         {
             id:"",
-            type: FunctionType.Simple,
+            kind: EffectKind.Simple,
             name:"Scene 1",
+            indent: 0,
         },
         {
             id: "",
-            type: FunctionType.SequencePrototype,
+            kind: EffectKind.Sequence,
             name: "Scene 2",
+            indent: 0,
         }
     ];
     in property <int> selected-index;
 
-    callback new-simple-function();
-    callback new-simple-function-prototype();
-    callback new-sequence-funtion();
-    callback new-sequence-function-prototype();
-    callback new-parallel-function();
-    callback new-parallel-function-prototype();
+    callback new-simple-effect();
+    callback new-simple-effect-spec();
+    callback new-sequence-effect();
+    callback new-sequence-effect-spec();
+    callback new-parallel-effect();
+    callback new-parallel-effect-spec();
 
-    callback remove-function(id: string, type: FunctionType);
-    callback set-selected-function(id: string, type: FunctionType);
+    callback remove-effect(id: string, kind: EffectKind);
+    callback set-selected-effect(id: string, kind: EffectKind);
 }
 
 export { Adopter as EffectTreeViewAdopter }
@@ -132,47 +144,47 @@ export component EffectTreeView inherits Rectangle {
             text: @tr("Functions");
         }
 
-        for fun[i] in Adopter.model: EffectTreeViewItem {
-            id: fun.id;
-            name: fun.name;
-            type: fun.type;
+        for effect[i] in Adopter.model: EffectTreeViewItem {
+            id: effect.id;
+            name: effect.name;
+            kind: effect.kind;
             selected: i == Adopter.selected-index;
 
-            remove => Adopter.remove-function(fun.id, fun.type);
-            clicked => Adopter.set-selected-function(fun.id, fun.type);
+            remove => Adopter.remove-effect(effect.id, effect.kind);
+            clicked => Adopter.set-selected-effect(effect.id, effect.kind);
         }
 
         ContextMenuArea {
             height: 100%;
             Menu {
                 MenuItem {
-                    title: @tr("New Simple Function");
-                    activated => Adopter.new-simple-function();
+                    title: @tr("New Simple Effect");
+                    activated => Adopter.new-simple-effect();
                 }
 
                 MenuItem {
-                    title: @tr("New Simple Function Prototype");
-                    activated => Adopter.new-simple-function-prototype();
+                    title: @tr("New Simple Effect Spec");
+                    activated => Adopter.new-simple-effect-spec();
                 }
 
                 MenuItem {
-                    title: @tr("New Sequence Function");
-                    activated => Adopter.new-sequence-funtion();
+                    title: @tr("New Sequence Effect");
+                    activated => Adopter.new-sequence-effect();
                 }
 
                 MenuItem {
-                    title: @tr("New Sequence Function Prototype");
-                    activated => Adopter.new-sequence-function-prototype();
+                    title: @tr("New Sequence Effect Spec");
+                    activated => Adopter.new-sequence-effect-spec();
                 }
 
                 MenuItem {
-                    title: @tr("New Parallel Function");
-                    activated => Adopter.new-parallel-function();
+                    title: @tr("New Parallel Effect");
+                    activated => Adopter.new-parallel-effect();
                 }
 
                 MenuItem {
-                    title: @tr("New Parallel Function Prototype");
-                    activated => Adopter.new-parallel-function-prototype();
+                    title: @tr("New Parallel Effect Spec");
+                    activated => Adopter.new-parallel-effect-spec();
                 }
             }
         }

@@ -7,12 +7,12 @@ use tsukuyomidmx_core::{
     prelude::EffectId,
 };
 
-use crate::{app::AnyFunctionId, ui};
+use crate::{app::AnyEffectId, ui};
 
 pub struct EffectTreeViewModel {
     doc: DocStateView,
-    row_order: RefCell<Vec<AnyFunctionId>>,
-    data: RefCell<HashMap<AnyFunctionId, ui::EffectTreeViewItemData>>,
+    row_order: RefCell<Vec<AnyEffectId>>,
+    data: RefCell<HashMap<AnyEffectId, ui::EffectTreeViewItemData>>,
     notify: ModelNotify,
 }
 
@@ -44,11 +44,11 @@ impl EffectTreeViewModel {
         let data = doc.state_view().with_effects(|it| {
             it.iter().fold(HashMap::new(), |mut acc, v| {
                 acc.insert(
-                    AnyFunctionId::Effect(v.0.to_owned()),
+                    AnyEffectId::Effect(v.0.to_owned()),
                     ui::EffectTreeViewItemData {
                         id: v.0.to_shared_string(),
                         name: v.1.name().to_shared_string(),
-                        r#type: ui::FunctionType::Simple,
+                        r#type: ui::EffectKind::Simple,
                     },
                 );
                 acc
@@ -68,16 +68,16 @@ impl EffectTreeViewModel {
 
             Box::new(move |ev| match ev {
                 DocEffect::EffectAdded(id) => me_clone.doc.with_effects(|it| {
-                    let fun = it.get(id).unwrap();
-                    let id = AnyFunctionId::Effect(*id);
+                    let effect = it.get(id).unwrap();
+                    let id = AnyEffectId::Effect(*id);
                     let added_row = me_clone.row_order.borrow().len();
                     me_clone.row_order.borrow_mut().push(id);
                     me_clone.data.borrow_mut().insert(
                         id,
                         ui::EffectTreeViewItemData {
                             id: id.to_shared_string(),
-                            name: fun.name().to_shared_string(),
-                            r#type: get_effect_type(fun),
+                            name: effect.name().to_shared_string(),
+                            r#type: get_effect_type(effect),
                         },
                     );
                     me_clone.notify.row_added(added_row, 1);
@@ -87,12 +87,12 @@ impl EffectTreeViewModel {
                         .row_order
                         .borrow()
                         .iter()
-                        .position(|el| matches!(el, AnyFunctionId::Effect(v) if v==id))
+                        .position(|el| matches!(el, AnyEffectId::Effect(v) if v==id))
                         .unwrap();
                     me_clone.doc.with_effects(|it| {
                         let fx = it.get(id).unwrap();
                         me_clone.data.borrow_mut().insert(
-                            AnyFunctionId::Effect(*id),
+                            AnyEffectId::Effect(*id),
                             ui::EffectTreeViewItemData {
                                 id: id.to_shared_string(),
                                 name: fx.name().to_shared_string(),
@@ -107,13 +107,10 @@ impl EffectTreeViewModel {
                         .row_order
                         .borrow()
                         .iter()
-                        .position(|el| matches!(el, AnyFunctionId::Effect(v) if v==id))
+                        .position(|el| matches!(el, AnyEffectId::Effect(v) if v==id))
                         .unwrap();
                     me_clone.row_order.borrow_mut().remove(pos);
-                    me_clone
-                        .data
-                        .borrow_mut()
-                        .remove(&AnyFunctionId::Effect(*id));
+                    me_clone.data.borrow_mut().remove(&AnyEffectId::Effect(*id));
                     me_clone.notify.row_removed(pos, 1);
                 }
                 DocEffect::EffectSpecAdded(id) => todo!(),
@@ -129,15 +126,25 @@ impl EffectTreeViewModel {
         me
     }
 
-    pub fn get_index(&self, id: AnyFunctionId) -> Option<usize> {
+    pub fn get_index(&self, id: AnyEffectId) -> Option<usize> {
         self.row_order.borrow().iter().position(|v| *v == id)
     }
 }
 
-fn get_effect_type(fun: &Effect) -> ui::FunctionType {
-    match fun.body() {
-        EffectBody::Simple(_) => ui::FunctionType::Simple,
-        EffectBody::Sequence(_) => ui::FunctionType::Sequence,
-        EffectBody::Parallel(_) => ui::FunctionType::Parallel,
+fn get_effect_type(effect: &Effect) -> ui::EffectKind {
+    match effect.body() {
+        EffectBody::Simple(_) => ui::EffectKind::Simple,
+        EffectBody::Sequence(_) => ui::EffectKind::Sequence,
+        EffectBody::Parallel(_) => ui::EffectKind::Parallel,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn effect_tree_view_model_adds_item_on_doc_effect() {
+        todo!()
     }
 }

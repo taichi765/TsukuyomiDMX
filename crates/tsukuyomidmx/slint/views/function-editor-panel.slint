@@ -1,4 +1,4 @@
-import { FunctionType } from "../types.slint";
+import { EffectKind } from "../types.slint";
 import { BorderHorz, Icons, Theme } from "../styling.slint";
 import { SimpleFunctionView } from "simple-function-view.slint";
 import { SequenceFunctionView } from "sequence-function-view.slint";
@@ -45,7 +45,7 @@ global Adopter {
             name: "Scene 2",
         },
     ];
-    in property <FunctionType> type;
+    in property <EffectKind> kind;
     callback close(id: string);
 }
 
@@ -58,7 +58,7 @@ export component FunctionEditorPanel inherits Rectangle {
             HorizontalLayout {
                 for data in Adopter.model: TabItem {
                     name: data.name;
-                    selected: GlobalState.current-function == data.id;
+                    selected: GlobalState.current-effect-id == data.id;
                     clicked => Adopter.close(data.id);
                 }
             }
@@ -66,8 +66,8 @@ export component FunctionEditorPanel inherits Rectangle {
 
         BorderHorz { }
 
-        if Adopter.type == FunctionType.Simple:SimpleFunctionView { }
-        if Adopter.type == FunctionType.Sequence:SequenceFunctionView { }
-        if Adopter.type == FunctionType.Parallel:ParallelFunctionView { }
+        if Adopter.kind == EffectKind.Simple:SimpleFunctionView { }
+        if Adopter.kind == EffectKind.Sequence:SequenceFunctionView { }
+        if Adopter.kind == EffectKind.Parallel:ParallelFunctionView { }
     }
 }

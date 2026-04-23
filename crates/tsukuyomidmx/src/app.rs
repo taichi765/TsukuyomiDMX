@@ -477,7 +477,7 @@ impl App {
 }
 
 pub struct AppState {
-    selected_function: Option<AnyFunctionId>,
+    selected_function: Option<AnyEffectId>,
 }
 
 /// これらのModelにMapModel等を使ってuiに渡す、共通化部分
@@ -489,7 +489,7 @@ pub struct SharedInnerModel {
 
 /// [`AppState`]を変更するコマンド
 pub enum AppStateChange {
-    SetSelectedFunction(AnyFunctionId),
+    SetSelectedFunction(AnyEffectId),
 }
 
 pub struct Dispatcher(Rc<dyn Fn(AppStateChange)>);
@@ -614,13 +614,13 @@ impl<'a> Serialize for FixturesSeq<'a> {
 
 // TODO: core側で定義したほうがいいかも
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AnyFunctionId {
+pub enum AnyEffectId {
     Effect(EffectId),
     Spec(EffectSpecId),
     Template(EffectTemplateId),
 }
 
-impl Display for AnyFunctionId {
+impl Display for AnyEffectId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Effect(id) => write!(f, "{}", id),

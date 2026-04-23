@@ -1,5 +1,8 @@
+import { EffectKind } from "./types.slint";
+
 export global GlobalState {
     in property <string> error-message;
-    in property <string> current-function;
+    in property <string> current-effect-id;
+    in property <EffectKind> current-effect-kind;
     in property <string> selected-fixture;
 }
