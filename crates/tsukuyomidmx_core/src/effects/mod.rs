@@ -174,20 +174,6 @@ impl EffectTemplate {
     }
 }
 
-impl EffectTemplateBody {
-    fn resolve_props(
-        &self,
-        given_props: HashMap<String, Value>,
-        doc: DocStateView,
-    ) -> Box<dyn EffectRuntime> {
-        match self {
-            EffectTemplateBody::Simple(body) => body.resolve_props(given_props, doc),
-            EffectTemplateBody::Sequence(body) => body.resolve_props(given_props, doc),
-            EffectTemplateBody::Parallel(body) => body.resolve_props(given_props, doc),
-        }
-    }
-}
-
 /// bind_to()でFixtureに関連付けたあとのfunction.
 ///
 /// Goboなどmodel-specificなチャンネルを制御する。
@@ -241,7 +227,7 @@ impl Effect {
     }
 
     pub(crate) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        self.body.create_runtime(doc)
+        doc.create_runtime(self.id)
     }
 
     pub(crate) fn apply_change(&mut self, change: EffectChange) {
@@ -254,18 +240,6 @@ impl Effect {
             }
             EffectChange::Sequence(body) => self.body = EffectBody::Sequence(body),
             EffectChange::Parallel(body) => self.body = EffectBody::Parallel(body),
-        }
-    }
-}
-
-impl EffectBody {
-    /// infallible
-    fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
-        match &self {
-            // TODO: Boxを返すかそのまま返すか統一する
-            EffectBody::Simple(fun) => fun.create_runtime(doc),
-            EffectBody::Sequence(fun) => fun.create_runtime(doc),
-            EffectBody::Parallel(fun) => fun.create_runtime(doc),
         }
     }
 }
@@ -481,20 +455,6 @@ trait PropsResolver<Id> {
     ) -> Box<dyn EffectRuntime>;
 }
 
-impl PropsResolver<EffectId> for DocStateView {
-    fn resolve_props(
-        &self,
-        id: EffectId,
-        given_props: HashMap<String, Value>,
-        // fixtures: &FixtureQuery,
-    ) -> Box<dyn EffectRuntime> {
-        self.with_effects(|it| {
-            let body = it.get(&id).unwrap();
-        });
-        todo!()
-    }
-}
-
 impl PropsResolver<EffectTemplateId> for DocStateView {
     fn resolve_props(
         &self,
@@ -502,7 +462,14 @@ impl PropsResolver<EffectTemplateId> for DocStateView {
         given_props: HashMap<String, Value>,
         // fixtures: &FixtureQuery,
     ) -> Box<dyn EffectRuntime> {
-        todo!()
+        self.with_effect_templates(|it| {
+            let tmpl = it.get(&id).unwrap();
+            match &tmpl.body {
+                EffectTemplateBody::Simple(body) => body.resolve_props(given_props, self.clone()),
+                EffectTemplateBody::Sequence(body) => body.resolve_props(given_props, self.clone()),
+                EffectTemplateBody::Parallel(body) => body.resolve_props(given_props, self.clone()),
+            }
+        })
     }
 }
 
@@ -513,7 +480,16 @@ impl PropsResolver<&(EffectSpecId, FixtureQuery)> for DocStateView {
         given_props: HashMap<String, Value>,
         // fixtures: &FixtureQuery,
     ) -> Box<dyn EffectRuntime> {
-        todo!()
+        self.with_effect_specs(|it| {
+            let spec = it.get(id).unwrap();
+            match &spec.body {
+                EffectSpecBody::Simple(body) => {
+                    body.resolve_props(fixtures, given_props, self.clone())
+                }
+                EffectSpecBody::Sequence(body) => body.resolve_props(given_props, self.clone()),
+                EffectSpecBody::Parallel(body) => body.resolve_props(given_props, self.clone()),
+            }
+        })
     }
 }
 
@@ -523,6 +499,13 @@ trait CreateRuntime {
 
 impl CreateRuntime for DocStateView {
     fn create_runtime(&self, id: EffectId) -> Box<dyn EffectRuntime> {
-        todo!()
+        self.with_effects(|it| {
+            let effect = it.get(&id).unwrap();
+            match &effect.body {
+                EffectBody::Simple(body) => body.create_runtime(self.clone()),
+                EffectBody::Sequence(body) => body.create_runtime(self.clone()),
+                EffectBody::Parallel(body) => body.create_runtime(self.clone()),
+            }
+        })
     }
 }
