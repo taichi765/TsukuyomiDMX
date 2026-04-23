@@ -91,7 +91,10 @@ impl ParallelEffectBody {
         Self::New { items: Vec::new() }
     }
 
-    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+    pub(super) fn create_runtime(
+        &self,
+        doc: impl PropsResolver<EffectTemplateId> + CreateRuntime,
+    ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromTemplate {
                 tmpl_id,

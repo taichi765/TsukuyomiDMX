@@ -164,14 +164,15 @@ impl SimpleEffectBody {
         }
     }
 
-    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+    pub(super) fn create_runtime(
+        &self,
+        doc: impl PropsResolver<EffectTemplateId>,
+    ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromTemplate {
                 tmpl_id,
                 tmpl_props,
-            } => doc.with_template(*tmpl_id, |body: &SimpleEffectTemplateBody| {
-                body.resolve_props(tmpl_props.clone(), doc.clone())
-            }),
+            } => doc.resolve_props(*tmpl_id, tmpl_props.clone()),
             Self::New { fixtures, values } => Box::new(SimpleEffectRuntime::new(values.clone())),
         }
     }

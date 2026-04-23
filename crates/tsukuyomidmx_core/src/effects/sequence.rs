@@ -122,15 +122,14 @@ pub enum SequenceEffectBody {
 }
 
 impl SequenceEffectBody {
-    pub(super) fn create_runtime(&self, doc: DocStateView) -> Box<dyn EffectRuntime> {
+    pub(super) fn create_runtime(
+        &self,
+        doc: impl PropsResolver<EffectTemplateId> + CreateRuntime,
+    ) -> Box<dyn EffectRuntime> {
         match self {
-            Self::FromTemplate(tmpl_id, tmpl_props) => doc.with_effect_templates(|it| {
-                let EffectTemplateBody::Sequence(tmpl) = &it.get(tmpl_id).unwrap().body else {
-                    unreachable!()
-                };
-
-                tmpl.resolve_props(tmpl_props.clone(), doc.clone())
-            }),
+            Self::FromTemplate(tmpl_id, tmpl_props) => {
+                doc.resolve_props(*tmpl_id, tmpl_props.clone())
+            }
             Self::New(steps) => {
                 // TODO: SequenceEffectTemplateBody::resolve_props()と重複しているコードがある
                 // TODO: SimpleEffectRuntime::empty()みたいなやつ作る。作るときにfixturesを渡す。
