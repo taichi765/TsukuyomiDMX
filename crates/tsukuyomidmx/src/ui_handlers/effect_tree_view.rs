@@ -4,10 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use super::wrap_callback;
 use crate::{
     app::{AnyEffectId, App, AppStateChange},
     models::EffectTreeViewModel,
-    tea::wrap_callback,
     ui,
 };
 use anyhow::Context;

@@ -36,8 +36,8 @@ use tsukuyomidmx_core::{
 use crate::{
     Observable,
     models::{EffectEditorData, EffectEditorModel, FixtureDefModel, FixtureModel, UniverseModel},
-    tea::{effect_editor, effect_tree_view, fixture_list_view, preview_2d, universe_view},
     ui,
+    ui_handlers::{effect_editor, effect_tree_view, fixture_list_view, preview_2d, universe_view},
 };
 
 /// root struct
