@@ -3,7 +3,10 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 use slint::{Model, ModelNotify, ToSharedString};
 use tsukuyomidmx_core::{
     doc::{Doc, DocEffect, DocStateView},
-    effects::{Effect, EffectBody, EffectSpecId},
+    effects::{
+        Effect, EffectBody, EffectSpec, EffectSpecBody, EffectSpecId, EffectTemplate,
+        EffectTemplateBody,
+    },
     prelude::EffectId,
 };
 
@@ -46,9 +49,10 @@ impl EffectTreeViewModel {
                 acc.insert(
                     AnyEffectId::Effect(v.0.to_owned()),
                     ui::EffectTreeViewItemData {
-                        id: v.0.to_shared_string(),
+                        id: serde_json::to_string(&v.0).unwrap().to_shared_string(),
                         name: v.1.name().to_shared_string(),
-                        r#type: ui::EffectKind::Simple,
+                        kind: ui::EffectKind::Simple,
+                        indent: 0, //TODO
                     },
                 );
                 acc
@@ -75,9 +79,10 @@ impl EffectTreeViewModel {
                     me_clone.data.borrow_mut().insert(
                         id,
                         ui::EffectTreeViewItemData {
-                            id: id.to_shared_string(),
+                            id: serde_json::to_string(&id).unwrap().to_shared_string(),
                             name: effect.name().to_shared_string(),
-                            r#type: get_effect_type(effect),
+                            kind: effect.effect_kind(),
+                            indent: 0, //TODO
                         },
                     );
                     me_clone.notify.row_added(added_row, 1);
@@ -94,9 +99,10 @@ impl EffectTreeViewModel {
                         me_clone.data.borrow_mut().insert(
                             AnyEffectId::Effect(*id),
                             ui::EffectTreeViewItemData {
-                                id: id.to_shared_string(),
+                                id: serde_json::to_string(id).unwrap().to_shared_string(),
                                 name: fx.name().to_shared_string(),
-                                r#type: get_effect_type(fx),
+                                kind: fx.effect_kind(),
+                                indent: 0, //TODO
                             },
                         );
                     });
@@ -131,11 +137,37 @@ impl EffectTreeViewModel {
     }
 }
 
-fn get_effect_type(effect: &Effect) -> ui::EffectKind {
-    match effect.body() {
-        EffectBody::Simple(_) => ui::EffectKind::Simple,
-        EffectBody::Sequence(_) => ui::EffectKind::Sequence,
-        EffectBody::Parallel(_) => ui::EffectKind::Parallel,
+trait GetEffectKind {
+    fn effect_kind(&self) -> ui::EffectKind;
+}
+
+impl GetEffectKind for Effect {
+    fn effect_kind(&self) -> ui::EffectKind {
+        match self.body() {
+            EffectBody::Simple(_) => ui::EffectKind::Simple,
+            EffectBody::Sequence(_) => ui::EffectKind::Sequence,
+            EffectBody::Parallel(_) => ui::EffectKind::Parallel,
+        }
+    }
+}
+
+impl GetEffectKind for EffectSpec {
+    fn effect_kind(&self) -> ui::EffectKind {
+        match self.body() {
+            EffectSpecBody::Simple(_) => ui::EffectKind::SimpleSpec,
+            EffectSpecBody::Sequence(_) => ui::EffectKind::SequenceSpec,
+            EffectSpecBody::Parallel(_) => ui::EffectKind::ParallelSpec,
+        }
+    }
+}
+
+impl GetEffectKind for EffectTemplate {
+    fn effect_kind(&self) -> ui::EffectKind {
+        match self.body() {
+            EffectTemplateBody::Simple(_) => ui::EffectKind::SimpleTemplate,
+            EffectTemplateBody::Sequence(_) => ui::EffectKind::SequenceTemplate,
+            EffectTemplateBody::Parallel(_) => ui::EffectKind::ParallelTemplate,
+        }
     }
 }
 

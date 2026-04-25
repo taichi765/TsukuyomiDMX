@@ -10,6 +10,7 @@ use crate::{
     tea::wrap_callback,
     ui,
 };
+use anyhow::Context;
 use slint::{ComponentHandle, Global, SharedString, ToSharedString};
 use tsukuyomidmx_core::{
     effects::{Effect, EffectSpecId},
@@ -99,16 +100,17 @@ pub fn setup(app: &App) {
 
         move |id, r#type| {
             wrap_callback("FunctionListViewAdopter::on_remove_effect", || {
-                if is_effect_spec(&r#type) {
-                    let id = EffectId::from_str(id.as_str()).expect("todo");
-                    doc_clone.lock().unwrap().remove_effect(id).expect("todo");
-                } else {
-                    let id = EffectSpecId::from_str(id.as_str()).expect("todo");
-                    doc_clone
-                        .lock()
-                        .unwrap()
-                        .remove_effect_spec(id)
-                        .expect("todo");
+                let id:AnyEffectId=serde_json::from_str(&id).with_context(||format!("failed to deserialize id {} from FunctionListViewAdopter::on_remove_effect()",id)).unwrap();
+                match id{
+                    AnyEffectId::Spec(id)=>{
+                        doc_clone.lock().unwrap().remove_effect_spec(id).unwrap();
+                    }
+                    AnyEffectId::Template(id)=>{
+                        doc_clone.lock().unwrap().remove_effect_template(id).unwrap();
+                    }
+                    AnyEffectId::Effect(id)=>{
+                        doc_clone.lock().unwrap().remove_effect(id).unwrap();
+                    }
                 }
             })
         }
@@ -116,39 +118,19 @@ pub fn setup(app: &App) {
 
     adopter.on_set_selected_effect({
         let adopter_weak = adopter.as_weak();
-        let state_weak = app.ui.global::<ui::GlobalState>().as_weak();
         let model_clone = Rc::clone(&model);
+        let id_state = app.state.read().unwrap().current_effect_id();
 
-        move |id, r#type| {
+        move |id_str, r#type| {
             wrap_callback("FunctionListViewAdopter::on_set_selected_effect", || {
-                let id = if is_effect_spec(&r#type) {
-                    AnyEffectId::Spec(EffectSpecId::from_str(id.as_str()).unwrap())
-                } else {
-                    AnyEffectId::Effect(EffectId::from_str(id.as_str()).unwrap())
-                };
+                let id: AnyEffectId = serde_json::from_str(&id_str).unwrap();
 
                 let idx = model_clone.get_index(id).unwrap();
                 adopter_weak
                     .unwrap()
                     .set_selected_index(idx.try_into().unwrap());
-                state_weak
-                    .unwrap()
-                    .set_current_effect_id(id.to_shared_string());
+                id_state.set(Some(id));
             });
         }
     });
-}
-
-trait ToAnyEffectId {
-    fn to_any_effect_id(&self, val: SharedString) -> AnyEffectId;
-}
-
-impl ToAnyEffectId for ui::EffectKind {
-    fn to_any_effect_id(&self) -> AnyEffectId {
-        match self {
-            ui::EffectKind::SimpleSpec
-            | ui::EffectKind::SequenceSpec
-            | ui::EffectKind::ParallelSpec => todo!(),
-        }
-    }
 }

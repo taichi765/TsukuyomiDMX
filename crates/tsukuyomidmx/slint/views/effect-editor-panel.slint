@@ -1,8 +1,14 @@
 import { EffectKind } from "../types.slint";
 import { BorderHorz, Icons, Theme } from "../styling.slint";
-import { SimpleFunctionView } from "simple-function-view.slint";
-import { SequenceFunctionView } from "sequence-function-view.slint";
-import { ParallelFunctionView } from "parallel-function-view.slint";
+import {
+    SimpleEffectSingleView,
+} from "./effects/simple-effect-single-view.slint";
+import {
+    SequenceEffectSingleView,
+} from "./effects/sequence-effect-single-view.slint";
+import {
+    ParallelEffectSingleView,
+} from "./effects/parallel-effect-single-view.slint";
 import { MiddleText } from "../parts/texts.slint";
 import { GlobalState } from "../global-state.slint";
 import { ScrollView } from "std-widgets.slint";
@@ -29,13 +35,13 @@ component TabItem inherits Rectangle {
     }
 }
 
-struct FunctionEditorPanelData {
+struct EffectEditorPanelData {
     id: string,
     name: string,
 }
 
 global Adopter {
-    in property <[FunctionEditorPanelData]> model:[
+    in property <[EffectEditorPanelData]> model:[
         {
             id: "",
             name: "Scene 1",
@@ -45,20 +51,22 @@ global Adopter {
             name: "Scene 2",
         },
     ];
-    in property <EffectKind> kind;
+    in property <string> current-id;
+    in property <EffectKind> current-kind;
     callback close(id: string);
 }
 
-export { Adopter as FunctionEditorPanelAdopter }
+export { Adopter as EffectEditorPanelAdopter }
 
-export component FunctionEditorPanel inherits Rectangle {
+export component EffectEditorPanel inherits Rectangle {
+
     VerticalLayout {
         alignment: LayoutAlignment.start;
         ScrollView {
             HorizontalLayout {
                 for data in Adopter.model: TabItem {
                     name: data.name;
-                    selected: GlobalState.current-effect-id == data.id;
+                    selected: Adopter.current-id == data.id;
                     clicked => Adopter.close(data.id);
                 }
             }
@@ -66,8 +74,8 @@ export component FunctionEditorPanel inherits Rectangle {
 
         BorderHorz { }
 
-        if Adopter.kind == EffectKind.Simple:SimpleFunctionView { }
-        if Adopter.kind == EffectKind.Sequence:SequenceFunctionView { }
-        if Adopter.kind == EffectKind.Parallel:ParallelFunctionView { }
+        if Adopter.current-kind == EffectKind.Simple:SimpleEffectSingleView { }
+        if Adopter.current-kind == EffectKind.Sequence:SequenceEffectSingleView { }
+        if Adopter.current-kind == EffectKind.Parallel:ParallelEffectSingleView { }
     }
 }

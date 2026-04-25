@@ -5,11 +5,13 @@ pub mod colors;
 //pub mod controllers;
 pub mod models;
 pub mod tea {
+    pub mod effect_editor;
     pub mod effect_tree_view;
     pub mod fixture_list_view;
     pub mod preview_2d;
     pub mod universe_view;
 
+    // TODO: macroにするかも
     /// spanを作って、経過時間が長かった場合warn!()で出力する
     pub fn wrap_callback(name: &'static str, mut f: impl FnMut()) {
         let _span = tracing::debug_span!("callback_wrapper_span", name).entered();
@@ -23,6 +25,7 @@ pub mod tea {
     }
 }
 mod test_helpers;
+pub use observable::Observable;
 
 use std::cell::RefCell;
 use std::error::Error;
@@ -90,9 +93,9 @@ pub fn run_main() -> Result<(), Box<dyn Error>> {
 mod observable {
     use i_slint_core::model::{ModelChangeListener, ModelChangeListenerContainer};
     use slint::{ModelNotify, ModelTracker};
-    use std::{cell::RefCell, pin::Pin, rc::Rc};
+    use std::{cell::RefCell, fmt::Debug, pin::Pin, rc::Rc};
 
-    /// Observable data
+    /// Observable data.
     ///
     /// # Example
     /// ```
@@ -113,18 +116,22 @@ mod observable {
     /// count.update(|v| v + 3);
     /// assert_eq!(double.get(), 10);
     /// ```
-    pub struct Observable<T: 'static>(Rc<RefCell<ObservableInner<T>>>);
+    #[derive(Debug)]
+    pub struct Observable<T: 'static + Debug>(Rc<RefCell<ObservableInner<T>>>);
 
-    struct ObservableInner<T: 'static> {
+    #[derive(derive_more::Debug)]
+    struct ObservableInner<T: 'static + Debug> {
         data: T,
+        #[debug(skip)]
         peer_containers: Vec<Pin<Box<ModelChangeListenerContainer<Peer<T>>>>>,
         // TODO: slintのシステムを使う必要あるか？
+        #[debug(skip)]
         notify: ModelNotify,
     }
 
     impl<T> Observable<T>
     where
-        T: 'static,
+        T: Debug + 'static,
     {
         pub fn new(data: T) -> Self {
             Self(Rc::new(RefCell::new(ObservableInner {
@@ -132,6 +139,15 @@ mod observable {
                 peer_containers: Vec::new(),
                 notify: ModelNotify::default(),
             })))
+        }
+
+        /// Do something with current value. If `T` implements `Copy`,
+        /// use [`Observable::get()`] instead.
+        pub fn with<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(&T) -> R,
+        {
+            f(&self.0.borrow().data)
         }
 
         /// Sets the new value and notifies to subscribers.
@@ -167,21 +183,33 @@ mod observable {
         }
     }
 
-    impl<T> Clone for Observable<T> {
+    impl<T> Observable<T>
+    where
+        T: 'static + Copy + Debug,
+    {
+        pub fn get(&self) -> T {
+            self.0.borrow().data
+        }
+    }
+
+    impl<T: Debug> Clone for Observable<T> {
         /// This is cheap clone (same as [`Rc::clone()`][std::rc::Rc])
         fn clone(&self) -> Self {
             Self(Rc::clone(&self.0))
         }
     }
 
-    struct Peer<T: 'static> {
+    // TODO: こういうDebug実装をしてデバッグの役に立つか怪しい
+    #[derive(derive_more::Debug)]
+    struct Peer<T: 'static + Debug> {
         val: Observable<T>,
+        #[debug(skip)]
         f: RefCell<Box<dyn FnMut(&T) + 'static>>,
     }
 
     impl<T> ModelChangeListener for Peer<T>
     where
-        T: 'static,
+        T: Debug + 'static,
     {
         fn row_added(self: Pin<&Self>, _index: usize, _count: usize) {
             unimplemented!("row_added() is never called");
@@ -189,6 +217,7 @@ mod observable {
 
         fn row_changed(self: Pin<&Self>, row: usize) {
             debug_assert_eq!(0, row);
+            tracing::trace!(?self, row, "row change was notified");
             (self.f.borrow_mut())(&self.val.0.borrow().data)
         }
 

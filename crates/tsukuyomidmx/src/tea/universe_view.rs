@@ -17,14 +17,14 @@ use crate::{
 pub fn setup(app: &App) {
     let adopter = app.ui.global::<ui::UniverseViewAdopter>();
     let model_base = Rc::new(UniverseViewModel::new(
-        app.shared_model_inner.fixture_model.get().cloned().unwrap(),
+        app.shared_model.fixture_model.get().cloned().unwrap(),
         app.doc.lock().unwrap().state_view(),
         24,
     ));
     let model = create_mapped_model(Rc::clone(&model_base), UniverseId::MIN);
     let cols_model = Rc::new(VecModel::from((0..24).collect::<Vec<i32>>()));
     let rows_model = Rc::new(VecModel::from((0..22).collect::<Vec<i32>>()));
-    let universe_model = Rc::clone(&app.shared_model_inner.universe_model.get().unwrap())
+    let universe_model = Rc::clone(&app.shared_model.universe_model.get().unwrap())
         .map(|u_id| universe_id_to_shared_string(u_id));
 
     adopter.set_fixtures(Rc::clone(&model).into());
@@ -94,7 +94,7 @@ fn create_mapped_model(
     model
 }
 
-/// From/Intoトレイトでやったほうが良さそうだが、Universe名をどう扱うか決まってないのでとりあえずここに
+/// From/IntoトレイトかDisplayでやったほうが良さそうだが、Universe名をどう扱うか決まってないのでとりあえずここに
 ///
 /// fixture_list_view.rsにも同じものがあるが、共通とは限らないのでコピペしておく
 fn universe_id_to_shared_string(id: UniverseId) -> SharedString {

@@ -1,3 +1,12 @@
+//! A model is a data structure.
+//!
+//! Model deals with [`DocEffect`], which means, convert [`DocEffect`] into the reactive state like
+//! [`slint::Model`] or [`Observable`][crate::Observable].
+//!
+//! You can think this is something like `ViewModel` in MVVM architecture.
+//!
+//! [`DocEffect`]:tsukuyomidmx_core::doc::DocEffect
+
 mod fixture;
 pub use fixture::*;
 mod fixture_def;
@@ -12,6 +21,8 @@ mod universe;
 pub use universe::UniverseModel;
 mod effect_tree_view;
 pub use effect_tree_view::EffectTreeViewModel;
+mod effect_editor;
+pub use effect_editor::{EffectEditorData, EffectEditorModel};
 
 #[cfg(test)]
 mod test_helpers {

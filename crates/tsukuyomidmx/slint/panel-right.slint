@@ -1,11 +1,10 @@
 import { PlaneText } from "parts/texts.slint";
 import { Button } from "std-widgets.slint";
 import { Icons } from "styling.slint";
-import { SimpleFunctionView } from "views/simple-function-view.slint";
-import { FunctionEditorPanel } from "views/function-editor-panel.slint";
+import { EffectEditorPanel } from "views/effect-editor-panel.slint";
 export component RightPanel inherits Rectangle {
     property <bool> is-hidden;
     if !is-hidden:VerticalLayout {
-        FunctionEditorPanel { }
+        EffectEditorPanel { }
     }
 }

@@ -27,10 +27,10 @@ pub fn setup(app: &App) {
     let adopter = app.ui.global::<ui::FixtureListAdopter>();
 
     let manufacturer_model = Rc::new(ManufacturerModel::new(
-        app.shared_model_inner.def_model.get().unwrap().clone(),
+        app.shared_model.def_model.get().unwrap().clone(),
         app.doc.lock().unwrap().state_view(),
     ));
-    let base_model = app.shared_model_inner.universe_model.get().unwrap();
+    let base_model = app.shared_model.universe_model.get().unwrap();
     let universe_model = Rc::clone(&base_model).map(|u_id| universe_id_to_shared_string(u_id));
 
     adopter.set_model(Rc::clone(&manufacturer_model).into());
@@ -192,7 +192,7 @@ mod tests {
         // TODO: DefRegistryのfakeを使う
         let mut app = App::new_empty();
 
-        app.shared_model_inner
+        app.shared_model
             .def_model
             .set(FixtureDefModel::create(&mut app.doc.lock().unwrap()))
             .unwrap();

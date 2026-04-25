@@ -14,6 +14,7 @@ use tracing::warn;
 use crate::doc::DocStateView;
 use crate::fixture::{FixtureId, FixtureTag};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::time::Duration;
 
 declare_id_newtype!(EffectSpecId);
@@ -236,7 +237,7 @@ impl Effect {
         }
     }
 
-    fn unwrap_simple(&self) -> &SimpleEffectBody {
+    pub fn unwrap_simple(&self) -> &SimpleEffectBody {
         if let EffectBody::Simple(body) = self.body() {
             body
         } else {
@@ -244,7 +245,7 @@ impl Effect {
         }
     }
 
-    fn unwrap_sequnece(&self) -> &SequenceEffectBody {
+    pub fn unwrap_sequnece(&self) -> &SequenceEffectBody {
         if let EffectBody::Sequence(body) = self.body() {
             body
         } else {
@@ -252,7 +253,7 @@ impl Effect {
         }
     }
 
-    fn unwrap_parallel(&self) -> &ParallelEffectBody {
+    pub fn unwrap_parallel(&self) -> &ParallelEffectBody {
         if let EffectBody::Parallel(body) = self.body() {
             body
         } else {
@@ -409,7 +410,7 @@ impl FixtureQuery {
     }
 
     /// queryにmatchするFixtureを全て返す
-    pub(crate) fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
+    pub fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
         self.data.iter().fold(Vec::new(), |mut acc, v| {
             match v {
                 Selector::Id(id) => {
@@ -460,6 +461,12 @@ impl Default for FixtureQuery {
             string: ".some-tag".to_string(),
             data: vec![Selector::Tags(vec![FixtureTag::new("some-tag").unwrap()])],
         }
+    }
+}
+
+impl Display for FixtureQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.string)
     }
 }
 

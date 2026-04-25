@@ -22,7 +22,7 @@ pub fn setup(app: &App) {
     let (frame_tx, frame_rx) = mpsc::channel();
 
     let model = Rc::new(Preview2DModel::new(
-        Rc::clone(&app.shared_model_inner.fixture_model.get().unwrap()),
+        Rc::clone(&app.shared_model.fixture_model.get().unwrap()),
         app.doc.lock().unwrap().state_view(),
         frame_rx,
     ));

@@ -34,8 +34,9 @@ use tsukuyomidmx_core::{
 };
 
 use crate::{
-    models::{FixtureDefModel, FixtureModel, UniverseModel},
-    tea::{effect_tree_view, fixture_list_view, preview_2d, universe_view},
+    Observable,
+    models::{EffectEditorData, EffectEditorModel, FixtureDefModel, FixtureModel, UniverseModel},
+    tea::{effect_editor, effect_tree_view, fixture_list_view, preview_2d, universe_view},
     ui,
 };
 
@@ -43,9 +44,9 @@ use crate::{
 pub struct App {
     pub doc: Arc<Mutex<Doc>>,
     pub ui: ui::AppWindow,
-    state: Arc<RwLock<AppState>>,
+    pub state: Arc<RwLock<AppState>>,
     pub dispatcher: Dispatcher,
-    pub shared_model_inner: SharedInnerModel,
+    pub shared_model: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
     pub universe_configs: HashMap<UniverseId, UniverseConfig>,
     project_path: Mutex<Option<PathBuf>>,
@@ -66,17 +67,14 @@ impl App {
         ));
 
         let ui = ui::AppWindow::new().unwrap();
-        let state = Arc::new(RwLock::new(AppState {
-            selected_function: None,
-        }));
-        let dispatcher = create_dispatcher(Arc::clone(&state));
+        let state = Arc::new(RwLock::new(AppState::new()));
         debug!("App instance created");
         Self {
             doc,
             ui,
-            state,
-            dispatcher,
-            shared_model_inner: SharedInnerModel {
+            state: Arc::clone(&state),
+            dispatcher: create_dispatcher(state),
+            shared_model: SharedInnerModel {
                 def_model: OnceCell::new(),
                 fixture_model: OnceCell::new(),
                 universe_model: OnceCell::new(),
@@ -162,16 +160,14 @@ impl App {
 
         let ui = ui::AppWindow::new().unwrap();
         ui.set_project_path(dir.to_str().unwrap().to_shared_string());
-        let state = Arc::new(RwLock::new(AppState {
-            selected_function: None,
-        }));
+        let state = Arc::new(RwLock::new(AppState::new()));
 
         Ok(Self {
             doc: Arc::clone(&doc),
             ui,
             state: Arc::clone(&state),
             dispatcher: create_dispatcher(state),
-            shared_model_inner: SharedInnerModel {
+            shared_model: SharedInnerModel {
                 fixture_model: OnceCell::new(),
                 def_model: OnceCell::new(),
                 universe_model: OnceCell::new(),
@@ -187,15 +183,15 @@ impl App {
     }
 
     pub fn run(self: Arc<Self>) -> Result<(), Box<dyn Error>> {
-        self.shared_model_inner
+        self.shared_model
             .def_model
             .set(FixtureDefModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
-        self.shared_model_inner
+        self.shared_model
             .fixture_model
             .set(FixtureModel::create(&mut self.doc.lock().unwrap()))
             .unwrap();
-        self.shared_model_inner
+        self.shared_model
             .universe_model
             .set(UniverseModel::new(&mut self.doc.lock().unwrap()))
             .unwrap();
@@ -206,6 +202,8 @@ impl App {
         self.setup_engine();
         self.setup_window();
         preview_2d::setup(&self);
+        effect_editor::setup(&self);
+
         // TODO: この部分はuniverses.jsonから読み込んでやる
         let plugin = Box::new(OlaPlugin::new().unwrap());
         let p_id = plugin.id();
@@ -231,44 +229,6 @@ impl App {
             .get()
             .unwrap()
             .send(EngineCommand::UniverseAdded(UniverseId::new(0)))
-            .unwrap();
-
-        self.command_tx
-            .get()
-            .unwrap()
-            .send(EngineCommand::StartFunction(
-                EffectId::from_str("a155cabb-3019-4377-b6ff-178c7bd8a54a").unwrap(),
-            ))
-            .unwrap();
-
-        let fxt = Fixture::new(
-            "Parlight",
-            UniverseId::new(0),
-            DmxAddress::MIN,
-            FixtureDefId::new("stage-evolution".into(), "hpar64-9".into()),
-            "7-channel",
-            0.,
-            0.,
-        );
-        let fxt_id = fxt.id();
-        self.doc.lock().unwrap().add_fixture(fxt).unwrap();
-
-        let effect = Effect::new_simple("Scene 1");
-        let effect_id = effect.id();
-        self.doc.lock().unwrap().add_effect(effect).unwrap();
-        let body = SimpleEffectBody::New {
-            fixtures: FixtureQuery::from_str(format!("#{}", fxt_id)).unwrap(),
-            values: HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 255), ((fxt_id, 2), 255)]),
-        };
-        self.doc
-            .lock()
-            .unwrap()
-            .update_effect(effect_id, EffectChange::Simple(body))
-            .unwrap();
-        self.command_tx
-            .get()
-            .unwrap()
-            .send(EngineCommand::StartFunction(effect_id))
             .unwrap();
 
         self.ui.run()?;
@@ -477,7 +437,19 @@ impl App {
 }
 
 pub struct AppState {
-    selected_function: Option<AnyEffectId>,
+    current_effect_id: Observable<Option<AnyEffectId>>,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            current_effect_id: Observable::new(None),
+        }
+    }
+
+    pub fn current_effect_id(&self) -> Observable<Option<AnyEffectId>> {
+        self.current_effect_id.clone()
+    }
 }
 
 /// これらのModelにMapModel等を使ってuiに渡す、共通化部分
@@ -613,19 +585,35 @@ impl<'a> Serialize for FixturesSeq<'a> {
 }
 
 // TODO: core側で定義したほうがいいかも
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnyEffectId {
     Effect(EffectId),
     Spec(EffectSpecId),
     Template(EffectTemplateId),
 }
 
-impl Display for AnyEffectId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Effect(id) => write!(f, "{}", id),
-            Self::Spec(id) => write!(f, "{}", id),
-            Self::Template(id) => write!(f, "{}", id),
+impl AnyEffectId {
+    pub fn unwrap_effect(&self) -> EffectId {
+        if let Self::Effect(id) = self {
+            *id
+        } else {
+            panic!("EffectLikeId::unwrap_effect() is called on {:?}", self);
+        }
+    }
+
+    pub fn unwrap_spec(&self) -> EffectSpecId {
+        if let Self::Spec(id) = self {
+            *id
+        } else {
+            panic!("EffectLikeId::unwrap_spec() is called on {:?}", self);
+        }
+    }
+
+    pub fn unwrap_template(&self) -> EffectTemplateId {
+        if let Self::Template(id) = self {
+            *id
+        } else {
+            panic!("EffectLikeId::unwrap_template() is called on {:?}", self);
         }
     }
 }
@@ -633,7 +621,7 @@ impl Display for AnyEffectId {
 fn create_dispatcher(state: Arc<RwLock<AppState>>) -> Dispatcher {
     Dispatcher(Rc::new(move |change| match change {
         AppStateChange::SetSelectedFunction(id) => {
-            state.write().unwrap().selected_function = Some(id)
+            state.write().unwrap().current_effect_id.set(Some(id));
         }
     }))
 }
