@@ -2,10 +2,10 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
-use crate::doc::{DocStateView, OutputPluginId, ResolveError, ResolvedAddress};
+use crate::doc::{DocStateView, ResolveError, ResolvedAddress};
 use crate::effects::{EffectCommand, EffectId, EffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::plugins::{DmxFrame, Plugin};
+use crate::plugins::{BlockingPlugin, DmxFrame, OutputPluginId};
 use crate::universe::UniverseId;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -25,7 +25,7 @@ pub struct Engine {
 
     active_runtime: Option<Box<dyn EffectRuntime>>,
     /// Pluginインスタンス
-    output_plugins: HashMap<OutputPluginId, Box<dyn Plugin>>,
+    blocking_output_plugins: HashMap<OutputPluginId, Box<dyn BlockingPlugin>>,
     /// どのPluginがどのUniverseに出力するか
     output_map: HashMap<OutputPluginId, HashSet<UniverseId>>,
 
@@ -47,7 +47,7 @@ impl Engine {
             command_rx,
             message_tx,
             active_runtime: None,
-            output_plugins: HashMap::new(),
+            blocking_output_plugins: HashMap::new(),
             universe_states: HashMap::new(),
             output_map: HashMap::new(),
             live_values: HashMap::new(),
@@ -114,14 +114,14 @@ impl Engine {
                 }
                 EngineCommand::AddPlugin(p) => {
                     let id = p.id();
-                    self.output_plugins.insert(id, p);
+                    self.blocking_output_plugins.insert(id, p);
                     self.output_map.insert(id, HashSet::new());
                 }
                 EngineCommand::AddPluginDestination {
                     plugin,
                     dest_universe,
                 } => {
-                    if !self.output_plugins.contains_key(&plugin) {
+                    if !self.blocking_output_plugins.contains_key(&plugin) {
                         self.message_tx
                             .send(EngineMessage::ErrorOccured(
                                 EngineError::OutputPluginNotFound { id: plugin },
@@ -143,7 +143,7 @@ impl Engine {
                     plugin,
                     dest_universe,
                 } => {
-                    if !self.output_plugins.contains_key(&plugin) {
+                    if !self.blocking_output_plugins.contains_key(&plugin) {
                         self.message_tx
                             .send(EngineMessage::ErrorOccured(
                                 EngineError::OutputPluginNotFound { id: plugin },
@@ -186,7 +186,7 @@ impl Engine {
 
     fn dispatch_outputs(&mut self) {
         self.output_map.par_iter().for_each(|(p_id, u_ids)| {
-            let Some(plugin) = self.output_plugins.get(p_id) else {
+            let Some(plugin) = self.blocking_output_plugins.get(p_id) else {
                 warn!(plugin_id = %p_id, "plugin not found"); // FIXME: message_txでエラーを送るべき？
                 return;
             };
@@ -293,7 +293,7 @@ pub enum EngineCommand {
         channel: String,
         value: u8,
     },
-    AddPlugin(Box<dyn Plugin>),
+    AddPlugin(Box<dyn BlockingPlugin>),
     AddPluginDestination {
         plugin: OutputPluginId,
         dest_universe: UniverseId,

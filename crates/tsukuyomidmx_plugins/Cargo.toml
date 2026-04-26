@@ -1,0 +1,21 @@
+[package]
+name = "tsukuyomidmx-plugins"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+tsukuyomidmx-core = { path = "../tsukuyomidmx_core" }
+
+artnet_protocol = "0.4.3"
+ftdi = "0.1.3"
+
+tracing = { workspace = true }
+tonic = { version = "0.14.5" }
+prost = "0.14.3"
+tonic-prost = "0.14.5"
+
+[build-dependencies]
+tonic-prost-build = "0.14.5"
+
+[dev-dependencies]
+tokio = { version = "1.52.1", features = ["rt", "macros", "process"] }

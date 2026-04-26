@@ -26,8 +26,6 @@ use crate::{
 };
 use tracing::instrument;
 
-declare_id_newtype!(OutputPluginId);
-
 /// Facade of [`DocState`].
 ///
 /// Orchestrates `decider`, `commands`, `subscribers` etc.

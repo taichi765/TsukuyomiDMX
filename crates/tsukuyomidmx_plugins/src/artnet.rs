@@ -3,8 +3,7 @@ use std::net::{SocketAddr, UdpSocket};
 use artnet_protocol::{ArtCommand, Output};
 use tracing::info;
 
-use crate::{
-    doc::OutputPluginId,
+use tsukuyomidmx_core::{
     plugins::{DmxFrame, Plugin},
     universe::UniverseId,
 };

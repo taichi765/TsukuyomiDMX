@@ -61,7 +61,7 @@ pub mod universe;
 
 pub mod prelude {
     pub use super::{
-        doc::{Doc, OutputPluginId},
+        doc::{Doc, DocStateView},
         effects::EffectId,
         fixture::{Fixture, FixtureId, MergeMode},
         fixture_def::{

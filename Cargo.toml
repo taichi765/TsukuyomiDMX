@@ -5,6 +5,7 @@ members = [
     "crates/slint_model_ext",
     "crates/ofl_schemes",
     "crates/tsukuyomidmx_dsl",
+    "crates/tsukuyomidmx_plugins",
 ]
 resolver = "3"
 

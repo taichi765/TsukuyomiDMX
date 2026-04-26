@@ -1,21 +1,30 @@
+//! Plugin's trait definition, data structures etc.
+
 use std::{
     fmt::Debug,
     sync::{Arc, RwLock},
 };
 
-use crate::{
-    doc::OutputPluginId,
-    universe::{DmxAddress, UniverseId},
-};
+use crate::prelude::{DmxAddress, UniverseId};
 
-pub mod artnet;
-mod ola;
-pub use ola::OlaPlugin;
+declare_id_newtype!(OutputPluginId);
 
-pub trait Plugin: Send + Sync + Debug {
+/// Blocking output plugin.
+pub trait BlockingPlugin: Send + Sync + Debug {
     fn id(&self) -> OutputPluginId;
 
     fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error>;
+}
+
+/// Asynchronous output plugin.
+pub trait AsyncPlugin: Send + Sync + Debug {
+    fn id(&self) -> OutputPluginId;
+
+    fn send_dmx(
+        &mut self,
+        universe_id: UniverseId,
+        dmx_data: DmxFrame,
+    ) -> impl std::future::Future<Output = Result<(), std::io::Error>> + Send;
 }
 
 #[derive(derive_more::Debug)]
@@ -25,7 +34,7 @@ pub struct SpyPlugin {
     pub data: Arc<RwLock<Vec<DmxFrame>>>,
 }
 
-impl Plugin for SpyPlugin {
+impl BlockingPlugin for SpyPlugin {
     fn id(&self) -> OutputPluginId {
         self.id
     }
@@ -47,7 +56,7 @@ impl SpyPlugin {
 
 #[derive(Debug)]
 pub struct DmxFrame {
-    data: [u8; 512], // FIXME: &[u8]の方がいい？
+    pub data: [u8; 512], // FIXME: &[u8]の方がいい？
 }
 
 impl DmxFrame {

@@ -7,7 +7,7 @@ use tsukuyomidmx_core::{
     doc::Doc,
     effects::Effect,
     engine::{Engine, EngineCommand},
-    plugins::{Plugin, SpyPlugin},
+    plugins::{BlockingPlugin, SpyPlugin},
     prelude::{DmxAddress, Fixture, FixtureDefId, UniverseId},
 };
 
