@@ -490,7 +490,7 @@ mod tests {
             panic!("should match")
         };
 
-        let new_values = HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 200)]);
+        let new_values = HashMap::from([(0, 255), (1, 200)]);
         let new = SimpleEffectBody::New {
             fixtures: fixtures.clone(),
             values: new_values,
@@ -506,7 +506,7 @@ mod tests {
             panic!("should match")
         };
 
-        let new_values = HashMap::from([((fxt_id, 0), 0), ((fxt_id, 1), 100), ((fxt_id, 2), 255)]);
+        let new_values = HashMap::from([(0, 0), (1, 100), (2, 255)]);
         let new = SimpleEffectBody::New {
             fixtures: fixtures.clone(),
             values: new_values,

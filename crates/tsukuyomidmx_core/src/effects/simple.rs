@@ -18,35 +18,30 @@ impl SimpleEffectSpecBody {
         &self,
         fixtures: &FixtureQuery,
         given_props: HashMap<String, Value>,
-        doc: DocStateView,
+        doc: impl FixtureQueryResolver + GetDimmerAndColorChannel,
     ) -> Box<dyn EffectRuntime> {
-        let fixtures = fixtures.query(doc.clone());
-        debug_assert_ne!(fixtures.len(), 0);
+        let (dimmer_channel, color_channel) = doc.get_dimmer_and_color(fixtures.fixture_model());
+        let mut values = HashMap::new();
 
-        let values = fixtures.iter().fold(HashMap::new(), |mut acc, fxt_id| {
-            let (dimmer_channel, color_channel) = doc.get_dimmer_and_color(*fxt_id);
+        if let Some(val) = &self.dimmer {
+            let val = match val {
+                Expression::Value(val) => val.clone(),
+                Expression::Prop(p_name) => given_props.get(p_name).cloned().unwrap(),
+            };
+            values.insert(dimmer_channel.unwrap(), val.unwrap_dimmer());
+        }
 
-            if let Some(val) = &self.dimmer {
-                let val = match val {
-                    Expression::Value(val) => val.clone(),
-                    Expression::Prop(p_name) => given_props.get(p_name).cloned().unwrap(),
-                };
-                acc.insert((*fxt_id, dimmer_channel.unwrap()), val.unwrap_dimmer());
+        if let Some(val) = &self.color {
+            let val = match val {
+                Expression::Value(val) => val.clone(),
+                Expression::Prop(p_name) => given_props.get(p_name).cloned().unwrap(),
+            };
+            for (i, ch) in color_channel.unwrap().iter().enumerate() {
+                values.insert(*ch, val.unwrap_color()[i]);
             }
+        }
 
-            if let Some(val) = &self.color {
-                let val = match val {
-                    Expression::Value(val) => val.clone(),
-                    Expression::Prop(p_name) => given_props.get(p_name).cloned().unwrap(),
-                };
-                for (i, ch) in color_channel.unwrap().iter().enumerate() {
-                    acc.insert((*fxt_id, *ch), val.unwrap_color()[i]);
-                }
-            }
-            acc
-        });
-
-        Box::new(SimpleEffectRuntime::new(values))
+        Box::new(SimpleEffectRuntime::new(values, fixtures, doc))
     }
 }
 
@@ -61,7 +56,8 @@ pub enum SimpleEffectTemplateBody {
     // TODO: FromTemplate(),
     New {
         fixtures: FixtureQuery,
-        values: HashMap<(FixtureId, usize), u8>,
+        /// offset -> value
+        values: HashMap<usize, u8>,
         dimmer: Expression,
         color: Expression,
         props: HashMap<String, Type>,
@@ -121,16 +117,7 @@ impl SimpleEffectTemplateBody {
                     Expression::Prop(p_name) => given_props.get(p_name).unwrap().unwrap_color(),
                 };
 
-                let fixtures = fixtures.query(doc.clone());
-                let values = fixtures.iter().fold(values.clone(), |mut acc, fxt_id| {
-                    let (dimmer_ch, color_ch) = doc.clone().get_dimmer_and_color(*fxt_id);
-                    acc.insert((*fxt_id, dimmer_ch.unwrap()), dimmer);
-                    color.iter().zip(color_ch.unwrap()).for_each(|(val, ch)| {
-                        acc.insert((*fxt_id, ch), *val);
-                    });
-                    acc
-                });
-                Box::new(SimpleEffectRuntime::new(values))
+                Box::new(SimpleEffectRuntime::new(values.clone(), fixtures, doc))
             }
         }
     }
@@ -150,7 +137,8 @@ pub enum SimpleEffectBody {
     },
     New {
         fixtures: FixtureQuery,
-        values: HashMap<(FixtureId, usize), u8>,
+        /// offset -> value
+        values: HashMap<usize, u8>,
     },
 }
 
@@ -164,14 +152,16 @@ impl SimpleEffectBody {
 
     pub(super) fn create_runtime(
         &self,
-        doc: impl PropsResolver<EffectTemplateId>,
+        doc: impl FixtureQueryResolver + PropsResolver<EffectTemplateId>,
     ) -> Box<dyn EffectRuntime> {
         match self {
             Self::FromTemplate {
                 tmpl_id,
                 tmpl_props,
             } => doc.resolve_props(*tmpl_id, tmpl_props.clone()),
-            Self::New { fixtures, values } => Box::new(SimpleEffectRuntime::new(values.clone())),
+            Self::New { fixtures, values } => {
+                Box::new(SimpleEffectRuntime::new(values.clone(), fixtures, doc))
+            }
         }
     }
 }
@@ -195,17 +185,25 @@ impl EffectRuntime for SimpleEffectRuntime {
 }
 
 impl SimpleEffectRuntime {
-    pub(super) fn new(values: HashMap<(FixtureId, usize), u8>) -> Self {
-        Self {
-            commands: values
-                .iter()
-                .map(|((fxt_id, offset), val)| EffectCommand::WriteUniverse {
-                    fixture_id: *fxt_id,
-                    channel: *offset,
-                    value: *val,
-                })
-                .collect(),
-        }
+    fn new(
+        values: HashMap<usize, u8>,
+        fixtures: &FixtureQuery,
+        doc: impl FixtureQueryResolver,
+    ) -> Self {
+        let fixtures = doc.resolve_query(fixtures);
+        let commands = fixtures
+            .iter()
+            .flat_map(|&fxt_id| {
+                values
+                    .iter()
+                    .map(move |(&offset, &val)| EffectCommand::WriteUniverse {
+                        fixture_id: fxt_id,
+                        channel: offset,
+                        value: val,
+                    })
+            })
+            .collect();
+        Self { commands }
     }
 }
 
@@ -220,7 +218,7 @@ enum SimpleEffectBodyDto {
     },
     New {
         fixtures: FixtureQuery,
-        values: Vec<(FixtureId, usize, u8)>,
+        values: Vec<(usize, u8)>,
     },
 }
 
@@ -238,7 +236,7 @@ impl From<SimpleEffectBody> for SimpleEffectBodyDto {
                 fixtures,
                 values: values
                     .into_iter()
-                    .map(|((fxt_id, offset), val)| (fxt_id, offset, val))
+                    .map(|(offset, val)| (offset, val))
                     .collect(),
             },
         }
@@ -259,7 +257,7 @@ impl From<SimpleEffectBodyDto> for SimpleEffectBody {
                 fixtures,
                 values: values
                     .into_iter()
-                    .map(|(fxt_id, offset, val)| ((fxt_id, offset), val))
+                    .map(|(offset, val)| (offset, val))
                     .collect(),
             },
         }
@@ -294,26 +292,8 @@ impl EffectRegistry<SimpleEffectSpecBody, SimpleEffectTemplateBody> for DocState
     }
 }
 
-trait DocStateViewExt {
-    fn get_dimmer_and_color(&self, fxt_id: FixtureId) -> (Option<usize>, Option<[usize; 3]>);
-}
-
-impl DocStateViewExt for DocStateView {
-    /// Get the offset of dimmer channel and color channel in the fixture.
-    fn get_dimmer_and_color(&self, fxt_id: FixtureId) -> (Option<usize>, Option<[usize; 3]>) {
-        self.with_fixtures_and_defs(|fxts, defs| {
-            let fxt = fxts.get(&fxt_id).unwrap();
-            let def = defs.get(fxt.fixture_def()).unwrap();
-            let dimmer_channel = def.find_dimmer_channel_in_mode(fxt.fixture_mode());
-            let color_channel = def.find_rgb_channel_in_mode(fxt.fixture_mode());
-            (dimmer_channel, color_channel)
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     fn create_simple_effect_with_some_values() -> (Effect, FixtureId) {
@@ -324,7 +304,7 @@ mod tests {
             panic!("should match")
         };
 
-        let new_values = HashMap::from([((fxt_id, 0), 255), ((fxt_id, 1), 200)]);
+        let new_values = HashMap::from([(0, 255), (1, 200)]);
         let new = SimpleEffectBody::New {
             fixtures: fixtures.clone(),
             values: new_values,

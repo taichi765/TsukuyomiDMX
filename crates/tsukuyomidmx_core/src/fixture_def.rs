@@ -6,6 +6,7 @@ use std::{
 
 use bimap::BiHashMap;
 use derive_getters::Getters;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
@@ -15,7 +16,8 @@ use crate::{
 };
 pub use ofl::*;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "FixtureDefIdDto", into = "FixtureDefIdDto")]
 pub struct FixtureDefId(Arc<(ofl_schemas::NonEmptyString, ofl_schemas::NonEmptyString)>);
 
 impl FixtureDefId {
@@ -59,6 +61,27 @@ impl TryFrom<&str> for FixtureDefId {
 impl Display for FixtureDefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}", self.0.1, self.0.0) // TODO: manufacturerやmodelの中に'@'が含まれていないことは保証されていない
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FixtureDefIdDto {
+    manufacturer: String,
+    model: String,
+}
+
+impl From<FixtureDefId> for FixtureDefIdDto {
+    fn from(value: FixtureDefId) -> Self {
+        Self {
+            manufacturer: value.0.0.clone(),
+            model: value.0.1.clone(),
+        }
+    }
+}
+
+impl From<FixtureDefIdDto> for FixtureDefId {
+    fn from(value: FixtureDefIdDto) -> Self {
+        Self(Arc::new((value.manufacturer, value.model)))
     }
 }
 

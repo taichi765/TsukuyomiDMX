@@ -13,6 +13,7 @@ use tracing::warn;
 
 use crate::doc::DocStateView;
 use crate::fixture::{FixtureId, FixtureTag};
+use crate::prelude::FixtureDefId;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::time::Duration;
@@ -383,19 +384,14 @@ impl Value {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixtureQuery {
     string: String,
-    data: Vec<Selector>,
-}
-
-/// [`FixtureQuery`]で指定できるselector.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Selector {
-    Id(FixtureId),
-    Tags(Vec<FixtureTag>),
+    model: FixtureDefId,
+    tags: Vec<FixtureTag>,
 }
 
 impl FixtureQuery {
     pub fn from_str(val: impl Into<String>) -> Option<Self> {
-        let val = val.into();
+        todo!()
+        /*let val = val.into();
         let selector = if val.chars().next()? == '#' {
             Selector::Id(Self::parse_id(val.chars()).expect("todo: Errを返す"))
         } else if val.chars().next().unwrap() == '.' {
@@ -406,34 +402,21 @@ impl FixtureQuery {
         Some(Self {
             string: val,
             data: vec![selector], // TODO: カンマで複数指定
-        })
+        })*/
+    }
+
+    pub fn fixture_model(&self) -> FixtureDefId {
+        self.model.clone()
     }
 
     /// queryにmatchするFixtureを全て返す
     pub fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
-        self.data.iter().fold(Vec::new(), |mut acc, v| {
-            match v {
-                Selector::Id(id) => {
-                    doc.with_fixtures(|it| {
-                        if it.contains_key(id) {
-                            acc.push(id.to_owned());
-                        } else {
-                            warn!(?id, "fixture does not exist");
-                        };
-                    });
-                }
-                Selector::Tags(tags) => doc.with_fixtures(|it| {
-                    let mut fxts = it
-                        .iter()
-                        .filter(|(_, fxt)| tags.iter().any(|tag| fxt.tags().contains(tag)))
-                        .map(|(fxt_id, _)| fxt_id)
-                        .cloned()
-                        .collect();
-                    acc.append(&mut fxts);
-                }),
-            }
-
-            acc
+        doc.with_fixtures(|it| {
+            it.iter()
+                .filter(|(_, fxt)| self.tags.iter().any(|tag| fxt.tags().contains(tag)))
+                .map(|(fxt_id, _)| fxt_id)
+                .cloned()
+                .collect()
         })
     }
 
@@ -458,8 +441,10 @@ impl FixtureQuery {
 impl Default for FixtureQuery {
     fn default() -> Self {
         Self {
-            string: ".some-tag".to_string(),
-            data: vec![Selector::Tags(vec![FixtureTag::new("some-tag").unwrap()])],
+            // TODO: hardcode
+            string: "#american-dj__pocket-pro.some-tag".to_string(),
+            model: FixtureDefId::new("american-dj".into(), "pocket-pro".into()),
+            tags: vec![FixtureTag::new("some-tag").unwrap()],
         }
     }
 }
@@ -528,6 +513,36 @@ impl PropsResolver<EffectTemplateId> for DummyPropsResolver {
         // fixtures: &FixtureQuery,
     ) -> Box<dyn EffectRuntime> {
         unimplemented!("This is dummy!")
+    }
+}
+
+// TODO: Docの拡張/抽象化系のトレイトはまとめてもいい気がする
+/// Resolves [`FixtureQuery`] to `Vec<FixtureId>`.
+trait FixtureQueryResolver {
+    fn resolve_query(&self, fixtures: &FixtureQuery) -> Vec<FixtureId>;
+}
+
+impl FixtureQueryResolver for DocStateView {
+    fn resolve_query(&self, fixtures: &FixtureQuery) -> Vec<FixtureId> {
+        fixtures.query(self.clone())
+    }
+}
+
+trait GetDimmerAndColorChannel {
+    /// Get the offset of dimmer channel and color channel in the fixture.
+    fn get_dimmer_and_color(&self, def_id: FixtureDefId) -> (Option<usize>, Option<[usize; 3]>);
+}
+
+impl GetDimmerAndColorChannel for DocStateView {
+    fn get_dimmer_and_color(&self, def_id: FixtureDefId) -> (Option<usize>, Option<[usize; 3]>) {
+        self.with_fixture_defs(|it| {
+            let def = it.get(&def_id).unwrap();
+            // TODO! FixtureTagでmodeを指定するなどまともな方法を考える
+            let dummy_mode = def.modes_all().keys().next().unwrap();
+            let dimmer_channel = def.find_dimmer_channel_in_mode(dummy_mode);
+            let color_channel = def.find_rgb_channel_in_mode(dummy_mode);
+            (dimmer_channel, color_channel)
+        })
     }
 }
 
