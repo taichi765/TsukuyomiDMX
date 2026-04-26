@@ -1,6 +1,15 @@
-use std::ops::ControlFlow;
+use std::{collections::HashMap, ops::ControlFlow, time::Duration};
 
-use super::*;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    doc::DocStateView,
+    effects::{
+        CreateRuntime, EffectCommand, EffectId, EffectRuntime, EffectSpecId, EffectTemplateId,
+        Expression, FixtureQuery, PropsResolver, Type, Value,
+    },
+    fixture::FixtureId,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceTemplateStepBase<T> {
@@ -250,11 +259,11 @@ impl EffectRuntime for SequenceEffectRuntime {
     }
 
     fn first_frame_hint(&self) -> Vec<EffectCommand> {
-        self.steps.get(0).unwrap().runtime.first_frame_hint()
+        self.steps.get(0).unwrap().first_frame_hint()
     }
 
     fn last_frame_hint(&self) -> Vec<EffectCommand> {
-        self.steps.last().unwrap().runtime.first_frame_hint()
+        self.steps.last().unwrap().last_frame_hint()
     }
 }
 
@@ -452,6 +461,8 @@ impl StepRuntime {
 mod tests {
     use std::cell::RefCell;
 
+    use crate::effects::{DummyResolver, Effect, EffectBody, EffectChange, SimpleEffectBody};
+
     use super::*;
 
     struct StubCreateRuntime {
@@ -563,11 +574,11 @@ mod tests {
         let stub = StubCreateRuntime::new([
             (
                 simple_1.id(),
-                simple_1.unwrap_simple().create_runtime(DummyPropsResolver),
+                simple_1.unwrap_simple().create_runtime(DummyResolver),
             ),
             (
                 simple_2.id(),
-                simple_2.unwrap_simple().create_runtime(DummyPropsResolver),
+                simple_2.unwrap_simple().create_runtime(DummyResolver),
             ),
         ]);
 

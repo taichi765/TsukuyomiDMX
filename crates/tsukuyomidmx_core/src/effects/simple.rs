@@ -1,4 +1,15 @@
-use super::*;
+use std::{collections::HashMap, time::Duration};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    doc::DocStateView,
+    effects::{
+        EffectCommand, EffectRegistry, EffectRuntime, EffectSpecBody, EffectSpecId,
+        EffectTemplateBody, EffectTemplateId, Expression, FixtureQuery, FixtureQueryResolver,
+        GetDimmerAndColorChannel, PropsResolver, Type, Value,
+    },
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SimpleEffectSpecBody {
@@ -294,6 +305,11 @@ impl EffectRegistry<SimpleEffectSpecBody, SimpleEffectTemplateBody> for DocState
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        effects::{DummyResolver, Effect, EffectBody, EffectChange},
+        fixture::FixtureId,
+    };
+
     use super::*;
 
     fn create_simple_effect_with_some_values() -> (Effect, FixtureId) {
@@ -330,7 +346,7 @@ mod tests {
         let (effect, fxt_id) = create_simple_effect_with_some_values();
 
         let mut rt = if let EffectBody::Simple(body) = effect.body() {
-            body.create_runtime(DummyPropsResolver)
+            body.create_runtime(DummyResolver)
         } else {
             panic!("should match")
         };
@@ -362,7 +378,7 @@ mod tests {
         let (effect, _) = create_simple_effect_with_some_values();
 
         let rt = if let EffectBody::Simple(body) = effect.body() {
-            body.create_runtime(DummyPropsResolver)
+            body.create_runtime(DummyResolver)
         } else {
             panic!("should match")
         };

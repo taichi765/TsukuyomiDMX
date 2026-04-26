@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{Arc, mpsc},
     time::Duration,
 };
@@ -26,7 +25,7 @@ fn engine_can_start_function() {
         0.,
         0.,
     );
-    let fxt_id = fxt.id();
+    //let fxt_id = fxt.id();
     doc.add_fixture(fxt).unwrap();
 
     let fun = Effect::new_simple("Scene 1");

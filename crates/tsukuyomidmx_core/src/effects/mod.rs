@@ -9,7 +9,6 @@ pub use simple::{SimpleEffectBody, SimpleEffectSpecBody, SimpleEffectTemplateBod
 
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
 use crate::doc::DocStateView;
 use crate::fixture::{FixtureId, FixtureTag};
@@ -100,21 +99,6 @@ impl EffectSpec {
             }
             EffectSpecChange::Sequence(body) => self.body = EffectSpecBody::Sequence(body),
             EffectSpecChange::Parallel(body) => self.body = EffectSpecBody::Parallel(body),
-        }
-    }
-}
-
-impl EffectSpecBody {
-    fn resolve_props(
-        &self,
-        fixtures: &FixtureQuery,
-        given_props: HashMap<String, Value>,
-        doc: DocStateView,
-    ) -> Box<dyn EffectRuntime> {
-        match self {
-            Self::Simple(body) => body.resolve_props(fixtures, given_props, doc),
-            Self::Sequence(body) => body.resolve_props(given_props, doc),
-            Self::Parallel(body) => body.resolve_props(given_props, doc),
         }
     }
 }
@@ -502,16 +486,27 @@ impl PropsResolver<&(EffectSpecId, FixtureQuery)> for DocStateView {
     }
 }
 
+/// Dummy implementor for [`PropsResolver`] etc. This is intended to be used in
+/// test which doesn't use `EffectSpec` and `EffectTemplate`
 /// Panics when [`PropsResolver::resolve_props()`] is called.
-struct DummyPropsResolver;
+#[cfg(test)]
+struct DummyResolver;
 
-impl PropsResolver<EffectTemplateId> for DummyPropsResolver {
+#[cfg(test)]
+impl PropsResolver<EffectTemplateId> for DummyResolver {
     fn resolve_props(
         &self,
         id: EffectTemplateId,
         given_props: HashMap<String, Value>,
         // fixtures: &FixtureQuery,
     ) -> Box<dyn EffectRuntime> {
+        unimplemented!("This is dummy!")
+    }
+}
+
+#[cfg(test)]
+impl FixtureQueryResolver for DummyResolver {
+    fn resolve_query(&self, fixtures: &FixtureQuery) -> Vec<FixtureId> {
         unimplemented!("This is dummy!")
     }
 }
