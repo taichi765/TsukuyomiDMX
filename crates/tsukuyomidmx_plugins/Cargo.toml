@@ -15,8 +15,6 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
-[build-dependencies]
-tonic-prost-build = "0.14.5"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "process"] }
