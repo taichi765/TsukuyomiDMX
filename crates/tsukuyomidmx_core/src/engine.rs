@@ -1,13 +1,14 @@
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thiserror::Error;
+use tokio::sync::watch;
+use tokio::task;
 use tracing::{debug, info, warn};
 
 use crate::doc::{DocStateView, ResolveError, ResolvedAddress};
 use crate::effects::{EffectCommand, EffectId, EffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::plugins::{DmxFrame, OutputPluginId};
+use crate::plugins::{DmxFrame, OutputPluginId, PluginInfo, PluginMessage};
 use crate::universe::UniverseId;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
@@ -25,9 +26,11 @@ pub struct Engine {
 
     active_runtime: Option<Box<dyn EffectRuntime>>,
     /// Pluginインスタンス
-    blocking_output_plugins: HashMap<OutputPluginId, Box<dyn BlockingPlugin>>,
+    //blocking_output_plugins: HashMap<OutputPluginId, Box<dyn BlockingPlugin>>,
     /// どのPluginがどのUniverseに出力するか
-    output_map: HashMap<OutputPluginId, HashSet<UniverseId>>,
+    //output_map: HashMap<OutputPluginId, HashSet<UniverseId>>,
+    plugins: Vec<(UniverseId, watch::Sender<PluginMessage>)>,
+    plugin_handles: Vec<tokio::task::JoinHandle<()>>,
 
     universe_states: HashMap<UniverseId, UniverseState>,
     /// シンプル卓など一時的な値
@@ -47,20 +50,31 @@ impl Engine {
             command_rx,
             message_tx,
             active_runtime: None,
-            blocking_output_plugins: HashMap::new(),
             universe_states: HashMap::new(),
-            output_map: HashMap::new(),
+            plugins: Vec::new(),
+            plugin_handles: Vec::new(),
             live_values: HashMap::new(),
             should_shutdown: false,
         }
     }
 
-    pub fn start_loop(mut self) {
+    /// Main entry point of [`Engine`].
+    #[tokio::main]
+    pub async fn start_loop(mut self) {
         info!("starting engine...");
         loop {
             self.handle_engine_commands();
 
             if self.should_shutdown {
+                // TODO: JoinHandleとSenderが同じ順序というのは実装依存なので、一つのVecにまとめるなどしたい
+                for (join, tx) in self
+                    .plugin_handles
+                    .into_iter()
+                    .zip(self.plugins.iter().map(|(_, tx)| tx))
+                {
+                    tx.send(PluginMessage::Stop).unwrap();
+                    join.await.expect("failed to join on plugin task");
+                }
                 break;
             }
 
@@ -112,54 +126,14 @@ impl Engine {
                         let _ = self.live_values.insert((fixture_id, channel), value);
                     }
                 }
-                EngineCommand::AddPlugin(p) => {
-                    let id = p.id();
-                    self.blocking_output_plugins.insert(id, p);
-                    self.output_map.insert(id, HashSet::new());
-                }
-                EngineCommand::AddPluginDestination {
-                    plugin,
-                    dest_universe,
-                } => {
-                    if !self.blocking_output_plugins.contains_key(&plugin) {
-                        self.message_tx
-                            .send(EngineMessage::ErrorOccured(
-                                EngineError::OutputPluginNotFound { id: plugin },
-                            ))
-                            .expect("failed to send message from engine")
-                    }
-                    let dests = self.output_map.get_mut(&plugin).unwrap();
-                    if dests.contains(&dest_universe) {
-                        warn!(
-                            ?plugin,
-                            ?dest_universe,
-                            "universe already exists in output_map. command is ignored."
-                        )
-                    } else {
-                        dests.insert(dest_universe);
-                    }
-                }
-                EngineCommand::RemovePluginDestination {
-                    plugin,
-                    dest_universe,
-                } => {
-                    if !self.blocking_output_plugins.contains_key(&plugin) {
-                        self.message_tx
-                            .send(EngineMessage::ErrorOccured(
-                                EngineError::OutputPluginNotFound { id: plugin },
-                            ))
-                            .expect("failed to send message from engine");
-                    }
-                    let dests = self.output_map.get_mut(&plugin).unwrap();
-                    if !dests.contains(&dest_universe) {
-                        warn!(
-                            ?plugin,
-                            ?dest_universe,
-                            "universe does not exist in output_map. command is ignored."
-                        );
-                    } else {
-                        dests.insert(dest_universe);
-                    }
+                EngineCommand::AddPlugin(info) => {
+                    let univ = info.universe();
+                    let (tx, rx) = watch::channel(PluginMessage::DmxFrame(DmxFrame::zeros()));
+                    let plugin = info.create_instance(rx);
+                    let handle =
+                        task::spawn(async move { plugin.start().await.expect("plugin exited") });
+                    self.plugins.push((univ, tx));
+                    self.plugin_handles.push(handle);
                 }
                 EngineCommand::Shutdown => self.should_shutdown = true,
             }
@@ -184,27 +158,16 @@ impl Engine {
         }
     }
 
+    /// Send dmx frame to all output plugins.
     fn dispatch_outputs(&mut self) {
-        self.output_map.par_iter().for_each(|(p_id, u_ids)| {
-            let Some(plugin) = self.blocking_output_plugins.get(p_id) else {
-                warn!(plugin_id = %p_id, "plugin not found"); // FIXME: message_txでエラーを送るべき？
-                return;
-            };
-            u_ids.iter().for_each(|u_id| {
-                let Some(universe_data) = self.universe_states.get(u_id) else {
-                    warn!(universe_id = ?u_id, "universe state not created");
-                    return;
-                };
-                if let Err(e) = plugin.send_dmx(*u_id, DmxFrame::from(universe_data.values)) {
-                    self.message_tx
-                        .send(EngineMessage::ErrorOccured(EngineError::SendingDmx {
-                            universe_id: *u_id,
-                            plugin_id: *p_id,
-                            source: Box::new(e),
-                        }))
-                        .unwrap();
-                }
-            });
+        self.plugins.iter().for_each(|(univ, plugin)| {
+            let frame = self
+                .universe_states
+                .get(univ)
+                .expect("universe states not initialized"); // TODO: tracingに出力
+            plugin
+                .send(PluginMessage::DmxFrame(DmxFrame::from(frame.values)))
+                .unwrap();
         });
     }
 
@@ -293,15 +256,7 @@ pub enum EngineCommand {
         channel: String,
         value: u8,
     },
-    AddPlugin(Box<dyn BlockingPlugin>),
-    AddPluginDestination {
-        plugin: OutputPluginId,
-        dest_universe: UniverseId,
-    },
-    RemovePluginDestination {
-        plugin: OutputPluginId,
-        dest_universe: UniverseId,
-    },
+    AddPlugin(Box<dyn PluginInfo>),
     Shutdown,
 
     // Events

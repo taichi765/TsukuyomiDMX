@@ -422,7 +422,6 @@ impl StepRuntime {
         };
 
         if self.time_to_next_action > elapsed {
-            println!("branch 1");
             // action継続
             self.time_to_next_action -= elapsed;
             dbg!(self.time_to_next_action);
@@ -430,13 +429,11 @@ impl StepRuntime {
         }
 
         if self.running_state == SequenceStepState::Hold {
-            println!("branch 2");
             (
                 commands,
                 ControlFlow::Break(elapsed - self.time_to_next_action),
             )
         } else {
-            println!("branch 3");
             // FadeIn -> Hold
             self.running_state = SequenceStepState::Hold;
             self.time_to_next_action = self.hold - (elapsed - self.time_to_next_action);

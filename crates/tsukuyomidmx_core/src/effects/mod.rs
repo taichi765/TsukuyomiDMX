@@ -389,6 +389,18 @@ impl FixtureQuery {
         })*/
     }
 
+    pub fn from_model(def_id: FixtureDefId, doc: DocStateView) -> Option<Self> {
+        let string = doc.with_fixture_defs(|it| {
+            let def = it.get(&def_id).ok()?; // TODO: Resultを返す
+            Some(format!("#{}__{}", def.manufacturer(), def.model()))
+        })?;
+        Some(Self {
+            string,
+            model: def_id,
+            tags: Vec::new(),
+        })
+    }
+
     pub fn fixture_model(&self) -> FixtureDefId {
         self.model.clone()
     }
@@ -397,7 +409,7 @@ impl FixtureQuery {
     pub fn query(&self, doc: DocStateView) -> Vec<FixtureId> {
         doc.with_fixtures(|it| {
             it.iter()
-                .filter(|(_, fxt)| self.tags.iter().any(|tag| fxt.tags().contains(tag)))
+                .filter(|(_, fxt)| self.tags.iter().all(|tag| fxt.tags().contains(tag)))
                 .map(|(fxt_id, _)| fxt_id)
                 .cloned()
                 .collect()
