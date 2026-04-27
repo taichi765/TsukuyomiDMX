@@ -30,7 +30,7 @@ jobs:
           path: slint
       - uses: Swatinem/rust-cache@v2
       - name: Install fontconfig and protobuf-compiler
-        if: ${{matrix.os　==　'ubuntu-latest'}}
+        if: ${{matrix.os=='ubuntu-latest'}}
         run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev\
             protobuf-compiler
       - name: Build
