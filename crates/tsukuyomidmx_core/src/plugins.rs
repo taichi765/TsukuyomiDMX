@@ -9,22 +9,10 @@ use crate::prelude::{DmxAddress, UniverseId};
 
 declare_id_newtype!(OutputPluginId);
 
-/// Blocking output plugin.
-pub trait BlockingPlugin: Send + Sync + Debug {
+pub trait Plugin: Send + Sync + Debug {
     fn id(&self) -> OutputPluginId;
 
-    fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error>;
-}
-
-/// Asynchronous output plugin.
-pub trait AsyncPlugin: Send + Sync + Debug {
-    fn id(&self) -> OutputPluginId;
-
-    fn send_dmx(
-        &mut self,
-        universe_id: UniverseId,
-        dmx_data: DmxFrame,
-    ) -> impl std::future::Future<Output = Result<(), std::io::Error>> + Send;
+    fn start(&mut self) -> impl std::future::Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[derive(derive_more::Debug)]
@@ -34,16 +22,16 @@ pub struct SpyPlugin {
     pub data: Arc<RwLock<Vec<DmxFrame>>>,
 }
 
-impl BlockingPlugin for SpyPlugin {
+// TODO
+/*impl Plugin for SpyPlugin {
     fn id(&self) -> OutputPluginId {
         self.id
     }
 
-    fn send_dmx(&self, _universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error> {
-        self.data.write().unwrap().push(dmx_data);
-        Ok(())
+    async fn start(&mut self) -> Result<(), anyhow::Error> {
+        loop {}
     }
-}
+}*/
 
 impl SpyPlugin {
     pub fn new() -> Self {

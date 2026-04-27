@@ -1,85 +1,58 @@
-use std::fmt::Debug;
-use tonic::transport::{Channel, Endpoint};
-use tracing::info;
-use tsukuyomidmx_core::plugins::{AsyncPlugin, OutputPluginId};
+use std::{
+    io::ErrorKind,
+    sync::mpsc::{self, Sender},
+    thread::JoinHandle,
+};
 
-use crate::ola::ola_proto::{DmxData, ola_server_service_client::OlaServerServiceClient};
+use anyhow::Context;
+use ola::{
+    DmxBuffer,
+    config::{Config, ConnectError},
+};
+use tokio::sync::watch;
+use tsukuyomidmx_core::plugins::BlockingPlugin;
 
-mod ola_proto {
-    tonic::include_proto!("ola.proto");
-    tonic::include_proto!("ola.rpc");
-}
-
-const OLAD_DEFAULT_PORT: &'static str = "https://127.0.0.1:9010";
+use tsukuyomidmx_core::{
+    plugins::{DmxFrame, OutputPluginId, Plugin},
+    prelude::UniverseId,
+};
 
 #[derive(Debug)]
 pub struct OlaPlugin {
-    client: OlaServerServiceClient<Channel>,
     id: OutputPluginId,
+    universe: UniverseId,
+    rx: watch::Receiver<[u8; 512]>,
 }
 
-pub struct Builder {
-    port: String,
-}
-
-impl OlaPlugin {
-    /// Create OlaPlugin with default configuration. To configure, use [`OlaPlugin::builder()`].
-    pub async fn new() -> Result<Self, tonic::transport::Error> {
-        let client = OlaServerServiceClient::connect(OLAD_DEFAULT_PORT).await?;
-        info!(port = OLAD_DEFAULT_PORT, "successfully conneted to olad");
-        Ok(Self {
-            client,
-            id: OutputPluginId::new(),
-        })
-    }
-
-    pub fn builder() -> Builder {
-        Builder {
-            port: OLAD_DEFAULT_PORT.try_into().unwrap(),
-        }
-    }
-}
-
-impl Builder {
-    /// Port to send RPCs (should same as `--rpc-port` option of olad).
-    #[must_use]
-    pub fn port(self, port: &str) -> Builder {
-        Builder {
-            port: format!("https://127.0.0.1:{}", port),
-        }
-    }
-
-    pub async fn connect(self) -> Result<OlaPlugin, tonic::transport::Error> {
-        let port = self.port.clone();
-        let client = OlaServerServiceClient::connect(self.port).await?;
-        info!(?port, "successfully connected to olad");
-
-        Ok(OlaPlugin {
-            client,
-            id: OutputPluginId::new(),
-        })
-    }
-}
-
-impl AsyncPlugin for OlaPlugin {
+impl Plugin for OlaPlugin {
     fn id(&self) -> OutputPluginId {
         self.id
     }
 
-    async fn send_dmx(
-        &mut self,
-        universe_id: tsukuyomidmx_core::prelude::UniverseId,
-        dmx_data: tsukuyomidmx_core::plugins::DmxFrame,
-    ) -> Result<(), std::io::Error> {
-        let req = DmxData {
-            universe: universe_id.as_usize().try_into().unwrap(),
-            data: dmx_data.as_slice().iter().cloned().collect(), // OPTIM: ここのcloneはどうにかならないものか
-            priority: None,
-        };
-        self.client
-            .stream_dmx_data(req)
-            .await
-            .map_err(|status| std::io::Error::new(std::io::ErrorKind::Other, status))?;
-        Ok(())
+    async fn start(&mut self) -> Result<(), anyhow::Error> {
+        let config = Config::new();
+        let mut client = config
+            .connect()
+            .with_context(|| format!("failed to connect to olad at {}", "9010"))?;
+        let mut buf = DmxBuffer::from([0; 512]);
+        loop {
+            self.rx.changed().await.unwrap();
+            let frame = self.rx.borrow_and_update();
+            *buf = frame.clone();
+
+            client
+                .send_dmx(self.universe.as_usize() as u32, &buf)
+                .with_context(|| format!("failed to send dmx data to olad"))?;
+        }
+    }
+}
+
+impl OlaPlugin {
+    pub fn new(universe: UniverseId, rx: watch::Receiver<[u8; 512]>) -> Self {
+        Self {
+            id: OutputPluginId::new(),
+            universe,
+            rx,
+        }
     }
 }

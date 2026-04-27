@@ -8,14 +8,15 @@ tsukuyomidmx-core = { path = "../tsukuyomidmx_core" }
 
 artnet_protocol = "0.4.3"
 ftdi = "0.1.3"
+# Use forked version because original one is no longer maintained
+ola = { git = "https://github.com/taichi765/libola-rs" }
 
+anyhow = { workspace = true }
 tracing = { workspace = true }
-tonic = { version = "0.14.5" }
-prost = "0.14.3"
-tonic-prost = "0.14.5"
+tokio = { workspace = true, features = ["sync"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14.5"
 
 [dev-dependencies]
-tokio = { version = "1.52.1", features = ["rt", "macros", "process"] }
+tokio = { workspace = true, features = ["rt", "macros", "process"] }

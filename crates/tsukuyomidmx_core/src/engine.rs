@@ -5,7 +5,7 @@ use tracing::{debug, info, warn};
 use crate::doc::{DocStateView, ResolveError, ResolvedAddress};
 use crate::effects::{EffectCommand, EffectId, EffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::plugins::{BlockingPlugin, DmxFrame, OutputPluginId};
+use crate::plugins::{DmxFrame, OutputPluginId};
 use crate::universe::UniverseId;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
