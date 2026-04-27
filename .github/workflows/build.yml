@@ -31,7 +31,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install fontconfig and protobuf-compiler
         if: ${{matrix.os=='ubuntu-latest'}}
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev protobuf-compiler
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libfontconfig1-dev protobuf-compiler
+      - name: Install protobuf on MacOS
+        if: ${{matrix.os=='macos-14'}}
+        run: |
+          brew update
+          brew install protobuf
       - name: Build
         run: cargo build --release --verbose
         working-directory: ./tsukuyomi-rs-repo
