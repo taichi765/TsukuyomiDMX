@@ -1,6 +1,3 @@
 [submodule "open-fixture-library"]
 	path = open-fixture-library
 	url = https://github.com/OpenLightingProject/open-fixture-library
-[submodule "crates/tsukuyomidmx_plugins/ola"]
-	path = crates/tsukuyomidmx_plugins/ola
-	url = https://github.com/openlightingproject/ola
