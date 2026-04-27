@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: tsukuyomi-rs-repo
-          submodule: recursive
+          submodules: recursive
       - name: checkout slint repo
         uses: actions/checkout@v4
         with:
@@ -31,8 +31,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install fontconfig and protobuf-compiler
         if: ${{matrix.os=='ubuntu-latest'}}
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev\
-            protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev protobuf-compiler
       - name: Build
         run: cargo build --release --verbose
         working-directory: ./tsukuyomi-rs-repo
