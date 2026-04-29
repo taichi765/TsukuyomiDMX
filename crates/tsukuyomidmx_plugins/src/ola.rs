@@ -14,7 +14,7 @@ use tsukuyomidmx_core::{
 pub struct OlaPlugin {
     id: OutputPluginId,
     universe: UniverseId,
-    rx: watch::Receiver<PluginMessage>,
+    port: u16,
 }
 
 impl Plugin for OlaPlugin {
@@ -22,25 +22,33 @@ impl Plugin for OlaPlugin {
         self.id
     }
 
+    fn universe(&self) -> UniverseId {
+        self.universe
+    }
+
     fn start(
-        mut self: Box<Self>,
+        self: Box<Self>,
+        mut rx: watch::Receiver<PluginMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> {
         Box::pin(async move {
-            let config = Config::new();
+            let mut config = Config::new();
+            config.server_port = self.port;
             let mut client = config
-                .connect()
+                .connect_async()
+                .await
                 .with_context(|| format!("failed to connect to olad at {}", "9010"))?;
             let mut buf = DmxBuffer::from([0; 512]);
             loop {
-                self.rx.changed().await.unwrap();
-                let frame = match self.rx.borrow_and_update().deref() {
+                rx.changed().await.unwrap();
+                let frame = match rx.borrow_and_update().deref() {
                     PluginMessage::DmxFrame(frame) => frame.as_slice().to_owned(),
                     PluginMessage::Stop => break,
                 };
                 *buf = frame;
 
                 client
-                    .send_dmx(self.universe.as_usize() as u32, &buf)
+                    .send_dmx_streaming(self.universe.as_usize() as u32, &buf)
+                    .await
                     .with_context(|| format!("failed to send dmx data to olad"))?;
             }
             anyhow::Ok(())
@@ -49,11 +57,19 @@ impl Plugin for OlaPlugin {
 }
 
 impl OlaPlugin {
-    pub fn new(universe: UniverseId, rx: watch::Receiver<PluginMessage>) -> Self {
+    pub fn new(universe: UniverseId) -> Self {
         Self {
             id: OutputPluginId::new(),
             universe,
-            rx,
+            port: 9010,
+        }
+    }
+
+    pub fn new_with_port(universe: UniverseId, port: u16) -> Self {
+        Self {
+            id: OutputPluginId::new(),
+            universe,
+            port,
         }
     }
 }

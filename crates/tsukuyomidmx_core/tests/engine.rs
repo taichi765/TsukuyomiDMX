@@ -8,7 +8,7 @@ use tsukuyomidmx_core::{
     doc::Doc,
     effects::{Effect, EffectChange, FixtureQuery, SimpleEffectBody},
     engine::{Engine, EngineCommand},
-    plugins::SpyPluginInfo,
+    plugins::SpyPlugin,
     prelude::{DmxAddress, Fixture, FixtureDefId, UniverseId},
 };
 
@@ -62,12 +62,14 @@ fn engine_can_start_function() {
         engine.start_loop();
     });
 
-    let info = Box::new(SpyPluginInfo::new(UniverseId::MIN));
-    let data = Arc::clone(&info.data);
+    let plugin = SpyPlugin::new(UniverseId::new(0));
+    let data = Arc::clone(&plugin.data);
     command_tx
         .send(EngineCommand::UniverseAdded(UniverseId::new(0)))
         .unwrap();
-    command_tx.send(EngineCommand::AddPlugin(info)).unwrap();
+    command_tx
+        .send(EngineCommand::AddPlugin(Box::new(plugin)))
+        .unwrap();
     command_tx
         .send(EngineCommand::StartFunction(fx_id))
         .unwrap();

@@ -14,11 +14,20 @@ use crate::prelude::{DmxAddress, UniverseId};
 
 declare_id_newtype!(OutputPluginId);
 
-/// Runtime of output plugin.
+/// Output plugin.
 pub trait Plugin: Send + Sync + Debug {
     fn id(&self) -> OutputPluginId;
 
-    fn start(self: Box<Self>) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>;
+    fn universe(&self) -> UniverseId;
+
+    /// This function is called in [task::spawn()][tokio::task::spawn()], so
+    /// you should not perform a blocking operation.
+    /// If you need it, use [task::spawn_blocking()][tokio::task::spawn_blocking()]
+    /// inside the function.
+    fn start(
+        self: Box<Self>,
+        rx: watch::Receiver<PluginMessage>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>;
 }
 
 /// Message sent to running plugin.
@@ -28,64 +37,31 @@ pub enum PluginMessage {
     Stop,
 }
 
-/// Static data about plugin configuration.
-pub trait PluginInfo: Send + Sync + Debug {
-    /// Create instance of plugin ([`Plugin`]).
-    fn create_instance(&self, rx: watch::Receiver<PluginMessage>) -> Box<dyn Plugin>;
-
-    fn universe(&self) -> UniverseId;
-}
-
-#[derive(derive_more::Debug)]
+#[derive(derive_more::Debug, Clone)]
 pub struct SpyPlugin {
     id: OutputPluginId,
-    #[debug(skip)]
-    data: Arc<RwLock<Vec<DmxFrame>>>,
-    rx: watch::Receiver<PluginMessage>,
-}
-
-#[derive(Debug)]
-pub struct SpyPluginInfo {
     universe: UniverseId,
+    #[debug(skip)]
     pub data: Arc<RwLock<Vec<DmxFrame>>>,
 }
 
-impl PluginInfo for SpyPluginInfo {
-    fn create_instance(&self, rx: watch::Receiver<PluginMessage>) -> Box<dyn Plugin> {
-        Box::new(SpyPlugin {
-            id: OutputPluginId::new(),
-            data: Arc::clone(&self.data),
-            rx,
-        })
-    }
-
-    fn universe(&self) -> UniverseId {
-        self.universe
-    }
-}
-
-impl SpyPluginInfo {
-    pub fn new(universe: UniverseId) -> Self {
-        Self {
-            universe,
-            data: Arc::new(RwLock::new(Vec::new())),
-        }
-    }
-}
-
-// TODO
 impl Plugin for SpyPlugin {
     fn id(&self) -> OutputPluginId {
         self.id
     }
 
+    fn universe(&self) -> UniverseId {
+        self.universe
+    }
+
     fn start(
-        mut self: Box<SpyPlugin>,
+        self: Box<SpyPlugin>,
+        mut rx: watch::Receiver<PluginMessage>,
     ) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> {
         Box::pin(async move {
             loop {
-                self.rx.changed().await.unwrap();
-                let frame = match self.rx.borrow_and_update().deref() {
+                rx.changed().await.unwrap();
+                let frame = match rx.borrow_and_update().deref() {
                     PluginMessage::DmxFrame(frame) => frame.clone(),
                     PluginMessage::Stop => break,
                 };
@@ -93,6 +69,16 @@ impl Plugin for SpyPlugin {
             }
             anyhow::Ok(())
         })
+    }
+}
+
+impl SpyPlugin {
+    pub fn new(universe: UniverseId) -> Self {
+        Self {
+            id: OutputPluginId::new(),
+            universe,
+            data: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 }
 

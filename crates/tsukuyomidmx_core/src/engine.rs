@@ -6,7 +6,7 @@ use tracing::{debug, info, warn};
 use crate::doc::{DocStateView, ResolveError, ResolvedAddress};
 use crate::effects::{EffectCommand, EffectId, EffectRuntime};
 use crate::fixture::{FixtureId, MergeMode};
-use crate::plugins::{DmxFrame, OutputPluginId, PluginInfo, PluginMessage};
+use crate::plugins::{DmxFrame, OutputPluginId, Plugin, PluginMessage};
 use crate::universe::UniverseId;
 use std::collections::HashMap;
 use std::error::Error;
@@ -126,12 +126,11 @@ impl Engine {
                         let _ = self.live_values.insert((fixture_id, channel), value);
                     }
                 }
-                EngineCommand::AddPlugin(info) => {
-                    let univ = info.universe();
+                EngineCommand::AddPlugin(plugin) => {
+                    let univ = plugin.universe();
                     let (tx, rx) = watch::channel(PluginMessage::DmxFrame(DmxFrame::zeros()));
-                    let plugin = info.create_instance(rx);
                     let handle =
-                        task::spawn(async move { plugin.start().await.expect("plugin exited") });
+                        task::spawn(async move { plugin.start(rx).await.expect("plugin exited") });
                     self.plugins.push((univ, tx));
                     self.plugin_handles.push(handle);
                 }
@@ -256,7 +255,7 @@ pub enum EngineCommand {
         channel: String,
         value: u8,
     },
-    AddPlugin(Box<dyn PluginInfo>),
+    AddPlugin(Box<dyn Plugin>),
     Shutdown,
 
     // Events
