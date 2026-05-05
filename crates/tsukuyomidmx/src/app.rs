@@ -473,6 +473,7 @@ impl Dispatcher {
     }
 }
 
+// TODO: tsukuyomidmx_core::OutputPluginに移行する
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OutputPluginInfo {
     Artnet { target_ip: String },
@@ -484,7 +485,7 @@ pub enum OutputPluginInfo {
 impl OutputPluginInfo {
     pub fn create_instance(&self) -> Box<dyn Plugin> {
         match self {
-            Self::Artnet { target_ip } => todo!(),
+            Self::Artnet { target_ip: _ } => todo!(),
             Self::FTDI => todo!(),
             Self::Preview2D => todo!(),
             Self::Preview3D => todo!(),

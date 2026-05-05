@@ -16,13 +16,16 @@ use crate::{
 
 pub(super) fn setup(app: &App, effect_model: &EffectEditorModel) {
     let adopter = app.ui.global::<ui::SimpleEffectSingleViewAdopter>();
+    let handler = SimpleEffectSingleViewHandler {
+        doc: Arc::clone(&app.doc),
+        cur_id_state: app.global_store.read().unwrap().current_effect_id(),
+    };
 
     adopter.on_update_value({
-        let doc = Arc::clone(&app.doc);
-        let cur_id_state = app.global_store.read().unwrap().current_effect_id();
+        let handler = handler.clone();
 
         move |offset, value| {
-            update_value(&doc, &cur_id_state, offset, value);
+            handler.update_value(offset, value);
         }
     });
 
@@ -42,39 +45,47 @@ pub(super) fn setup(app: &App, effect_model: &EffectEditorModel) {
     });
 }
 
-#[instrument]
-fn update_value(
-    doc: &Arc<Mutex<Doc>>,
-    cur_id_state: &Observable<Option<AnyEffectId>>,
-    offset: i32,
-    value: i32,
-) {
-    let doc_view = doc.lock().unwrap().state_view();
-    let offset: usize = offset.try_into().unwrap();
-    let cur_id = cur_id_state.get().unwrap().unwrap_effect();
+trait SimpleEffectSingleViewHandlerTrait {
+    fn update_value(&self, offset: i32, value: i32);
+}
 
-    let new_body = doc_view.with_effects(|it| {
-        let fx_body = it.get(&cur_id).unwrap().unwrap_simple();
-        let SimpleEffectBody::New { fixtures, values } = fx_body else {
-            unreachable!("this effect is always SimpleEffectBody::New");
-        };
-        let new_values = values
-            .iter()
-            .map(|(&old_offset, &old_val)| {
-                if old_offset == offset {
-                    (offset, value.try_into().unwrap())
-                } else {
-                    (old_offset, old_val)
-                }
-            })
-            .collect();
-        SimpleEffectBody::New {
-            fixtures: fixtures.clone(),
-            values: new_values,
-        }
-    });
-    doc.lock()
-        .unwrap()
-        .update_effect(cur_id, EffectChange::Simple(new_body))
-        .unwrap();
+#[derive(Clone)]
+struct SimpleEffectSingleViewHandler {
+    doc: Arc<Mutex<Doc>>,
+    cur_id_state: Observable<Option<AnyEffectId>>,
+}
+
+impl SimpleEffectSingleViewHandlerTrait for SimpleEffectSingleViewHandler {
+    #[instrument(skip(self))]
+    fn update_value(&self, offset: i32, value: i32) {
+        let doc_view = self.doc.lock().unwrap().state_view();
+        let offset: usize = offset.try_into().unwrap();
+        let cur_id = self.cur_id_state.get().unwrap().unwrap_effect();
+
+        let new_body = doc_view.with_effects(|it| {
+            let fx_body = it.get(&cur_id).unwrap().unwrap_simple();
+            let SimpleEffectBody::New { fixtures, values } = fx_body else {
+                unreachable!("this effect is always SimpleEffectBody::New");
+            };
+            let new_values = values
+                .iter()
+                .map(|(&old_offset, &old_val)| {
+                    if old_offset == offset {
+                        (offset, value.try_into().unwrap())
+                    } else {
+                        (old_offset, old_val)
+                    }
+                })
+                .collect();
+            SimpleEffectBody::New {
+                fixtures: fixtures.clone(),
+                values: new_values,
+            }
+        });
+        self.doc
+            .lock()
+            .unwrap()
+            .update_effect(cur_id, EffectChange::Simple(new_body))
+            .unwrap();
+    }
 }
