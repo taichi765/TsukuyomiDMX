@@ -70,6 +70,11 @@ component Channel inherits Rectangle {
 
         Image {
             source: icon;
+            //preferred-height: edit.preferred-height;
+            preferred-width: edit.preferred-height * icon.width / icon.height;
+            //image-fit: contain;
+            vertical-alignment: center;
+            //horizontal-alignment: left;
             horizontal-stretch: 0;
         }
 
@@ -83,10 +88,9 @@ component Channel inherits Rectangle {
         }
 
         Rectangle {
-            LineEdit {
+            edit := LineEdit {
                 input-type: number;
                 width: 30px;
-                horizontal-stretch: 2;
                 accepted(text) => {
                     value-changed(text.to-float())
                 }
