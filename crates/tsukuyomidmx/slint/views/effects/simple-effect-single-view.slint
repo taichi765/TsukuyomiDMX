@@ -57,12 +57,12 @@ global Adopter {
 export { Adopter as SimpleEffectSingleViewAdopter }
 
 component Channel inherits Rectangle {
-    in property <image> icon;
-    in property <length> slider-width;
+    in property <image> icon: Icons.default;
+    in property <length> slider-width:100px;
     in property <bool> enabled;
     in property <ChannelKind> kind;
     in property <int> value;
-    in property <string> name;
+    in property <string> name:"Dummy";
 
     callback value-changed(val: int);
 
@@ -70,32 +70,47 @@ component Channel inherits Rectangle {
 
         Image {
             source: icon;
+            horizontal-stretch: 0;
         }
 
-        PlaneText {
-            text: root.name;
-            min-width: 20px;
-        }
+        Rectangle {
+            horizontal-stretch: 0;
 
-        LineEdit {
-            input-type: number;
-            width: 30px;
-            accepted(text) => {
-                value-changed(text.to-float())
+            PlaneText {
+                text: root.name;
+                min-width: 20px;
             }
         }
 
-        slider := Slider {
-            orientation: Orientation.horizontal;
-            minimum: 0;
-            maximum: 255;
-            width: root.slider-width;
-            value: root.value;
-            changed(value) => value-changed(value);
+        Rectangle {
+            LineEdit {
+                input-type: number;
+                width: 30px;
+                horizontal-stretch: 2;
+                accepted(text) => {
+                    value-changed(text.to-float())
+                }
+            }
         }
 
-        PlaneText {
-            text: round(slider.value);
+        Rectangle {
+            slider := Slider {
+                orientation: Orientation.horizontal;
+                minimum: 0;
+                maximum: 255;
+                width: root.slider-width;
+                value: root.value;
+                horizontal-stretch: 2;
+                changed(value) => value-changed(value);
+            }
+        }
+
+        Rectangle {
+            PlaneText {
+                text: round(slider.value);
+                min-width: 52px;
+                horizontal-stretch: 0;
+            }
         }
     }
 }
@@ -115,18 +130,16 @@ export component SimpleEffectSingleView {
         }
 
         VerticalLayout {
-            for ch in Adopter.item.channels: Rectangle {
-                Channel {
-                    icon: Icons.dimmer; //TODO: kindに応じて変える
-                    slider-width: 30px; //TODO: hard code
-                    enabled: ch.enabled;
-                    kind: ch.kind;
-                    value: ch.value;
-                    name: ch.name;
+            for ch in Adopter.item.channels: Channel {
+                icon: Icons.dimmer; //TODO: kindに応じて変える
+                slider-width: 30px; //TODO: hard code
+                enabled: ch.enabled;
+                kind: ch.kind;
+                value: ch.value;
+                name: ch.name;
 
-                    value-changed(val) => {
-                        Adopter.update-value(ch.offset, val);
-                    }
+                value-changed(val) => {
+                    Adopter.update-value(ch.offset, val);
                 }
             }
         }
