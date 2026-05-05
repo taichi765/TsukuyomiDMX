@@ -23,15 +23,16 @@ use std::{
 };
 use tracing::{debug, instrument};
 use tsukuyomidmx_core::{
-    doc::{Doc, OutputPluginId},
+    doc::Doc,
     effects::{
         Effect, EffectChange, EffectSpec, EffectSpecId, EffectTemplate, EffectTemplateId,
         FixtureQuery, SimpleEffectBody,
     },
     engine::{Engine, EngineCommand, EngineMessage},
-    plugins::{OlaPlugin, Plugin},
+    plugins::{OutputPluginId, Plugin},
     prelude::{DmxAddress, EffectId, Fixture, FixtureDefId, FixtureId, UniverseId},
 };
+use tsukuyomidmx_plugins::OlaPlugin;
 
 use crate::{
     Observable,
@@ -44,7 +45,7 @@ use crate::{
 pub struct App {
     pub doc: Arc<Mutex<Doc>>,
     pub ui: ui::AppWindow,
-    pub state: Arc<RwLock<AppState>>,
+    pub global_store: Arc<RwLock<GlobalStateStore>>,
     pub dispatcher: Dispatcher,
     pub shared_model: SharedInnerModel,
     /// 永続化される状態だが、DocはPluginの詳細を知らないのでAppが保持する
@@ -67,12 +68,12 @@ impl App {
         ));
 
         let ui = ui::AppWindow::new().unwrap();
-        let state = Arc::new(RwLock::new(AppState::new()));
+        let state = Arc::new(RwLock::new(GlobalStateStore::new()));
         debug!("App instance created");
         Self {
             doc,
             ui,
-            state: Arc::clone(&state),
+            global_store: Arc::clone(&state),
             dispatcher: create_dispatcher(state),
             shared_model: SharedInnerModel {
                 def_model: OnceCell::new(),
@@ -160,12 +161,12 @@ impl App {
 
         let ui = ui::AppWindow::new().unwrap();
         ui.set_project_path(dir.to_str().unwrap().to_shared_string());
-        let state = Arc::new(RwLock::new(AppState::new()));
+        let state = Arc::new(RwLock::new(GlobalStateStore::new()));
 
         Ok(Self {
             doc: Arc::clone(&doc),
             ui,
-            state: Arc::clone(&state),
+            global_store: Arc::clone(&state),
             dispatcher: create_dispatcher(state),
             shared_model: SharedInnerModel {
                 fixture_model: OnceCell::new(),
@@ -204,26 +205,18 @@ impl App {
         preview_2d::setup(&self);
         effect_editor::setup(&self);
 
-        // TODO: この部分はuniverses.jsonから読み込んでやる
-        let plugin = Box::new(OlaPlugin::new().unwrap());
-        let p_id = plugin.id();
+        // TODO!: この部分はuniverses.jsonから読み込んでやる
+        let plugin = Box::new(OlaPlugin::new(UniverseId::new(0)));
         self.command_tx
             .get()
             .unwrap()
             .send(EngineCommand::AddPlugin(plugin))
             .unwrap();
-        self.command_tx
-            .get()
-            .unwrap()
-            .send(EngineCommand::AddPluginDestination {
-                plugin: p_id,
-                dest_universe: UniverseId::new(0),
-            })
-            .unwrap();
+
         self.register_global_actions();
         self.register_key_bindings();
 
-        // TODO: ファイルから読み込む
+        // TODO!: ファイルから読み込む
         (0..2).for_each(|_| self.doc.lock().unwrap().add_universe());
         self.command_tx
             .get()
@@ -436,11 +429,12 @@ impl App {
     }
 }
 
-pub struct AppState {
+/// Shared across the app. Similar to Pinia's store in Vue.js.
+pub struct GlobalStateStore {
     current_effect_id: Observable<Option<AnyEffectId>>,
 }
 
-impl AppState {
+impl GlobalStateStore {
     fn new() -> Self {
         Self {
             current_effect_id: Observable::new(None),
@@ -618,7 +612,7 @@ impl AnyEffectId {
     }
 }
 
-fn create_dispatcher(state: Arc<RwLock<AppState>>) -> Dispatcher {
+fn create_dispatcher(state: Arc<RwLock<GlobalStateStore>>) -> Dispatcher {
     Dispatcher(Rc::new(move |change| match change {
         AppStateChange::SetSelectedFunction(id) => {
             state.write().unwrap().current_effect_id.set(Some(id));

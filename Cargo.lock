@@ -5836,9 +5836,11 @@ dependencies = [
  "slint",
  "slint-build",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "tsukuyomidmx-core",
+ "tsukuyomidmx-plugins",
  "uuid",
  "wgpu",
 ]

@@ -16,7 +16,7 @@ pub(super) fn setup(app: &App, effect_model: &EffectEditorModel) {
     adopter.on_update_value({
         let doc = Arc::clone(&app.doc);
         let doc_view = doc.lock().unwrap().state_view();
-        let cur_id_state = app.state.read().unwrap().current_effect_id();
+        let cur_id_state = app.global_store.read().unwrap().current_effect_id();
 
         move |offset, value| {
             let offset: usize = offset.try_into().unwrap();
@@ -29,11 +29,11 @@ pub(super) fn setup(app: &App, effect_model: &EffectEditorModel) {
                 };
                 let new_values = values
                     .iter()
-                    .map(|((fxt_id, old_offset), old_val)| {
-                        if *old_offset == offset {
-                            ((*fxt_id, offset), value.try_into().unwrap())
+                    .map(|(&old_offset, &old_val)| {
+                        if old_offset == offset {
+                            (offset, value.try_into().unwrap())
                         } else {
-                            ((*fxt_id, *old_offset), *old_val)
+                            (old_offset, old_val)
                         }
                     })
                     .collect();

@@ -12,7 +12,7 @@ use crate::{app::App, models::EffectEditorModel, ui};
 pub fn setup(app: &App) {
     let model = EffectEditorModel::new(
         Arc::clone(&app.doc),
-        app.state.read().unwrap().current_effect_id(),
+        app.global_store.read().unwrap().current_effect_id(),
     );
 
     let adopter = app.ui.global::<ui::EffectEditorPanelAdopter>();

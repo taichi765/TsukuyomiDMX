@@ -4,12 +4,13 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use slint::{ComponentHandle, Timer, TimerMode};
+use tokio::sync::watch;
 use tracing::instrument;
 use tsukuyomidmx_core::{
-    doc::OutputPluginId,
     engine::EngineCommand,
-    plugins::{DmxFrame, Plugin},
+    plugins::{DmxFrame, OutputPluginId, Plugin, PluginMessage},
     prelude::UniverseId,
 };
 
@@ -27,24 +28,16 @@ pub fn setup(app: &App) {
         frame_rx,
     ));
 
-    let plugin = Box::new(Preview2DPlugin::new(frame_tx));
-    let p_id = plugin.id();
-    app.command_tx
-        .get()
-        .unwrap()
-        .send(EngineCommand::AddPlugin(plugin))
-        .unwrap();
-
     // UniverseごとにAddPluginDestinationする
     let universes = app.doc.lock().unwrap().state_view().universes();
     universes.into_iter().for_each(|u| {
         app.command_tx
             .get()
             .unwrap()
-            .send(EngineCommand::AddPluginDestination {
-                plugin: p_id,
-                dest_universe: u,
-            })
+            .send(EngineCommand::AddPlugin(Box::new(Preview2DPlugin::new(
+                u,
+                frame_tx.clone(),
+            ))))
             .unwrap()
     });
 
@@ -63,29 +56,48 @@ pub fn setup(app: &App) {
 #[derive(derive_more::Debug)]
 struct Preview2DPlugin {
     id: OutputPluginId,
+    universe: UniverseId,
     #[debug(skip)]
     frame_tx: Sender<(UniverseId, DmxFrame)>,
 }
 
 impl Preview2DPlugin {
-    pub fn new(frame_tx: Sender<(UniverseId, DmxFrame)>) -> Self {
+    pub fn new(universe: UniverseId, frame_tx: Sender<(UniverseId, DmxFrame)>) -> Self {
         Self {
             id: OutputPluginId::new(),
+            universe,
             frame_tx,
         }
     }
 }
 
 impl Plugin for Preview2DPlugin {
-    fn send_dmx(&self, universe_id: UniverseId, dmx_data: DmxFrame) -> Result<(), std::io::Error> {
-        self.frame_tx
-            .send((universe_id, dmx_data))
-            .expect("failed to send message from preview plugin to preview model");
-        Ok(())
-    }
-
     fn id(&self) -> OutputPluginId {
         self.id
+    }
+
+    fn universe(&self) -> UniverseId {
+        self.universe
+    }
+
+    fn start(
+        self: Box<Self>,
+        mut rx: watch::Receiver<PluginMessage>,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> {
+        Box::pin(async move {
+            loop {
+                rx.changed()
+                    .await
+                    .expect("it seems that engine has been panicked"); // TODO: engineをrestartのほうが良い？
+                match &*rx.borrow_and_update() {
+                    PluginMessage::DmxFrame(frame) => {
+                        self.frame_tx.send((self.universe, frame.clone())).unwrap();
+                    }
+                    PluginMessage::Stop => break,
+                };
+            }
+            anyhow::Ok(())
+        })
     }
 }
 

@@ -119,7 +119,7 @@ pub fn setup(app: &App) {
     adopter.on_set_selected_effect({
         let adopter_weak = adopter.as_weak();
         let model_clone = Rc::clone(&model);
-        let id_state = app.state.read().unwrap().current_effect_id();
+        let id_state = app.global_store.read().unwrap().current_effect_id();
 
         move |id_str, r#type| {
             wrap_callback("FunctionListViewAdopter::on_set_selected_effect", || {

@@ -7,6 +7,7 @@ edition = "2024"
 
 [dependencies]
 tsukuyomidmx-core = { path = "../tsukuyomidmx_core" }
+tsukuyomidmx-plugins = { path = "../tsukuyomidmx_plugins" }
 
 slint = { workspace = true }
 i-slint-backend-winit = { workspace = true }
@@ -22,6 +23,7 @@ tracing = { workspace = true }
 rfd = "0.17.2"
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 wgpu = { workspace = true }
 derive_more = { workspace = true, features = ["debug"] }
 
