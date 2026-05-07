@@ -15,6 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-2022", "macos-14"]
+        command: ["build --release --verbose", "test --verbose"]
 
     runs-on: ${{matrix.os}}
 
@@ -24,20 +25,46 @@ jobs:
         with:
           submodules: recursive
       - uses: Swatinem/rust-cache@v2
-      - name: Install fontconfig and protobuf-compiler
+      - name: Install fontconfig on Linux
         if: ${{matrix.os=='ubuntu-latest'}}
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libfontconfig1-dev protobuf-compiler
-      - name: Install protobuf on MacOS
-        if: ${{matrix.os=='macos-14'}}
+          sudo apt-get install -y libfontconfig1-dev
+      - name: Install protoc
+        shell: bash
         run: |
-          brew update
-          brew install protobuf
-      - name: Build
-        run: cargo build --release --verbose
-      - name: Run tests
-        run: cargo test --verbose
+          set -eux
+
+          PROTOC_VERSION=29.3
+
+          case "${RUNNER_OS}" in
+            Linux)
+              ARCH=linux-x86_64
+              ;;
+            macOS)
+              ARCH=osx-universal_binary
+              ;;
+            Windows)
+              ARCH=win64
+              ;;
+            *)
+              echo "unsupported OS"
+              exit 1
+              ;;
+          esac
+
+          URL="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${ARCH}.zip"
+
+          curl -LO "$URL"
+
+          unzip "protoc-${PROTOC_VERSION}-${ARCH}.zip" -d protoc
+
+          echo "$PWD/protoc/bin" >> $GITHUB_PATH
+
+      - name: Print protoc version
+        run: protoc --version
+      - name: Run commands
+        run: cargo ${{matrix.command}}
       - name: Upload a build artifact(windows)
         if: ${{matrix.os=='windows-2022'}}
         uses: actions/upload-artifact@v5
