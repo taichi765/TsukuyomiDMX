@@ -1,7 +1,7 @@
 use std::{ops::Deref, pin::Pin};
 
 use anyhow::Context;
-use ola::{DmxBuffer, config::Config};
+use ola::{Config, DmxBuffer};
 use tokio::sync::watch;
 use tsukuyomidmx_core::plugins::PluginMessage;
 
