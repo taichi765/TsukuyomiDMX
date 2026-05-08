@@ -61,12 +61,12 @@ jobs:
 
           unzip "protoc-${PROTOC_VERSION}-${ARCH}.zip" -d protoc
 
-          echo "$PWD/protoc/bin" | tee $GITHUB_PATH
-
       - name: Print protoc version
         run: protoc --version
       - name: Run commands
         run: cargo ${{matrix.command}}
+        env:
+          PROTOC: "$PWD/protoc/bin"
       - name: Upload a build artifact(windows)
         if: ${{matrix.os=='windows-2022'}}
         uses: actions/upload-artifact@v5
